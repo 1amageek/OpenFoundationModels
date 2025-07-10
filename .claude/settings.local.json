@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:developer.apple.com)",
+      "Bash(mkdir:*)",
+      "Bash(swift build)",
+      "Bash(mv:*)"
+    ],
+    "deny": []
+  }
+}
