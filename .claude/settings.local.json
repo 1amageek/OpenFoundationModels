@@ -4,7 +4,10 @@
       "WebFetch(domain:developer.apple.com)",
       "Bash(mkdir:*)",
       "Bash(swift build)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(remark:*)",
+      "Bash(rg:*)",
+      "Bash(swift build:*)"
     ],
     "deny": []
   }

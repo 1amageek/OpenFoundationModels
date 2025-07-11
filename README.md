@@ -4,11 +4,15 @@
 [![Platform](https://img.shields.io/badge/Platform-iOS%20%7C%20macOS%20%7C%20tvOS%20%7C%20watchOS%20%7C%20visionOS-blue.svg)](https://developer.apple.com)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-An open-source Swift implementation of Apple's Foundation Models framework, providing on-device LLM capabilities with structured generation, tool calling, and streaming support.
+An open-source Swift implementation of Apple's Foundation Models framework, enabling developers to use Foundation Models APIs without depending on Apple platforms or Apple Intelligence.
+
+⚠️ **IMPORTANT**: This project aims for **100% API compatibility** with Apple's Foundation Models. Users should be able to switch from `import FoundationModels` to `import OpenFoundationModels` with **zero code changes**.
 
 ## Overview
 
-OpenFoundationModels is a complete OSS reimplementation of Apple's Foundation Models framework introduced at WWDC 2025. It provides the same developer experience and API surface while being platform-agnostic and extensible to work with various LLM providers.
+OpenFoundationModels is a complete OSS reimplementation of Apple's Foundation Models framework introduced at WWDC 2025. It provides the exact same developer experience and API surface while being platform-agnostic and extensible to work with various LLM providers like OpenAI, Anthropic, and local models.
+
+**Current Status**: Pre-1.0 - Major API changes in progress to achieve Apple compatibility
 
 ### Key Features
 
@@ -246,22 +250,33 @@ Documentation is built with DocC:
 swift package generate-documentation
 ```
 
-## Roadmap
+## Roadmap to Version 1.0
 
-### Version 1.1
-- [ ] Complete macro implementation (`@Generable`, `@Guide`)
-- [ ] OpenAI provider adapter
-- [ ] Anthropic provider adapter
+### Current Status (Pre-1.0)
+- [x] Core API structure implemented
+- [x] Basic types and protocols defined
+- [ ] **Apple API compliance fixes** (breaking changes needed)
+- [ ] Working macro implementation (`@Generable`, `@Guide`)
+- [ ] At least one working LLM provider integration
+- [ ] Comprehensive test coverage
+- [ ] Complete documentation
 
-### Version 1.2
-- [ ] Local LLM support (Ollama integration)
-- [ ] Advanced tool orchestration
-- [ ] Custom adapter framework
+### Version 1.0 Requirements
+- [ ] 100% Apple Foundation Models API compliance
+- [ ] Functional `@Generable` and `@Guide` macros
+- [ ] OpenAI provider integration
+- [ ] Full streaming support
+- [ ] Tool calling functionality
+- [ ] Production-ready error handling
+- [ ] Complete API documentation
+- [ ] Migration guide from current API
 
-### Version 2.0
-- [ ] Apple Intelligence integration (when available)
-- [ ] Performance optimizations
-- [ ] Advanced structured generation features
+### Post-1.0 Features
+Future versions will add:
+- Additional LLM providers (Anthropic, local models)
+- Advanced tool orchestration
+- Performance optimizations
+- Enterprise features
 
 ## Contributing
 

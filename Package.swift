@@ -7,12 +7,13 @@ import CompilerPluginSupport
 let package = Package(
     name: "OpenFoundationModels",
     platforms: [
-        .macOS(.v14),
-        .iOS(.v17),
-        .tvOS(.v17),
-        .watchOS(.v10),
-        .macCatalyst(.v17),
-        .visionOS(.v1)
+        // ✅ CONFIRMED: Apple Foundation Models requires iOS 26.0+/macOS 26.0+ Beta
+        // Using closest available versions - will need update when 26.0 releases
+        .macOS(.v15),         // Target: macOS 26.0+ Beta
+        .iOS(.v18),           // Target: iOS 26.0+ Beta
+        // Note: tvOS and watchOS not supported by Apple Foundation Models
+        .macCatalyst(.v18),   // Target: Mac Catalyst 26.0+ Beta
+        .visionOS(.v2)        // Target: visionOS 26.0+ Beta
     ],
     products: [
         // Main library

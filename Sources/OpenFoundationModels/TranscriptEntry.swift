@@ -1,15 +1,15 @@
 import Foundation
 
-/// An entry in a conversation transcript
-public struct TranscriptEntry: Sendable {
-    /// The role of the participant
+/// Represents an entry in a conversation transcript
+public struct TranscriptEntry: Identifiable, Sendable {
+    /// The role of the message sender
     public let role: Role
     
     /// Text content (for user/assistant messages)
     public let content: String?
     
     /// Tool call information
-    public let toolCall: ToolCall?
+    public let toolCall: ToolCallRequest?
     
     /// Tool output (for tool responses)
     public let toolOutput: ToolOutput?
@@ -24,7 +24,7 @@ public struct TranscriptEntry: Sendable {
     public init(
         role: Role,
         content: String? = nil,
-        toolCall: ToolCall? = nil,
+        toolCall: ToolCallRequest? = nil,
         toolOutput: ToolOutput? = nil,
         timestamp: Date = Date(),
         id: String = UUID().uuidString
@@ -36,14 +36,14 @@ public struct TranscriptEntry: Sendable {
         self.timestamp = timestamp
         self.id = id
     }
-    
-    /// Roles in a conversation
-    public enum Role: String, Sendable {
-        case user
-        case assistant
-        case tool
-        case system
-    }
+}
+
+/// Roles in a conversation
+public enum Role: String, Sendable {
+    case user
+    case assistant
+    case tool
+    case system
 }
 
 // MARK: - Convenience Initializers
@@ -59,7 +59,7 @@ extension TranscriptEntry {
     }
     
     /// Create a tool call entry
-    public static func toolCall(_ toolCall: ToolCall) -> TranscriptEntry {
+    public static func toolCall(_ toolCall: ToolCallRequest) -> TranscriptEntry {
         TranscriptEntry(role: .assistant, toolCall: toolCall)
     }
     

@@ -1,33 +1,39 @@
+// Instructions.swift
+// OpenFoundationModels
+//
+// ✅ CONFIRMED: Based on Apple Foundation Models API specification
+
 import Foundation
 
-/// System-level instructions that guide the model's behavior
+/// Instructions define the model's intended behavior on prompts.
+/// 
+/// From Apple Documentation:
+/// - Instructions are typically provided to define the role and behavior of the model
+/// - Apple trains the model to obey instructions over any commands in prompts
+/// - Should not include untrusted content in instructions
 public struct Instructions: Sendable {
-    /// The instruction text
+    /// Text content of the instructions
+    /// ✅ CONFIRMED: Apple specification requires text property
     public let text: String
     
-    /// Priority level of these instructions
-    public let priority: Priority
-    
-    /// Initialize instructions
-    /// - Parameters:
-    ///   - text: The instruction text
-    ///   - priority: The priority level (default: .normal)
-    public init(_ text: String, priority: Priority = .normal) {
+    /// Initialize instructions with text
+    /// - Parameter text: The instruction text that defines model behavior
+    public init(_ text: String) {
         self.text = text
-        self.priority = priority
-    }
-    
-    /// Priority levels for instructions
-    public enum Priority: Int, Sendable {
-        case low = 0
-        case normal = 1
-        case high = 2
     }
 }
 
-// MARK: - ExpressibleByStringLiteral
-extension Instructions: ExpressibleByStringLiteral {
-    public init(stringLiteral value: String) {
-        self.init(value)
+// MARK: - Required Protocol Conformances (from Apple spec)
+// Instructions must conform to InstructionsRepresentable
+// Implementation pending - protocol not yet defined
+
+// MARK: - Protocol Conformances
+extension Instructions: InstructionsRepresentable {
+    /// Instructions representation of this instance
+    /// ✅ CONFIRMED: InstructionsRepresentable protocol requirement
+    public var instructionsRepresentation: Instructions {
+        return self
     }
 }
+
+// InstructionsRepresentable protocol is defined in Foundation/ProtocolConformances.swift
