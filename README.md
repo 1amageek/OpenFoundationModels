@@ -7,31 +7,31 @@
 
 **100% Apple Foundation Models β SDK Compatible Implementation**
 
-OpenFoundationModelsは、Apple Foundation Models framework（iOS 26/macOS 15 Xcode 17b3）の完全な**オープンソース実装**です。Apple公式APIとの100%互換性を提供し、Apple環境以外でもFoundation Models APIを使用可能にします。
+OpenFoundationModels is a complete **open-source implementation** of Apple's Foundation Models framework (iOS 26/macOS 15 Xcode 17b3), providing 100% API compatibility while enabling use outside Apple's ecosystem.
 
-## なぜOpenFoundationModelsが必要か？
+## Why OpenFoundationModels?
 
-### Apple Foundation Modelsの制限
+### Apple Foundation Models Limitations
 
-Apple Foundation Modelsは非常に優れたフレームワークですが、以下の制限があります：
+Apple Foundation Models is an excellent framework, but has significant limitations:
 
-- **Apple Intelligence必須**: Apple Intelligence対応デバイスでのみ利用可能
-- **Apple プラットフォーム限定**: iOS 26+、macOS 15+でのみ動作
-- **プロバイダー固定**: Apple提供のモデルのみ使用可能
-- **オンデバイス限定**: 外部LLMサービスとの統合不可
+- **Apple Intelligence Required**: Only available on Apple Intelligence-enabled devices
+- **Apple Platform Exclusive**: Works only on iOS 26+, macOS 15+
+- **Provider Locked**: Only Apple-provided models supported
+- **On-Device Only**: No integration with external LLM services
 
-### OpenFoundationModelsの価値
+### OpenFoundationModels Value
 
-OpenFoundationModelsは、これらの制限を解決する**Apple完全互換の代替実装**です：
+OpenFoundationModels solves these limitations as an **Apple-compatible alternative implementation**:
 
 ```swift
-// Apple Foundation Models（Apple環境でのみ動作）
+// Apple Foundation Models (Apple ecosystem only)
 import FoundationModels
 
-// OpenFoundationModels（どこでも動作）
+// OpenFoundationModels (works everywhere)
 import OpenFoundationModels
 
-// 🎯 API完全互換 - コード変更不要
+// 🎯 100% API Compatible - No code changes required
 let session = LanguageModelSession(
     model: SystemLanguageModel.default,
     guardrails: .default,
@@ -40,14 +40,14 @@ let session = LanguageModelSession(
 )
 ```
 
-**✅ Apple公式API完全準拠**: `import`文のみ変更でコード移行可能  
-**✅ マルチプラットフォーム**: Linux、Windows、Android等でも動作  
-**✅ プロバイダー選択**: OpenAI、Anthropic、ローカルモデル等に対応  
-**✅ エンタープライズ対応**: 既存インフラとの統合可能
+**✅ Apple Official API Compliant**: Code migration with just `import` change  
+**✅ Multi-Platform**: Works on Linux, Windows, Android, etc.  
+**✅ Provider Choice**: OpenAI, Anthropic, local models, and more  
+**✅ Enterprise Ready**: Integrates with existing infrastructure
 
-## アーキテクチャ
+## Architecture
 
-### 全体構成
+### System Overview
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -65,30 +65,30 @@ let session = LanguageModelSession(
 └─────────────────────────────────────────────────────────┘
 ```
 
-### 主要コンポーネント
+### Core Components
 
-#### 1. **SystemLanguageModel** - モデルアクセスの中心
-Apple公式のモデルアクセスポイント
+#### 1. **SystemLanguageModel** - Model Access Hub
+Apple's official model access point
 
 ```swift
 public final class SystemLanguageModel: LanguageModel, Observable, Sendable {
-    /// Apple公式: 単一のデフォルトモデルインスタンス
+    /// Apple Official: Single default model instance
     public static let `default`: SystemLanguageModel
     
-    /// Apple公式: モデル可用性ステータス
+    /// Apple Official: Model availability status
     public var availability: AvailabilityStatus { get }
     
-    /// Apple公式: 可用性の便利プロパティ
+    /// Apple Official: Convenience availability property
     public var isAvailable: Bool { get }
 }
 ```
 
-#### 2. **LanguageModelSession** - セッション管理
-会話状態とコンテキストを管理するメインクラス
+#### 2. **LanguageModelSession** - Session Management
+Main class managing conversation state and context
 
 ```swift
 public final class LanguageModelSession: Observable, @unchecked Sendable {
-    /// Apple公式初期化パターン
+    /// Apple Official initialization pattern
     public convenience init(
         model: SystemLanguageModel = SystemLanguageModel.default,
         guardrails: Guardrails = .default,
@@ -96,14 +96,14 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         instructions: Instructions? = nil
     )
     
-    /// Apple公式レスポンス生成（クロージャベース）
+    /// Apple Official response generation (closure-based)
     public func respond(
         options: GenerationOptions = .default,
         isolation: isolated (any Actor)? = nil,
         prompt: () throws -> Prompt
     ) async throws -> Response<String>
     
-    /// Apple公式構造化生成
+    /// Apple Official structured generation
     public func respond<Content: Generable>(
         generating: Content.Type,
         options: GenerationOptions = .default,
@@ -114,8 +114,8 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
 }
 ```
 
-#### 3. **Generable Protocol** - 構造化生成
-型安全な構造化データ生成のための中核プロトコル
+#### 3. **Generable Protocol** - Structured Generation
+Core protocol for type-safe structured data generation
 
 ```swift
 public protocol Generable: ConvertibleFromGeneratedContent, 
@@ -123,49 +123,49 @@ public protocol Generable: ConvertibleFromGeneratedContent,
                           PartiallyGenerable, 
                           Sendable, 
                           SendableMetatype {
-    /// Apple公式: コンパイル時スキーマ生成
+    /// Apple Official: Compile-time schema generation
     static var generationSchema: GenerationSchema { get }
     
-    /// Apple公式: GeneratedContentからの変換
+    /// Apple Official: Conversion from GeneratedContent
     static func from(generatedContent: GeneratedContent) throws -> Self
 }
 ```
 
-#### 4. **Tool Protocol** - 関数呼び出し
-LLMによる関数実行のためのプロトコル
+#### 4. **Tool Protocol** - Function Calling
+Protocol for LLM function execution
 
 ```swift
 public protocol Tool: Sendable, SendableMetatype {
     associatedtype Arguments: Generable
     
-    /// Apple公式: ツール名
+    /// Apple Official: Tool name
     static var name: String { get }
     
-    /// Apple公式: ツール説明
+    /// Apple Official: Tool description
     static var description: String { get }
     
-    /// Apple公式: 実行メソッド
+    /// Apple Official: Execution method
     func call(arguments: Arguments) async throws -> ToolOutput
 }
 ```
 
-#### 5. **Response System** - レスポンス処理
-型安全なレスポンス処理とストリーミング
+#### 5. **Response System** - Response Processing
+Type-safe response processing and streaming
 
 ```swift
-/// Apple公式: ジェネリックレスポンス
+/// Apple Official: Generic response
 public struct Response<Content: Sendable>: Sendable {
     public let content: Content
     public let transcriptEntries: ArraySlice<Transcript.Entry>
 }
 
-/// Apple公式: ストリーミングレスポンス
+/// Apple Official: Streaming response
 public struct ResponseStream<Content: Sendable>: AsyncSequence, Sendable {
     public typealias Element = Response<Content>.Partial
 }
 ```
 
-## インストール
+## Installation
 
 ### Swift Package Manager
 
@@ -175,21 +175,21 @@ dependencies: [
 ]
 ```
 
-## 使用方法
+## Usage
 
-### 1. 基本的なテキスト生成
+### 1. Basic Text Generation
 
 ```swift
 import OpenFoundationModels
 
-// モデル可用性確認
+// Check model availability
 let model = SystemLanguageModel.default
 guard model.isAvailable else {
     print("Model not available")
     return
 }
 
-// セッション作成（Apple公式API）
+// Create session (Apple Official API)
 let session = LanguageModelSession(
     model: model,
     guardrails: .default,
@@ -197,66 +197,66 @@ let session = LanguageModelSession(
     instructions: nil
 )
 
-// Apple公式クロージャベースプロンプト
+// Apple Official closure-based prompt
 let response = try await session.respond {
-    Prompt("Swift 6.1の新機能について教えてください")
+    Prompt("Tell me about Swift 6.1 new features")
 }
 
 print(response.content)
 ```
 
-### 2. 構造化生成（@Generableマクロ）
+### 2. Structured Generation (@Generable Macro)
 
 ```swift
-// Apple公式@Generableマクロ（完全実装済み）
+// Apple Official @Generable macro (fully implemented)
 @Generable
 struct ProductReview {
-    @Guide(description: "商品名", .pattern("^[A-Za-z0-9\\s]+$"))
+    @Guide(description: "Product name", .pattern("^[A-Za-z0-9\\s]+$"))
     let productName: String
     
-    @Guide(description: "評価点数", .range(1...5))
+    @Guide(description: "Rating score", .range(1...5))
     let rating: Int
     
-    @Guide(description: "レビューコメント", .count(50...500))
+    @Guide(description: "Review comment", .count(50...500))
     let comment: String
     
-    @Guide(description: "推奨度", .enumeration(["強く推奨", "推奨", "普通", "非推奨"]))
+    @Guide(description: "Recommendation", .enumeration(["Highly Recommend", "Recommend", "Neutral", "Not Recommend"]))
     let recommendation: String
 }
 
-// 構造化データ生成
+// Generate structured data
 let response = try await session.respond(
     generating: ProductReview.self,
     includeSchemaInPrompt: true
 ) {
-    Prompt("iPhone 15 Proについてのレビューを生成してください")
+    Prompt("Generate a review for iPhone 15 Pro")
 }
 
-// 型安全なアクセス
-print("商品: \(response.content.productName)")
-print("評価: \(response.content.rating)/5")
-print("コメント: \(response.content.comment)")
+// Type-safe access
+print("Product: \(response.content.productName)")
+print("Rating: \(response.content.rating)/5")
+print("Comment: \(response.content.comment)")
 ```
 
-### 3. ストリーミング応答
+### 3. Streaming Responses
 
 ```swift
-// Apple公式ストリーミングAPI
+// Apple Official streaming API
 let stream = session.streamResponse {
-    Prompt("Swiftプログラミングの歴史について詳しく説明してください")
+    Prompt("Explain the history of Swift programming language in detail")
 }
 
 for try await partial in stream {
     print(partial.content, terminator: "")
     
     if partial.isComplete {
-        print("\n--- 生成完了 ---")
+        print("\n--- Generation Complete ---")
         break
     }
 }
 ```
 
-### 4. 構造化データのストリーミング
+### 4. Structured Data Streaming
 
 ```swift
 @Generable
@@ -269,7 +269,7 @@ struct BlogPost {
 let stream = session.streamResponse(
     generating: BlogPost.self
 ) {
-    Prompt("Swift Concurrencyに関するブログ記事を書いてください")
+    Prompt("Write a blog post about Swift Concurrency")
 }
 
 for try await partial in stream {
@@ -279,35 +279,35 @@ for try await partial in stream {
     }
     
     if partial.isComplete {
-        print("記事生成完了！")
+        print("Article generation complete!")
     }
 }
 ```
 
-### 5. ツール呼び出し
+### 5. Tool Calling
 
 ```swift
-// Apple公式Toolプロトコル実装
+// Apple Official Tool protocol implementation
 struct WeatherTool: Tool {
     typealias Arguments = WeatherQuery
     
     static let name = "get_weather"
-    static let description = "指定した都市の現在の天気を取得"
+    static let description = "Get current weather for a city"
     
     func call(arguments: WeatherQuery) async throws -> ToolOutput {
-        // 天気API呼び出し（実装例）
+        // Weather API call (implementation example)
         let weather = try await fetchWeather(city: arguments.city)
-        return ToolOutput("🌤️ \(arguments.city)の天気: \(weather)")
+        return ToolOutput("🌤️ Weather in \(arguments.city): \(weather)")
     }
 }
 
 @Generable
 struct WeatherQuery {
-    @Guide(description: "都市名", .pattern("^[\\p{L}\\s]+$"))
+    @Guide(description: "City name", .pattern("^[\\p{L}\\s]+$"))
     let city: String
 }
 
-// ツール付きセッション
+// Session with tools
 let session = LanguageModelSession(
     model: SystemLanguageModel.default,
     guardrails: .default,
@@ -316,26 +316,26 @@ let session = LanguageModelSession(
 )
 
 let response = try await session.respond {
-    Prompt("東京の今日の天気はどうですか？")
+    Prompt("What's the weather like in Tokyo today?")
 }
 
-// LLMが自動的にWeatherToolを呼び出し、結果を回答に組み込み
+// LLM automatically calls WeatherTool and incorporates results
 print(response.content)
 ```
 
-### 6. 高度な機能
+### 6. Advanced Features
 
-#### Instructions（指示）とGuardrails（ガードレール）
+#### Instructions and Guardrails
 
 ```swift
-// Apple公式@InstructionsBuilderパターン
+// Apple Official @InstructionsBuilder pattern
 let session = LanguageModelSession {
-    "あなたは親切で知識豊富なSwiftプログラミング講師です。"
-    "初心者にも分かりやすく、具体例を交えて説明してください。"
-    "コードサンプルには適切なコメントを含めてください。"
+    "You are a helpful and knowledgeable Swift programming instructor."
+    "Explain concepts clearly with practical examples for beginners."
+    "Include appropriate comments in code samples."
 }
 
-// Guardrails設定
+// Guardrails configuration
 let guardrails = Guardrails(
     allowedTopics: ["programming", "swift", "technology"],
     restrictedContent: ["personal_info", "financial_advice"],
@@ -346,86 +346,98 @@ let session = LanguageModelSession(
     model: SystemLanguageModel.default,
     guardrails: guardrails,
     tools: [],
-    instructions: Instructions("Swift専門の技術アドバイザー")
+    instructions: Instructions("Swift technical advisor specialist")
 )
 ```
 
-## テストと品質保証
+## Testing and Quality Assurance
 
-### 154テスト全通過
+### 154 Tests Passing
 
 ```bash
-# 全テスト実行
+# Run all tests
 swift test
 
-# カテゴリ別テスト実行
-swift test --filter tag:generable  # 構造化生成テスト
-swift test --filter tag:core       # コアAPIテスト 
-swift test --filter tag:integration # 統合テスト
-swift test --filter tag:performance # パフォーマンステスト
+# Category-specific tests
+swift test --filter tag:generable  # Structured generation tests
+swift test --filter tag:core       # Core API tests
+swift test --filter tag:integration # Integration tests
+swift test --filter tag:performance # Performance tests
 ```
 
-### Apple互換性検証
+### Apple Compatibility Verification
 
-- ✅ **SystemLanguageModel**: Apple公式仕様100%準拠
-- ✅ **LanguageModelSession**: 全初期化パターン対応
-- ✅ **Tool Protocol**: SendableMetatype準拠
-- ✅ **Generable Protocol**: 完全実装済み
-- ✅ **Response/ResponseStream**: ジェネリック型対応
-- ✅ **@Generableマクロ**: 完全動作確認済み
-- ✅ **Transcript**: 全ネストタイプ実装済み
+- ✅ **SystemLanguageModel**: 100% Apple official specification compliance
+- ✅ **LanguageModelSession**: All initialization patterns supported
+- ✅ **Tool Protocol**: SendableMetatype conformance verified
+- ✅ **Generable Protocol**: Fully implemented
+- ✅ **Response/ResponseStream**: Generic type support
+- ✅ **@Generable Macro**: Complete functionality verified
+- ✅ **Transcript**: All nested types implemented
 
-詳細な検証情報は[TESTING.md](./TESTING.md)を参照してください。
+For detailed verification information, see [TESTING.md](./TESTING.md).
 
-## 開発
+## Development
 
-### ビルド
+### Build
 
 ```bash
 swift build
 ```
 
-### フォーマット
+### Format
 
 ```bash
 swift-format --in-place --recursive Sources/ Tests/
 ```
 
-### ドキュメント生成
+### Documentation
 
 ```bash
 swift package generate-documentation
 ```
 
-## プロバイダー統合
+## Provider Integration
 
-現在モック実装を提供。以下プロバイダーアダプターの追加が可能：
+Currently provides mock implementations. Provider adapters can be added for:
 
-- **OpenAI** (GPT-3.5, GPT-4, GPT-4o等)
-- **Anthropic** (Claude 3 Haiku, Sonnet, Opus等)
-- **Google** (Gemini Pro, Ultra等)
-- **ローカルモデル** (Ollama, llama.cpp等)
+- **OpenAI** (GPT-3.5, GPT-4, GPT-4o, etc.)
+- **Anthropic** (Claude 3 Haiku, Sonnet, Opus, etc.)
+- **Google** (Gemini Pro, Ultra, etc.)
+- **Local Models** (Ollama, llama.cpp, etc.)
 - **Azure OpenAI Service**
 - **AWS Bedrock**
 
-## 貢献
+## Performance
 
-コントリビューションを歓迎します！
+- **Warning-Free Compilation**: Zero compiler warnings
+- **Memory Efficient**: Proper memory management with transcript compaction
+- **Concurrent**: Full Swift 6.1+ concurrency support
+- **154 Tests Passing**: Comprehensive test coverage
+- **Type Safe**: Generic response system with compile-time checking
 
-### 開発セットアップ
+## Contributing
 
-1. リポジトリをクローン
-2. `swift test`でテスト実行確認
-3. 変更を実装
-4. プルリクエスト作成
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-詳細は[CONTRIBUTING.md](CONTRIBUTING.md)を参照してください。
+### Development Setup
 
-## ライセンス
+1. Clone the repository
+2. Run `swift test` to verify everything works
+3. Implement your changes
+4. Submit a pull request
 
-このプロジェクトはMITライセンスの下で公開されています。詳細は[LICENSE](LICENSE)ファイルを参照してください。
+## License
 
-## 関連プロジェクト
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Apple for the Foundation Models framework design and API
+- The Swift community for excellent concurrency and macro tools
+- Contributors and early adopters
+
+## Related Projects
 
 - [Swift OpenAI](https://github.com/MacPaw/OpenAI) - OpenAI API client
 - [LangChain Swift](https://github.com/bukowskidev/langchain-swift) - LangChain for Swift
@@ -433,4 +445,4 @@ swift package generate-documentation
 
 ---
 
-**注意**: このプロジェクトは独立したオープンソース実装であり、Apple Inc.とは関係ありません。Apple、Foundation Models、および関連する商標はApple Inc.の財産です。
+**Note**: This is an independent open-source implementation and is not affiliated with Apple Inc. Apple, Foundation Models, and related trademarks are property of Apple Inc.
