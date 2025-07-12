@@ -71,6 +71,6 @@ extension GeneratedContent: PromptRepresentable {
     /// ✅ CONFIRMED: promptRepresentation property from Apple docs
     public var promptRepresentation: Prompt {
         // Convert GeneratedContent to Prompt format
-        return Prompt(segments: [PromptSegment(content: stringValue)])
+        return Prompt(stringValue)
     }
 }

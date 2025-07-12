@@ -53,13 +53,6 @@ public struct Transcript: Codable, Sendable {
         self.entries = Array(entries)
     }
     
-    /// Legacy initializer for backward compatibility
-    /// 
-    /// **Deprecated:** Use init(entries: some Sequence<Transcript.Entry>) instead
-    @available(*, deprecated, message: "Use init(entries: some Sequence<Transcript.Entry>) instead")
-    public init(entries: [Entry]) {
-        self.entries = entries
-    }
     
     /// Add entry to transcript
     public mutating func append(_ entry: Entry) {

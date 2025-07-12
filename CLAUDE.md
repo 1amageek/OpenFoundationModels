@@ -82,11 +82,84 @@ Sources/OpenFoundationModels/
 - **Streaming Support**: AsyncSequence-based streaming
 
 ### Testing Strategy
-- Mock providers for unit tests
-- Test streaming with AsyncSequence
-- Verify Generable schema generation
-- Tool execution mocking
-- Apple API compatibility testing
+Comprehensive testing strategy focused on Generable functionality and Apple Foundation Models compatibility.
+
+**📋 Complete Testing Documentation**: See [TESTING.md](./TESTING.md) for detailed testing strategy, structure, and implementation guidelines.
+
+#### Quick Test Commands
+```bash
+# All tests
+swift test
+
+# Priority 1: Core Generable functionality
+swift test --filter tag:generable
+
+# System components  
+swift test --filter tag:core
+swift test --filter tag:foundation
+
+# Test types
+swift test --filter tag:macros
+swift test --filter tag:integration
+swift test --filter tag:performance
+```
+
+#### Test Priorities
+1. **🎯 Generable Core** (Highest Priority): @Generable macros, guided generation, constraints
+2. **🔧 System Core**: SystemLanguageModel, LanguageModelSession, Response handling
+3. **🔗 Integration**: End-to-end workflows, streaming, tool calling
+4. **⚡ Performance**: Large schemas, concurrent generation, memory efficiency
+
+#### Test Implementation Methodology
+**🔄 Incremental Test-Driven Development**
+
+**📖 DOCUMENTATION-FIRST APPROACH:**
+**⚠️ CRITICAL**: Before implementing ANY test, you MUST read the relevant Apple documentation using the Remark tool or official Apple documentation URLs provided below.
+
+**One Test at a Time Approach:**
+1. **📚 Read Documentation FIRST**: Always start by reading Apple's official documentation for the component being tested
+2. **Write Single Test**: Implement one specific test case based on the documentation
+3. **Run & Verify**: Execute `swift test` and ensure PASS
+4. **Fix If Needed**: If test fails, fix implementation before proceeding
+5. **Next Test**: Only after success, write the next test case
+6. **Continuous Validation**: Each new test must not break existing tests
+
+**Implementation Order:**
+```bash
+# Step 1: Foundation - READ DOCS FIRST!
+# 📚 Before implementing: Read https://developer.apple.com/documentation/foundationmodels
+swift test --filter "CustomTagsTests"           # Tags definition test
+swift test                                      # Verify base setup
+
+# Step 2: Generable Core (One by one) - READ DOCS FIRST!
+# 📚 Before implementing: Read https://developer.apple.com/documentation/foundationmodels/generable
+swift test --filter "GenerableMacroTests"       # First: @Generable macro
+swift test --filter "GuideMacroTests"          # Second: @Guide macro  
+swift test --filter "GenerationSchemaTests"     # Third: Schema generation
+
+# Step 3: Core System (One by one) - READ DOCS FIRST!
+# 📚 Before implementing: Read https://developer.apple.com/documentation/foundationmodels/systemlanguagemodel
+swift test --filter "SystemLanguageModelTests" # Fourth: Model tests
+# 📚 Before implementing: Read https://developer.apple.com/documentation/foundationmodels/languagemodelsession
+swift test --filter "LanguageModelSessionTests" # Fifth: Session tests
+```
+
+**Quality Gates:**
+- ✅ **Documentation Check**: Read Apple documentation BEFORE writing any test
+- ✅ Each test file must pass individually before next implementation
+- ✅ All existing tests must continue passing when new tests added
+- ✅ No skipped or ignored tests allowed in main branch
+- ✅ Fix broken implementation immediately, don't accumulate test debt
+
+**Development Workflow:**
+1. **📚 READ APPLE DOCUMENTATION FIRST** for the component you're testing
+2. Implement smallest possible test case for specific functionality based on documentation
+3. Run `swift test --filter SpecificTest` to verify single test
+4. Run `swift test` to verify no regressions in existing tests
+5. Commit successful test + implementation before next test
+6. Repeat cycle for next test case
+
+This methodical approach ensures rock-solid test coverage and prevents accumulation of broken tests.
 
 ## Key APIs (Apple Official)
 

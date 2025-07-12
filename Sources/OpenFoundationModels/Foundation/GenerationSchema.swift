@@ -141,7 +141,7 @@ public struct GenerationSchema: CustomDebugStringConvertible, Sendable, Sendable
             return "GenerationSchema(object: [\(propList)])"
         case .enumeration(let values):
             return "GenerationSchema(enum: \(values))"
-        case .dynamic(let _, let dependencies):
+        case .dynamic(_, let dependencies):
             return "GenerationSchema(dynamic: root + \(dependencies.count) dependencies)"
         }
     }
@@ -635,15 +635,3 @@ extension GenerationSchema {
     public typealias SchemaError = OpenFoundationModels.SchemaError
 }
 
-// MARK: - Legacy JSONSchema Warning
-// 🚨 WARNING: The following JSONSchema implementation is INCOMPATIBLE with Apple's API
-// JSONSchema will be removed - Apple uses GenerationSchema exclusively
-
-/*
-❌ INCOMPATIBLE: Apple does NOT use JSONSchema
-❌ INCOMPATIBLE: Apple uses GenerationSchema with Property arrays
-❌ INCOMPATIBLE: Apple uses different initialization patterns
-❌ INCOMPATIBLE: Apple uses different protocol conformances
-
-All code using JSONSchema must be migrated to GenerationSchema
-*/

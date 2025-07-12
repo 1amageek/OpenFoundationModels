@@ -255,8 +255,7 @@ extension GeneratedContent: Generable {
     public static var generationSchema: GenerationSchema {
         return GenerationSchema(
             type: "object",
-            description: "Generated content with flexible structure",
-            anyOf: []
+            description: "Generated content with flexible structure"
         )
     }
     

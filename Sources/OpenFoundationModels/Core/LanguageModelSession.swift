@@ -97,37 +97,6 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         self.transcript = Transcript()
     }
     
-    // MARK: - Legacy Initializers (Deprecated)
-    
-    /// Legacy initializer - use Apple official API instead
-    /// ✅ DEPRECATED: Use convenience init(model:guardrails:tools:instructions:) instead
-    @available(*, deprecated, message: "Use convenience init(model:guardrails:tools:instructions:) instead")
-    public init(instructions: Instructions) {
-        self.model = SystemLanguageModel.default
-        self.instructions = instructions
-        self.tools = []
-        self.transcript = Transcript()
-    }
-    
-    /// Legacy initializer - use Apple official API instead
-    /// ✅ DEPRECATED: Use convenience init(model:guardrails:tools:instructions:) instead
-    @available(*, deprecated, message: "Use convenience init(model:guardrails:tools:instructions:) instead")
-    public init(tools: [any Tool]) {
-        self.model = SystemLanguageModel.default
-        self.instructions = nil
-        self.tools = tools
-        self.transcript = Transcript()
-    }
-    
-    /// Legacy initializer - use Apple official API instead
-    /// ✅ DEPRECATED: Use convenience init(model:guardrails:tools:transcript:) instead
-    @available(*, deprecated, message: "Use convenience init(model:guardrails:tools:transcript:) instead")
-    public init(transcript: Transcript) {
-        self.model = SystemLanguageModel.default
-        self.instructions = nil
-        self.tools = []
-        self.transcript = transcript
-    }
     
     // MARK: - Apple Official API Methods
     
@@ -144,10 +113,17 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         let content = try await model.generate(prompt: promptText, options: options)
         let duration = Date().timeIntervalSince(startTime)
         
-        return Response(
-            userPrompt: promptText,
-            content: content,
+        // Create transcript entry
+        let entry = Transcript.Entry(
+            prompt: promptText,
+            response: content,
+            timestamp: Date(),
             duration: duration
+        )
+        
+        return Response(
+            content: content,
+            transcriptEntries: [entry][...]
         )
     }
     
@@ -174,10 +150,17 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         let content = try Content.from(generatedContent: generatedContent)
         let duration = Date().timeIntervalSince(startTime)
         
-        return Response(
-            userPrompt: promptText,
-            content: content,
+        // Create transcript entry
+        let entry = Transcript.Entry(
+            prompt: promptText,
+            response: "\(content)",
+            timestamp: Date(),
             duration: duration
+        )
+        
+        return Response(
+            content: content,
+            transcriptEntries: [entry][...]
         )
     }
     
@@ -203,10 +186,17 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         let content = GeneratedContent(text)
         let duration = Date().timeIntervalSince(startTime)
         
-        return Response(
-            userPrompt: promptText,
-            content: content,
+        // Create transcript entry
+        let entry = Transcript.Entry(
+            prompt: promptText,
+            response: "\(content)",
+            timestamp: Date(),
             duration: duration
+        )
+        
+        return Response(
+            content: content,
+            transcriptEntries: [entry][...]
         )
     }
     
@@ -264,21 +254,6 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
     
     // MARK: - Legacy Methods (Deprecated)
     
-    /// Legacy respond method - use Apple official API instead
-    /// ✅ DEPRECATED: Use respond(options:isolation:prompt:) instead
-    @available(*, deprecated, message: "Use respond(options:isolation:prompt:) instead")
-    public func respond(to prompt: String) async throws -> String {
-        let response: Response<String> = try await respond(to: prompt)
-        return response.content
-    }
-    
-    /// Legacy structured response method - use Apple official API instead
-    /// ✅ DEPRECATED: Use respond(to:generating:) instead
-    @available(*, deprecated, message: "Use respond(to:generating:) instead")
-    public func respond<T: Generable>(to prompt: String, generating type: T.Type) async throws -> T {
-        let response: Response<T> = try await respond(to: prompt, generating: type)
-        return response.content
-    }
     
     // MARK: - Apple Official Streaming API
     
@@ -293,29 +268,25 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         
         let stream = AsyncThrowingStream<Response<String>.Partial, Error> { continuation in
             Task {
-                do {
-                    let stringStream = model.stream(prompt: promptText, options: options)
-                    var accumulatedContent = ""
-                    
-                    for await chunk in stringStream {
-                        accumulatedContent += chunk
-                        let partial = Response<String>.Partial(
-                            content: accumulatedContent,
-                            isComplete: false
-                        )
-                        continuation.yield(partial)
-                    }
-                    
-                    // Final complete partial
-                    let finalPartial = Response<String>.Partial(
+                let stringStream = model.stream(prompt: promptText, options: options)
+                var accumulatedContent = ""
+                
+                for await chunk in stringStream {
+                    accumulatedContent += chunk
+                    let partial = Response<String>.Partial(
                         content: accumulatedContent,
-                        isComplete: true
+                        isComplete: false
                     )
-                    continuation.yield(finalPartial)
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
+                    continuation.yield(partial)
                 }
+                
+                // Final complete partial
+                let finalPartial = Response<String>.Partial(
+                    content: accumulatedContent,
+                    isComplete: true
+                )
+                continuation.yield(finalPartial)
+                continuation.finish()
             }
         }
         
@@ -335,43 +306,39 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         
         let stream = AsyncThrowingStream<Response<Content>.Partial, Error> { continuation in
             Task {
-                do {
-                    let schemaPrompt = includeSchemaInPrompt ? 
-                        "\(promptText)\n\nGenerate response following this schema: \(Content.generationSchema)" : 
-                        promptText
+                let schemaPrompt = includeSchemaInPrompt ? 
+                    "\(promptText)\n\nGenerate response following this schema: \(Content.generationSchema)" : 
+                    promptText
+                
+                let stringStream = model.stream(prompt: schemaPrompt, options: options)
+                var accumulatedText = ""
+                
+                for await chunk in stringStream {
+                    accumulatedText += chunk
+                    let partialContent = GeneratedContent(accumulatedText)
                     
-                    let stringStream = model.stream(prompt: schemaPrompt, options: options)
-                    var accumulatedText = ""
-                    
-                    for await chunk in stringStream {
-                        accumulatedText += chunk
-                        let partialContent = GeneratedContent(accumulatedText)
-                        
-                        // For now, create partial responses with string content
-                        // TODO: Implement proper Generable partial parsing when needed
-                        if let partialData = try? Content.from(generatedContent: partialContent) {
-                            let partial = Response<Content>.Partial(
-                                content: partialData,
-                                isComplete: false
-                            )
-                            continuation.yield(partial)
-                        }
-                    }
-                    
-                    // Final complete partial
-                    let finalContent = GeneratedContent(accumulatedText)
-                    if let finalData = try? Content.from(generatedContent: finalContent) {
+                    // For now, create partial responses with string content
+                    // TODO: Implement proper Generable partial parsing when needed
+                    if let partialData = try? Content.from(generatedContent: partialContent) {
                         let partial = Response<Content>.Partial(
-                            content: finalData,
-                            isComplete: true
+                            content: partialData,
+                            isComplete: false
                         )
                         continuation.yield(partial)
                     }
-                    
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
                 }
+                
+                // Final complete partial
+                let finalContent = GeneratedContent(accumulatedText)
+                if let finalData = try? Content.from(generatedContent: finalContent) {
+                    let partial = Response<Content>.Partial(
+                        content: finalData,
+                        isComplete: true
+                    )
+                    continuation.yield(partial)
+                }
+                
+                continuation.finish()
             }
         }
         
@@ -391,36 +358,32 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         
         let stream = AsyncThrowingStream<Response<GeneratedContent>.Partial, Error> { continuation in
             Task {
-                do {
-                    let schemaPrompt = includeSchemaInPrompt ? 
-                        "\(promptText)\n\nGenerate response following this schema: \(schema)" : 
-                        promptText
+                let schemaPrompt = includeSchemaInPrompt ? 
+                    "\(promptText)\n\nGenerate response following this schema: \(schema)" : 
+                    promptText
+                
+                let stringStream = model.stream(prompt: schemaPrompt, options: options)
+                var accumulatedText = ""
+                
+                for await chunk in stringStream {
+                    accumulatedText += chunk
+                    let partialContent = GeneratedContent(accumulatedText)
                     
-                    let stringStream = model.stream(prompt: schemaPrompt, options: options)
-                    var accumulatedText = ""
-                    
-                    for await chunk in stringStream {
-                        accumulatedText += chunk
-                        let partialContent = GeneratedContent(accumulatedText)
-                        
-                        let partial = Response<GeneratedContent>.Partial(
-                            content: partialContent,
-                            isComplete: false
-                        )
-                        continuation.yield(partial)
-                    }
-                    
-                    // Final complete partial
-                    let finalContent = GeneratedContent(accumulatedText)
-                    let finalPartial = Response<GeneratedContent>.Partial(
-                        content: finalContent,
-                        isComplete: true
+                    let partial = Response<GeneratedContent>.Partial(
+                        content: partialContent,
+                        isComplete: false
                     )
-                    continuation.yield(finalPartial)
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
+                    continuation.yield(partial)
                 }
+                
+                // Final complete partial
+                let finalContent = GeneratedContent(accumulatedText)
+                let finalPartial = Response<GeneratedContent>.Partial(
+                    content: finalContent,
+                    isComplete: true
+                )
+                continuation.yield(finalPartial)
+                continuation.finish()
             }
         }
         
@@ -474,31 +437,6 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         }
     }
     
-    // MARK: - Legacy Streaming Methods (Deprecated)
-    
-    /// Legacy streaming method - use Apple official API instead
-    /// ✅ DEPRECATED: Use streamResponse(to:options:) instead
-    @available(*, deprecated, message: "Use streamResponse(to:options:) instead")
-    public func stream(prompt: String) -> AsyncStream<String> {
-        return model.stream(prompt: prompt, options: nil)
-    }
-    
-    /// Legacy structured streaming method - use Apple official API instead
-    /// ✅ DEPRECATED: Use streamResponse(to:generating:) instead
-    @available(*, deprecated, message: "Use streamResponse(to:generating:) instead")
-    public func stream<T: Generable>(prompt: String, generating type: T.Type) -> AsyncStream<T> {
-        AsyncStream { continuation in
-            Task {
-                let responseStream = streamResponse(to: prompt, generating: type)
-                
-                for try await partial in responseStream {
-                    continuation.yield(partial.content)
-                }
-                
-                continuation.finish()
-            }
-        }
-    }
     
     // MARK: - Model Management
     

@@ -10,7 +10,7 @@
 /// - @attached(member, names: arbitrary) - generates required members
 /// - Generates init(_:) and generatedContent members
 /// - Optional description parameter for schema documentation
-@attached(member, names: named(init(_:)), named(generatedContent), named(from(generatedContent:)), named(toGeneratedContent), named(generationSchema), named(asPartiallyGenerated), named(PartiallyGenerated))
+@attached(member, names: named(init(_:)), named(generatedContent), named(from(generatedContent:)), named(toGeneratedContent), named(generationSchema), named(asPartiallyGenerated), named(instructionsRepresentation), named(promptRepresentation))
 public macro Generable(description: String? = nil) = #externalMacro(module: "OpenFoundationModelsMacrosImpl", type: "GenerableMacro")
 
 /// Provides guidance for property generation in Generable types
@@ -90,7 +90,6 @@ public struct GenerationGuide: Sendable {
 }
 
 /// Legacy constraint type for backwards compatibility
-/// ❌ DEPRECATED: Use GenerationGuide instead
 public enum GuideConstraint {
     case range(ClosedRange<Int>)
     case count(Int)

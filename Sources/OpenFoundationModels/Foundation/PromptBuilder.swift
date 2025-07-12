@@ -82,29 +82,3 @@ public struct PromptBuilder {
 // This avoids type ambiguity - removed duplicate definition
 
 /// Individual prompt segment
-/// ❌ STRUCTURE UNKNOWN: Inferred from usage
-/// Individual prompt segment for building prompts
-/// ❌ STRUCTURE UNKNOWN: Inferred from usage
-// NOTE: PromptSegment is deprecated in favor of Prompt.Segment
-@available(*, deprecated, message: "Use Prompt.Segment instead")
-public struct PromptSegment: Sendable {
-    /// Segment content
-    public let content: String
-    
-    /// Initialize segment with content
-    public init(content: String) {
-        self.content = content
-    }
-}
-
-// MARK: - Prompt extension for PromptBuilder compatibility
-extension Prompt {
-    /// Initialize prompt with legacy segments (for PromptBuilder compatibility)
-    /// - Parameter segments: Array of prompt segments
-    @available(*, deprecated, message: "Use init(segments: [Prompt.Segment]) instead")
-    public init(segments: [PromptSegment]) {
-        // Convert segments to text format
-        let text = segments.map(\.content).joined(separator: " ")
-        self.init(text)
-    }
-}

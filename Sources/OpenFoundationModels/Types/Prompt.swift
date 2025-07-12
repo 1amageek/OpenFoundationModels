@@ -21,6 +21,12 @@ public struct Prompt: Sendable {
     public init(_ text: String) {
         self.segments = [Segment(text: text)]
     }
+    
+    /// Get the text content of the prompt (convenience for single segment prompts)
+    /// - Returns: The combined text of all segments
+    public var text: String {
+        return segments.map { $0.text }.joined(separator: "\n")
+    }
 }
 
 // MARK: - Prompt.Segment
@@ -56,24 +62,3 @@ extension Prompt: ExpressibleByStringLiteral {
     }
 }
 
-// MARK: - Legacy Prompt (for backward compatibility)
-
-/// Legacy simple prompt structure
-/// ✅ DEPRECATED: Use Prompt with segments instead
-@available(*, deprecated, message: "Use Prompt with segments instead")
-public struct LegacyPrompt: Sendable {
-    /// The text content of the prompt
-    public let text: String
-    
-    /// Additional metadata for the prompt
-    public let metadata: [String: String]?
-    
-    /// Initialize a prompt with text content
-    /// - Parameters:
-    ///   - text: The prompt text
-    ///   - metadata: Optional metadata
-    public init(_ text: String, metadata: [String: String]? = nil) {
-        self.text = text
-        self.metadata = metadata
-    }
-}

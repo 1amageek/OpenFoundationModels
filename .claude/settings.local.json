@@ -8,7 +8,15 @@
       "Bash(remark:*)",
       "Bash(rg:*)",
       "Bash(swift build:*)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "mcp__wikideep__read_wiki_structure",
+      "mcp__wikideep__read_wiki_contents",
+      "mcp__wikideep__ask_question",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(swift test:*)",
+      "Bash(find:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }

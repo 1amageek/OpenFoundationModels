@@ -57,26 +57,6 @@ public struct Response<Content: Sendable>: Sendable {
         self.transcriptEntries = transcriptEntries
     }
     
-    /// Legacy initializer for backward compatibility
-    /// 
-    /// **Deprecated:** Use init(content:transcriptEntries:) instead
-    /// This initializer is provided for migration from older implementations.
-    @available(*, deprecated, message: "Use init(content:transcriptEntries:) instead")
-    public init(
-        userPrompt: String,
-        content: Content,
-        duration: TimeInterval
-    ) {
-        self.content = content
-        // Create a minimal transcript entry for compatibility
-        let entry = Transcript.Entry(
-            prompt: userPrompt,
-            response: "",
-            timestamp: Date(),
-            duration: duration
-        )
-        self.transcriptEntries = [entry][...]
-    }
 }
 
 // MARK: - Response.Partial
@@ -107,32 +87,6 @@ extension Response {
 
 // MARK: - String specialization (already handled by main Partial type)
 
-// MARK: - Legacy Response (for backward compatibility)
-
-/// Legacy non-generic Response type
-/// ✅ DEPRECATED: Use Response<String> instead
-@available(*, deprecated, message: "Use Response<String> instead")
-public struct LegacyResponse: Sendable {
-    /// The generated content
-    public let content: String
-    
-    /// Token usage information
-    public let usage: TokenUsage?
-    
-    /// Metadata about the response
-    public let metadata: ResponseMetadata?
-    
-    /// Initialize a response
-    public init(
-        content: String,
-        usage: TokenUsage? = nil,
-        metadata: ResponseMetadata? = nil
-    ) {
-        self.content = content
-        self.usage = usage
-        self.metadata = metadata
-    }
-}
 
 /// Token usage information
 public struct TokenUsage: Sendable {

@@ -118,14 +118,14 @@ extension ResponseStream {
         let allEntries: [Transcript.Entry] = []
         
         for try await partial in self {
-            finalContent = partial.content
             if partial.isComplete {
+                finalContent = partial.content
                 break
             }
         }
         
         guard let content = finalContent else {
-            let context = GenerationError.Context(debugDescription: "Stream completed without valid content")
+            let context = GenerationError.Context(debugDescription: "Stream completed without complete content")
             throw GenerationError.decodingFailure(context)
         }
         

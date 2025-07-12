@@ -88,10 +88,6 @@ public extension ToolCall {
     }
 }
 
-// MARK: - Legacy Errors (deprecated)
-
-// Note: ToolCallError is now defined in Foundation/ToolCallError.swift
-// This enum is kept for backward compatibility
 
 // MARK: - CustomStringConvertible
 

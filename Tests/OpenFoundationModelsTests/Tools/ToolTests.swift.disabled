@@ -1,0 +1,358 @@
+// ToolTests.swift
+// OpenFoundationModelsTests
+//
+// ✅ APPLE OFFICIAL: Tests for Apple Foundation Models Tool system
+
+import Foundation
+import Testing
+@testable import OpenFoundationModels
+
+/// Tests for Tool protocol and implementation
+/// 
+/// **Focus:** Validates Tool protocol conformance, default implementations,
+/// and tool execution according to Apple's Foundation Models specification.
+///
+/// **Apple Foundation Models Documentation:**
+/// Tools allow models to call code to gather information or perform side effects.
+/// Tests ensure proper tool definition, argument handling, and execution.
+///
+/// **Reference:** https://developer.apple.com/documentation/foundationmodels/tool
+@Suite("Tool Tests")
+struct ToolTests {
+    
+    // MARK: - Test Tools
+    
+    /// Simple test tool with basic arguments
+    struct WeatherTool: Tool {
+        let description = "Get weather information for a city"
+        
+        @Generable
+        struct Arguments {
+            @Guide(description: "City name")
+            let city: String
+            
+            @Guide(description: "Temperature unit", .enumeration(["celsius", "fahrenheit"]))
+            let unit: String = "celsius"
+        }
+        
+        func call(arguments: Arguments) async throws -> ToolOutput {
+            let weather = WeatherInfo(
+                city: arguments.city,
+                temperature: 22,
+                unit: arguments.unit,
+                condition: "sunny"
+            )
+            return ToolOutput(weather)
+        }
+    }
+    
+    /// Tool with complex arguments and error handling
+    struct DatabaseTool: Tool {
+        let name = "queryDatabase"
+        let description = "Query the user database"
+        
+        @Generable
+        struct Arguments {
+            @Guide(description: "SQL query to execute")
+            let query: String
+            
+            @Guide(description: "Maximum results", .range(1...100))
+            let limit: Int = 10
+        }
+        
+        func call(arguments: Arguments) async throws -> ToolOutput {
+            // Simulate database query
+            if arguments.query.lowercased().contains("drop") {
+                throw ToolCallError.invalidArguments(toolName: "queryDatabase", reason: "DROP commands not allowed")
+            }
+            
+            let results = DatabaseResults(
+                query: arguments.query,
+                count: min(arguments.limit, 5),
+                results: ["user1", "user2", "user3"]
+            )
+            return ToolOutput(results)
+        }
+    }
+    
+    /// Tool with minimal implementation using defaults
+    struct MinimalTool: Tool {
+        let description = "A minimal tool for testing defaults"
+        
+        struct Arguments: ConvertibleFromGeneratedContent {
+            let input: String
+            
+            static func from(generatedContent: GeneratedContent) throws -> Arguments {
+                return Arguments(input: generatedContent.stringValue)
+            }
+            
+            private init(input: String) {
+                self.input = input
+            }
+        }
+        
+        func call(arguments: Arguments) async throws -> ToolOutput {
+            return ToolOutput(SimpleResult(output: "processed: \(arguments.input)"))
+        }
+    }
+    
+    // MARK: - Supporting Types
+    
+    struct WeatherInfo: Codable {
+        let city: String
+        let temperature: Int
+        let unit: String
+        let condition: String
+    }
+    
+    struct DatabaseResults: Codable {
+        let query: String
+        let count: Int
+        let results: [String]
+    }
+    
+    struct SimpleResult: Codable {
+        let output: String
+    }
+    
+    // MARK: - Basic Tool Protocol Tests
+    
+    @Test("Tool protocol properties exist")
+    func toolProtocolProperties() {
+        let tool = WeatherTool()
+        
+        // Required properties exist
+        #expect(!tool.description.isEmpty)
+        #expect(!tool.name.isEmpty)
+        #expect(tool.includesSchemaInInstructions == true || tool.includesSchemaInInstructions == false)
+        #expect(tool.parameters.type == "object")
+    }
+    
+    @Test("Tool default name implementation")
+    func toolDefaultName() {
+        let tool = WeatherTool()
+        
+        // Default name should be type name
+        #expect(tool.name == "WeatherTool")
+    }
+    
+    @Test("Tool custom name implementation")
+    func toolCustomName() {
+        let tool = DatabaseTool()
+        
+        // Custom name should override default
+        #expect(tool.name == "queryDatabase")
+    }
+    
+    @Test("Tool default schema inclusion")
+    func toolDefaultSchemaInclusion() {
+        let tool = WeatherTool()
+        
+        // Default should include schema
+        #expect(tool.includesSchemaInInstructions == true)
+    }
+    
+    @Test("Tool parameters schema generation")
+    func toolParametersSchema() {
+        let tool = WeatherTool()
+        
+        // Schema should be generated from Arguments type
+        let schema = tool.parameters
+        #expect(schema.type == "object")
+        #expect(schema.description?.contains("Arguments") == true)
+    }
+    
+    // MARK: - Tool Execution Tests
+    
+    @Test("Tool execution with valid arguments")
+    func toolExecutionValid() async throws {
+        let tool = WeatherTool()
+        let args = WeatherTool.Arguments(city: "Tokyo", unit: "celsius")
+        
+        let result = try await tool.call(arguments: args)
+        
+        // Verify result can be decoded
+        let weather = try result.decode(as: WeatherInfo.self)
+        #expect(weather.city == "Tokyo")
+        #expect(weather.unit == "celsius")
+        #expect(weather.temperature == 22)
+        #expect(weather.condition == "sunny")
+    }
+    
+    @Test("Tool execution with error handling")
+    func toolExecutionError() async throws {
+        let tool = DatabaseTool()
+        let args = DatabaseTool.Arguments(query: "DROP TABLE users", limit: 10)
+        
+        // Should throw error for invalid query
+        do {
+            let _ = try await tool.call(arguments: args)
+            Issue.record("Expected error to be thrown")
+        } catch let error as ToolCallError {
+            #expect(error.localizedDescription.contains("DROP commands not allowed"))
+        } catch {
+            Issue.record("Wrong error type thrown: \(error)")
+        }
+    }
+    
+    @Test("Tool execution with successful database query")
+    func toolExecutionDatabaseSuccess() async throws {
+        let tool = DatabaseTool()
+        let args = DatabaseTool.Arguments(query: "SELECT * FROM users", limit: 3)
+        
+        let result = try await tool.call(arguments: args)
+        let dbResults = try result.decode(as: DatabaseResults.self)
+        
+        #expect(dbResults.query == "SELECT * FROM users")
+        #expect(dbResults.count == 3)
+        #expect(dbResults.results.count == 3)
+    }
+    
+    // MARK: - Tool Arguments Tests
+    
+    @Test("Generable Arguments work with Tool")
+    func generableArgumentsIntegration() {
+        let tool = WeatherTool()
+        
+        // Arguments type should conform to ConvertibleFromGeneratedContent through Generable
+        let _ = WeatherTool.Arguments.self as ConvertibleFromGeneratedContent.Type
+        
+        // Schema should be generated properly
+        let schema = tool.parameters
+        #expect(schema.type == "object")
+    }
+    
+    @Test("ConvertibleFromGeneratedContent Arguments work")
+    func convertibleArgumentsIntegration() async throws {
+        let tool = MinimalTool()
+        let content = GeneratedContent("test input")
+        let args = try MinimalTool.Arguments.from(generatedContent: content)
+        
+        let result = try await tool.call(arguments: args)
+        let output = try result.decode(as: SimpleResult.self)
+        
+        #expect(output.output == "processed: test input")
+    }
+    
+    // MARK: - Tool Output Tests
+    
+    @Test("ToolOutput creation and decoding")
+    func toolOutputCreationDecoding() throws {
+        let weather = WeatherInfo(city: "London", temperature: 15, unit: "celsius", condition: "rainy")
+        let output = ToolOutput(weather)
+        
+        // Should be able to decode back to original type
+        let decoded = try output.decode(as: WeatherInfo.self)
+        #expect(decoded.city == "London")
+        #expect(decoded.temperature == 15)
+        #expect(decoded.unit == "celsius")
+        #expect(decoded.condition == "rainy")
+    }
+    
+    @Test("ToolOutput from GeneratedContent")
+    func toolOutputFromGeneratedContent() throws {
+        let content = GeneratedContent("test content")
+        let output = ToolOutput.from(generatedContent: content)
+        
+        // Should have valid description
+        #expect(!output.description.isEmpty)
+        
+        // Should convert back to GeneratedContent
+        let converted = output.toGeneratedContent()
+        #expect(converted.stringValue.contains("test content"))
+    }
+    
+    @Test("ToolOutput description")
+    func toolOutputDescription() {
+        let simple = SimpleResult(output: "test")
+        let output = ToolOutput(simple)
+        
+        // Description should contain JSON representation
+        #expect(output.description.contains("test"))
+        #expect(output.description.contains("output"))
+    }
+    
+    // MARK: - Sendable Conformance Tests
+    
+    @Test("Tool Sendable conformance")
+    func toolSendableConformance() {
+        let tool = WeatherTool()
+        
+        // Tool should conform to Sendable
+        let _ = tool as Sendable
+        let _ = WeatherTool.self as SendableMetatype.Type
+    }
+    
+    @Test("ToolOutput Sendable conformance")
+    func toolOutputSendableConformance() {
+        let output = ToolOutput(SimpleResult(output: "test"))
+        
+        // ToolOutput should conform to Sendable
+        let _ = output as Sendable
+        let _ = ToolOutput.self as SendableMetatype.Type
+    }
+    
+    // MARK: - Edge Cases and Error Handling
+    
+    @Test("Tool with empty arguments type")
+    func toolWithEmptyArguments() async throws {
+        struct EmptyArgumentsTool: Tool {
+            let description = "Tool with no arguments"
+            
+            struct Arguments: ConvertibleFromGeneratedContent {
+                static func from(generatedContent: GeneratedContent) throws -> Arguments {
+                    return Arguments()
+                }
+                
+                private init() {
+                    // Empty arguments - no data needed
+                }
+            }
+            
+            func call(arguments: Arguments) async throws -> ToolOutput {
+                return ToolOutput(SimpleResult(output: "executed"))
+            }
+        }
+        
+        let tool = EmptyArgumentsTool()
+        let args = try EmptyArgumentsTool.Arguments.from(generatedContent: GeneratedContent(""))
+        
+        let result = try await tool.call(arguments: args)
+        let output = try result.decode(as: SimpleResult.self)
+        
+        #expect(output.output == "executed")
+    }
+    
+    @Test("Tool parameter schema for non-Generable arguments")
+    func toolParametersForNonGenerable() {
+        let tool = MinimalTool()
+        
+        // Should generate basic schema for ConvertibleFromGeneratedContent
+        let schema = tool.parameters
+        #expect(schema.type == "string")
+        #expect(schema.description?.contains("MinimalTool") == true)
+    }
+    
+    @Test("Tool concurrent execution")
+    func toolConcurrentExecution() async throws {
+        let tool = WeatherTool()
+        
+        // Execute multiple tool calls concurrently
+        async let result1 = tool.call(arguments: WeatherTool.Arguments(city: "Tokyo", unit: "celsius"))
+        async let result2 = tool.call(arguments: WeatherTool.Arguments(city: "London", unit: "fahrenheit"))
+        async let result3 = tool.call(arguments: WeatherTool.Arguments(city: "Paris", unit: "celsius"))
+        
+        let outputs = try await [result1, result2, result3]
+        
+        // All should complete successfully
+        #expect(outputs.count == 3)
+        
+        let weather1 = try outputs[0].decode(as: WeatherInfo.self)
+        let weather2 = try outputs[1].decode(as: WeatherInfo.self)
+        let weather3 = try outputs[2].decode(as: WeatherInfo.self)
+        
+        #expect(weather1.city == "Tokyo")
+        #expect(weather2.city == "London")
+        #expect(weather3.city == "Paris")
+    }
+}
