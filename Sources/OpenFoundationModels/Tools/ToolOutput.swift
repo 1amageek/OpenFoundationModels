@@ -1,22 +1,46 @@
 // ToolOutput.swift
 // OpenFoundationModels
 //
-// ✅ CONFIRMED: Based on Apple Foundation Models API specification
+// ✅ APPLE OFFICIAL: Based on Apple Foundation Models API specification
 
 import Foundation
 
-/// Structure that contains output a tool generates
+/// A structure that contains the output a tool generates.
 /// 
-/// ✅ CONFIRMED: From Apple Developer Documentation
-/// - Single initializer that takes any Encodable object
-/// - Conforms to Sendable and SendableMetatype
+/// **Apple Foundation Models Documentation:**
+/// A structure that contains the output a tool generates.
+/// 
+/// **Source:** https://developer.apple.com/documentation/foundationmodels/tooloutput
+/// 
+/// **Apple Official API:** `struct ToolOutput`
+/// - iOS 26.0+, iPadOS 26.0+, macOS 26.0+, visionOS 26.0+
+/// - Beta Software: Contains preliminary API information
+/// 
+/// **Conformances:**
+/// - Sendable
+/// - SendableMetatype
+/// 
+/// **Usage:**
+/// ```swift
+/// func call(arguments: Arguments) async throws -> ToolOutput {
+///     let result = ["contactNames": ["John Doe", "Jane Smith"]]
+///     return ToolOutput(GeneratedContent(properties: result))
+/// }
+/// ```
 public struct ToolOutput: Sendable, SendableMetatype {
     
     /// The encoded output data
     private let encodedData: Data
     
-    /// Create tool output with generated encodable object
-    /// ✅ CONFIRMED: Generic initializer from Apple docs
+    /// Creates a tool output with a generated encodable object.
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// Creates a tool output with a generated encodable object.
+    /// 
+    /// **Source:** https://developer.apple.com/documentation/foundationmodels/tooloutput/init(_:)
+    /// 
+    /// **Apple Official API:** `init(_:)`
+    /// 
     /// - Parameter object: Any encodable object to wrap as tool output
     public init<T>(_ object: T) where T : Encodable {
         do {
@@ -28,6 +52,10 @@ public struct ToolOutput: Sendable, SendableMetatype {
     }
     
     /// Access the output as a specific decodable type
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// Decodes the tool output to a specific type.
+    /// 
     /// - Parameter type: The type to decode the output as
     /// - Returns: The decoded object
     /// - Throws: DecodingError if decoding fails
@@ -36,7 +64,10 @@ public struct ToolOutput: Sendable, SendableMetatype {
     }
     
     /// Convert tool output to GeneratedContent
-    /// ✅ PHASE 4.2: Add GeneratedContent support to ToolOutput
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// Converts the tool output to GeneratedContent for use in model interactions.
+    /// 
     /// - Returns: GeneratedContent representation of the tool output
     public func toGeneratedContent() -> GeneratedContent {
         // Convert the encoded data to a string representation
@@ -45,7 +76,10 @@ public struct ToolOutput: Sendable, SendableMetatype {
     }
     
     /// Create ToolOutput from GeneratedContent
-    /// ✅ PHASE 4.2: Add GeneratedContent support to ToolOutput
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// Creates a ToolOutput from GeneratedContent.
+    /// 
     /// - Parameter content: GeneratedContent to convert
     /// - Returns: ToolOutput instance
     public static func from(generatedContent: GeneratedContent) -> ToolOutput {

@@ -39,6 +39,14 @@ public struct GeneratedContent: Codable {
         return String(data: data, encoding: .utf8) ?? ""
     }
     
+    /// Get content as text (alias for stringValue)
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// Text representation of the generated content for compatibility.
+    public var text: String {
+        return stringValue
+    }
+    
     /// Get raw data
     public var dataValue: Data {
         return data

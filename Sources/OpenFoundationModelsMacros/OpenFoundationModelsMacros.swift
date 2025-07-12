@@ -40,10 +40,10 @@ public macro Guide<RegexOutput>(
 /// Generation guidance for properties
 /// ✅ CONFIRMED: Referenced in Apple documentation for @Guide macro
 public struct GenerationGuide: Sendable {
-    internal let type: GuideType
-    internal let value: any Sendable
+    public let type: GuideType
+    public let value: any Sendable
     
-    private init(type: GuideType, value: any Sendable) {
+    public init(type: GuideType, value: any Sendable) {
         self.type = type
         self.value = value
     }
@@ -79,7 +79,7 @@ public struct GenerationGuide: Sendable {
         GenerationGuide(type: .pattern, value: regex)
     }
     
-    internal enum GuideType {
+    public enum GuideType: Sendable {
         case maximumCount
         case minimumCount
         case count

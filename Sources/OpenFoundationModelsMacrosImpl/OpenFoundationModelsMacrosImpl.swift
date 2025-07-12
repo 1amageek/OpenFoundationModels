@@ -113,6 +113,12 @@ public struct GenerableMacro: MemberMacro {
                             if let match = argText.firstMatch(of: patternRegex) {
                                 pattern = String(match.1)
                             }
+                        } else if argText.contains("pattern(") {
+                            // Handle pattern("regex") format
+                            let patternRegex = #/pattern\(\"([^\"]*)\"\)/#
+                            if let match = argText.firstMatch(of: patternRegex) {
+                                pattern = String(match.1)
+                            }
                         } else {
                             guides.append(argText)
                         }
@@ -201,8 +207,8 @@ public struct GenerableMacro: MemberMacro {
     /// Generate asPartiallyGenerated method
     private static func generateAsPartiallyGeneratedMethod(structName: String) -> DeclSyntax {
         return DeclSyntax(stringLiteral: """
-        public func asPartiallyGenerated() -> PartiallyGenerated {
-            return PartiallyGenerated(
+        public func asPartiallyGenerated() -> \(structName).PartiallyGenerated {
+            return \(structName).PartiallyGenerated(
                 partial: self,
                 isComplete: true,
                 rawContent: self.generatedContent

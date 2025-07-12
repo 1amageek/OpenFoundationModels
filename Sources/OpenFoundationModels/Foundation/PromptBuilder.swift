@@ -19,7 +19,7 @@ public struct PromptBuilder {
     public static func buildArray(_ components: [some PromptRepresentable]) -> Prompt {
         let segments = components.map { component in
             let prompt = component.promptRepresentation
-            return PromptSegment(content: prompt.text)
+            return Prompt.Segment(text: prompt.segments.map { $0.text }.joined(separator: " "))
         }
         return Prompt(segments: segments)
     }
@@ -27,25 +27,23 @@ public struct PromptBuilder {
     /// Build prompt from variadic representable elements
     /// ✅ CONFIRMED: buildBlock method from Apple docs
     public static func buildBlock<each P>(_ components: repeat each P) -> Prompt where repeat each P: PromptRepresentable {
-        var segments: [PromptSegment] = []
+        var segments: [Prompt.Segment] = []
         for component in repeat each components {
             let prompt = component.promptRepresentation
-            segments.append(PromptSegment(content: prompt.text))
+            segments.append(Prompt.Segment(text: prompt.segments.map { $0.text }.joined(separator: " ")))
         }
         return Prompt(segments: segments)
     }
     
     /// Build prompt from first branch of conditional
-    /// ✅ CONFIRMED: buildEither(first:) method from Apple docs
+    /// ✅ PHASE 4.8: Apple-compliant conditional handling (first branch)
     public static func buildEither(first component: some PromptRepresentable) -> Prompt {
-        // Implementation needed - handle first conditional branch
         return component.promptRepresentation
     }
     
     /// Build prompt from second branch of conditional
-    /// ✅ CONFIRMED: buildEither(second:) method from Apple docs
+    /// ✅ PHASE 4.8: Apple-compliant conditional handling (second branch)
     public static func buildEither(second component: some PromptRepresentable) -> Prompt {
-        // Implementation needed - handle second conditional branch
         return component.promptRepresentation
     }
     
@@ -64,10 +62,15 @@ public struct PromptBuilder {
     }
     
     /// Build prompt from optional component
-    /// ✅ CONFIRMED: buildOptional method from Apple docs
+    /// ✅ PHASE 4.8: Apple-compliant optional handling
     public static func buildOptional(_ component: Prompt?) -> Prompt {
-        // Implementation needed - handle optional component
-        return component ?? Prompt(segments: [])
+        return component ?? Prompt(segments: [] as [Prompt.Segment])
+    }
+    
+    /// Build prompt from optional PromptRepresentable component
+    /// ✅ PHASE 4.8: Apple-compliant optional handling for PromptRepresentable
+    public static func buildOptional(_ component: (some PromptRepresentable)?) -> Prompt {
+        return component?.promptRepresentation ?? Prompt(segments: [] as [Prompt.Segment])
     }
 }
 
@@ -82,6 +85,8 @@ public struct PromptBuilder {
 /// ❌ STRUCTURE UNKNOWN: Inferred from usage
 /// Individual prompt segment for building prompts
 /// ❌ STRUCTURE UNKNOWN: Inferred from usage
+// NOTE: PromptSegment is deprecated in favor of Prompt.Segment
+@available(*, deprecated, message: "Use Prompt.Segment instead")
 public struct PromptSegment: Sendable {
     /// Segment content
     public let content: String
@@ -94,8 +99,9 @@ public struct PromptSegment: Sendable {
 
 // MARK: - Prompt extension for PromptBuilder compatibility
 extension Prompt {
-    /// Initialize prompt with segments (for PromptBuilder compatibility)
+    /// Initialize prompt with legacy segments (for PromptBuilder compatibility)
     /// - Parameter segments: Array of prompt segments
+    @available(*, deprecated, message: "Use init(segments: [Prompt.Segment]) instead")
     public init(segments: [PromptSegment]) {
         // Convert segments to text format
         let text = segments.map(\.content).joined(separator: " ")
