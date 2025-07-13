@@ -45,6 +45,51 @@ let session = LanguageModelSession(
 **✅ Provider Choice**: OpenAI, Anthropic, local models, and more  
 **✅ Enterprise Ready**: Integrates with existing infrastructure
 
+## Quick Start
+
+Get started with OpenFoundationModels in minutes:
+
+### Try Sample Applications
+
+```bash
+# Clone and run sample chat applications
+git clone https://github.com/1amageek/OpenFoundationModels-Samples.git
+cd OpenFoundationModels-Samples
+
+# Option 1: On-device chat (no setup required)
+swift run foundation-chat
+
+# Option 2: OpenAI-powered chat
+export OPENAI_API_KEY="your_api_key_here"
+swift run openai-chat
+```
+
+### Basic Usage
+
+```swift
+import OpenFoundationModels
+
+// Apple's official API - works everywhere
+let session = LanguageModelSession()
+let response = try await session.respond {
+    Prompt("Hello, OpenFoundationModels!")
+}
+print(response.content)
+```
+
+### With OpenAI
+
+```swift
+import OpenFoundationModels
+import OpenFoundationModelsOpenAI
+
+let provider = OpenAIProvider(apiKey: "your_key")
+let session = LanguageModelSession(model: provider.gpt4o)
+let response = try await session.respond {
+    Prompt("Explain Swift concurrency")
+}
+```
+
 ## Architecture
 
 ### System Overview
@@ -169,10 +214,36 @@ public struct ResponseStream<Content: Sendable>: AsyncSequence, Sendable {
 
 ### Swift Package Manager
 
+#### Core Framework
 ```swift
 dependencies: [
     .package(url: "https://github.com/1amageek/OpenFoundationModels.git", from: "1.0.0")
 ]
+```
+
+#### With OpenAI Provider
+```swift
+dependencies: [
+    .package(url: "https://github.com/1amageek/OpenFoundationModels.git", from: "1.0.0"),
+    .package(url: "https://github.com/1amageek/OpenFoundationModels-OpenAI.git", from: "1.0.0")
+]
+```
+
+### Sample Applications
+
+Try the complete sample applications immediately:
+
+```bash
+# Clone samples repository
+git clone https://github.com/1amageek/OpenFoundationModels-Samples.git
+cd OpenFoundationModels-Samples
+
+# Run on-device chat (no API key required)
+swift run foundation-chat
+
+# Run OpenAI chat (requires API key)
+export OPENAI_API_KEY="your_api_key_here"
+swift run openai-chat
 ```
 
 ## Usage
@@ -350,6 +421,53 @@ let session = LanguageModelSession(
 )
 ```
 
+### 7. OpenAI Provider Integration
+
+```swift
+import OpenFoundationModels
+import OpenFoundationModelsOpenAI
+
+// Initialize OpenAI provider
+let openAIProvider = OpenAIProvider(apiKey: "your_api_key_here")
+
+// Create session with OpenAI model (same Apple API!)
+let session = LanguageModelSession(
+    model: openAIProvider.gpt4o,  // GPT-4o model
+    guardrails: .default,
+    tools: [],
+    instructions: nil
+)
+
+// Same Apple API, powered by OpenAI
+let response = try await session.respond {
+    Prompt("Explain quantum computing in simple terms")
+}
+
+print(response.content)
+
+// Structured generation with OpenAI
+@Generable
+struct TechnicalExplanation {
+    @Guide(description: "Main concept", .count(20...100))
+    let concept: String
+    
+    @Guide(description: "Simple explanation", .count(100...300))
+    let explanation: String
+    
+    @Guide(description: "Real-world applications", .count(50...200))
+    let applications: [String]
+}
+
+let structuredResponse = try await session.respond(
+    generating: TechnicalExplanation.self
+) {
+    Prompt("Explain quantum computing")
+}
+
+print("Concept: \(structuredResponse.content.concept)")
+print("Explanation: \(structuredResponse.content.explanation)")
+```
+
 ## Testing and Quality Assurance
 
 ### 154 Tests Passing
@@ -397,11 +515,29 @@ swift-format --in-place --recursive Sources/ Tests/
 swift package generate-documentation
 ```
 
-## Provider Integration
+## Ecosystem
 
-Currently provides mock implementations. Provider adapters can be added for:
+OpenFoundationModels provides a complete ecosystem with core framework, provider integrations, and sample applications:
 
-- **OpenAI** (GPT-3.5, GPT-4, GPT-4o, etc.)
+### 🏗️ Core Framework
+- **[OpenFoundationModels](https://github.com/1amageek/OpenFoundationModels)** - Apple Foundation Models compatible core framework
+- 100% API compatibility with Apple's official specification
+- 154 tests passing with comprehensive coverage
+
+### 🔗 Provider Integrations
+- **[OpenFoundationModels-OpenAI](https://github.com/1amageek/OpenFoundationModels-OpenAI)** ✅ **Complete**
+  - Full GPT model support (GPT-4o, GPT-4o Mini, GPT-4 Turbo, o1, o1-pro, o3, o3-pro, o4-mini)
+  - Streaming and multimodal capabilities
+  - Production-ready with rate limiting and error handling
+
+### 📱 Sample Applications
+- **[OpenFoundationModels-Samples](https://github.com/1amageek/OpenFoundationModels-Samples)** ✅ **Complete**
+  - `foundation-chat`: On-device chat using Apple's SystemLanguageModel
+  - `openai-chat`: Cloud-based chat using OpenAI models
+  - Interactive CLI applications with full streaming support
+
+### 🔮 Planned Integrations
+Provider adapters can be added for:
 - **Anthropic** (Claude 3 Haiku, Sonnet, Opus, etc.)
 - **Google** (Gemini Pro, Ultra, etc.)
 - **Local Models** (Ollama, llama.cpp, etc.)
@@ -438,6 +574,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Contributors and early adopters
 
 ## Related Projects
+
+### Official OpenFoundationModels Extensions
+
+- **[OpenFoundationModels-OpenAI](https://github.com/1amageek/OpenFoundationModels-OpenAI)** - Complete OpenAI provider integration
+- **[OpenFoundationModels-Samples](https://github.com/1amageek/OpenFoundationModels-Samples)** - Sample chat applications and demos
+
+### Community Swift AI Projects
 
 - [Swift OpenAI](https://github.com/MacPaw/OpenAI) - OpenAI API client
 - [LangChain Swift](https://github.com/bukowskidev/langchain-swift) - LangChain for Swift
