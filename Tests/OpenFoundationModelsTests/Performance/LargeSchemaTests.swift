@@ -242,7 +242,7 @@ struct LargeSchemaTests {
         var instances: [RepeatedAccessType] = []
         
         for i in 0..<100 { // Fewer instances to avoid memory issues
-            let instance = try RepeatedAccessType(GeneratedContent("test-\(i)"))
+            let instance = try RepeatedAccessType(GeneratedContent("{}"))
             instances.append(instance)
         }
         
@@ -357,8 +357,8 @@ struct LargeSchemaTests {
         var instances: [BatchTestType] = []
         instances.reserveCapacity(batchSize)
         
-        for i in 0..<batchSize {
-            let instance = try BatchTestType(GeneratedContent("batch-\(i)"))
+        for _ in 0..<batchSize {
+            let instance = try BatchTestType(GeneratedContent("{}"))
             instances.append(instance)
         }
         

@@ -51,6 +51,17 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
     /// ✅ CONFIRMED: init(_:) from Apple docs
     /// - Parameter string: The string content
     public init(_ string: String) {
+        // If string looks like JSON, try to parse it first
+        if (string.hasPrefix("{") && string.hasSuffix("}")) || (string.hasPrefix("[") && string.hasSuffix("]")) {
+            if let data = string.data(using: .utf8),
+               let jsonObject = try? JSONSerialization.jsonObject(with: data),
+               let parsedContent = try? Self.parseJSONObject(jsonObject) {
+                self.content = parsedContent
+                self.generationID = nil
+                return
+            }
+        }
+        
         self.content = .string(string)
         self.generationID = nil
     }

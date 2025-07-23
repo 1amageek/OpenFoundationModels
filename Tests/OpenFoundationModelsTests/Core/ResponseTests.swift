@@ -51,8 +51,8 @@ struct ResponseTests {
             transcriptEntries: transcriptEntries
         )
         
-        #expect(response.content.message == "")     // Default value (JSON parsing not yet implemented)
-        #expect(response.content.count == 0)       // Default value (JSON parsing not yet implemented)
+        #expect(response.content.message == "test")   // Parsed from JSON
+        #expect(response.content.count == 42)      // Parsed from JSON
         #expect(response.transcriptEntries.isEmpty)
     }
     

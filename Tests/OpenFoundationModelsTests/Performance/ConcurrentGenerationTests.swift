@@ -159,7 +159,7 @@ struct ConcurrentGenerationTests {
             // Type A instances
             for i in 0..<instancesPerType {
                 group.addTask {
-                    let instance = try TypeA(GeneratedContent("typeA-\(i)"))
+                    let instance = try TypeA(GeneratedContent("{}"))
                     return "A:\(instance.name):\(instance.count)"
                 }
             }
@@ -167,7 +167,7 @@ struct ConcurrentGenerationTests {
             // Type B instances
             for i in 0..<instancesPerType {
                 group.addTask {
-                    let instance = try TypeB(GeneratedContent("typeB-\(i)"))
+                    let instance = try TypeB(GeneratedContent("{}"))
                     return "B:\(instance.value):\(instance.score)"
                 }
             }
@@ -175,7 +175,7 @@ struct ConcurrentGenerationTests {
             // Type C instances
             for i in 0..<instancesPerType {
                 group.addTask {
-                    let instance = try TypeC(GeneratedContent("typeC-\(i)"))
+                    let instance = try TypeC(GeneratedContent("{}"))
                     return "C:\(instance.id):\(instance.active)"
                 }
             }
@@ -317,7 +317,7 @@ struct ConcurrentGenerationTests {
                     group.addTask {
                         // Mix of operations: schema access and instance creation
                         let schema = LoadTestType.generationSchema
-                        let instance = try LoadTestType(GeneratedContent("batch-\(i)"))
+                        let instance = try LoadTestType(GeneratedContent("{}"))
                         
                         return "op-\(i):\(schema.type):\(instance.id):\(instance.index)"
                     }
@@ -369,10 +369,10 @@ struct ConcurrentGenerationTests {
                 group.addTask {
                     // Multiple operations on the same type to test resource contention
                     let schema1 = SharedResourceType.generationSchema
-                    let instance1 = try SharedResourceType(GeneratedContent("access-\(i)-1"))
+                    let instance1 = try SharedResourceType(GeneratedContent("{}"))
                     
                     let schema2 = SharedResourceType.generationSchema
-                    let _ = try SharedResourceType(GeneratedContent("access-\(i)-2"))
+                    let _ = try SharedResourceType(GeneratedContent("{}"))
                     
                     // Verify schemas are consistent
                     let schemasMatch = (schema1.type == schema2.type)

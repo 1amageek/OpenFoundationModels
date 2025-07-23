@@ -59,7 +59,7 @@ struct MacroToolTests {
         
         // The Arguments type should now conform to ConvertibleFromGeneratedContent
         // through the Generable protocol inheritance
-        let content = GeneratedContent("test content")
+        let content = GeneratedContent("{}")
         
         // This should work if the macro properly generates the conformance
         do {
@@ -108,7 +108,7 @@ struct MacroToolTests {
         
         // Test if the macro generated the required methods
         do {
-            let content = GeneratedContent("test")
+            let content = GeneratedContent("{}")
             let _ = try SimpleTest(content)
         } catch {
             Issue.record("@Generable macro not generating init(_:) method: \(error)")
