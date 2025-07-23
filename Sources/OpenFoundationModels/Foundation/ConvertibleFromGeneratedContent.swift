@@ -13,10 +13,10 @@ import Foundation
 /// - PartiallyGenerated associated type constraint
 public protocol ConvertibleFromGeneratedContent {
     /// Create an instance from generated content
-    /// - Parameter generatedContent: The generated content to convert from
-    /// - Returns: An instance of this type
+    /// - Parameter content: The generated content to convert from
     /// - Throws: If the content cannot be converted to this type
-    static func from(generatedContent: GeneratedContent) throws -> Self
+    /// ✅ CONFIRMED: init(_:) throws from Apple docs
+    init(_ content: GeneratedContent) throws
 }
 
 // MARK: - Missing Required Types

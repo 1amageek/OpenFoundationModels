@@ -198,15 +198,17 @@ extension String: Generable {
     /// 
     /// **Apple Foundation Models Documentation:**
     /// Extracts string content from generated output.
-    public static func from(generatedContent: GeneratedContent) throws -> String {
-        return generatedContent.text
+    /// ✅ CONFIRMED: Required by ConvertibleFromGeneratedContent
+    public init(_ content: GeneratedContent) throws {
+        self = content.text
     }
     
     /// Convert String to generated content
     /// 
     /// **Apple Foundation Models Documentation:**
     /// Converts string to generated content format.
-    public func toGeneratedContent() -> GeneratedContent {
+    /// ✅ CONFIRMED: Required by ConvertibleToGeneratedContent
+    public var generatedContent: GeneratedContent {
         return GeneratedContent(self)
     }
     
@@ -259,21 +261,8 @@ extension GeneratedContent: Generable {
         )
     }
     
-    /// Create GeneratedContent from generated content (identity function)
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Identity transformation for GeneratedContent.
-    public static func from(generatedContent: GeneratedContent) throws -> GeneratedContent {
-        return generatedContent
-    }
-    
-    /// Convert GeneratedContent to generated content (identity function)
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Identity transformation for GeneratedContent.
-    public func toGeneratedContent() -> GeneratedContent {
-        return self
-    }
+    // ConvertibleFromGeneratedContent conformance is already in GeneratedContent.swift
+    // ConvertibleToGeneratedContent conformance: generatedContent property is already in GeneratedContent.swift
     
     /// Convert to partially generated representation (identity function)
     /// 

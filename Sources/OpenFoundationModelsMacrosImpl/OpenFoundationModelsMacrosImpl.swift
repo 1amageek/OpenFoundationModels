@@ -24,30 +24,48 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         in context: some MacroExpansionContext
     ) throws -> [DeclSyntax] {
         
-        // Extract the struct name
-        guard let structDecl = declaration.as(StructDeclSyntax.self) else {
+        // Check if it's a struct or enum
+        if let structDecl = declaration.as(StructDeclSyntax.self) {
+            let structName = structDecl.name.text
+            let description = extractDescription(from: node)
+            
+            // Get all properties with @Guide annotations
+            let properties = extractGuidedProperties(from: structDecl)
+            
+            // Generate the required members for struct
+            return [
+                generateInitFromGeneratedContent(structName: structName, properties: properties),
+                generateGeneratedContentProperty(structName: structName, description: description, properties: properties),
+                // Removed generateFromGeneratedContentMethod and generateToGeneratedContentMethod
+                // as they are not needed with the new protocol design
+                generateGenerationSchemaProperty(structName: structName, description: description, properties: properties),
+                generateAsPartiallyGeneratedMethod(structName: structName),
+                // Need to generate these properties as they don't have default implementations
+                generateInstructionsRepresentationProperty(),
+                generatePromptRepresentationProperty()
+            ]
+        } else if let enumDecl = declaration.as(EnumDeclSyntax.self) {
+            let enumName = enumDecl.name.text
+            let description = extractDescription(from: node)
+            
+            // Get all enum cases
+            let cases = extractEnumCases(from: enumDecl)
+            
+            // Generate the required members for enum
+            return [
+                generateEnumInitFromGeneratedContent(enumName: enumName, cases: cases),
+                generateEnumGeneratedContentProperty(enumName: enumName, description: description, cases: cases),
+                // Removed generateEnumFromGeneratedContentMethod and generateToGeneratedContentMethod
+                // as they are not needed with the new protocol design
+                generateEnumGenerationSchemaProperty(enumName: enumName, description: description, cases: cases),
+                generateAsPartiallyGeneratedMethod(structName: enumName),
+                // Need to generate these properties as they don't have default implementations
+                generateInstructionsRepresentationProperty(),
+                generatePromptRepresentationProperty()
+            ]
+        } else {
             throw MacroError.notApplicableToType
         }
-        
-        let structName = structDecl.name.text
-        let description = extractDescription(from: node)
-        
-        // Get all properties with @Guide annotations
-        let properties = extractGuidedProperties(from: structDecl)
-        
-        // Generate the required members according to Apple specs
-        // ✅ CONFIRMED: Apple only generates init(_:) and generatedContent
-        // Plus we need to generate protocol methods for full conformance
-        return [
-            generateInitFromGeneratedContent(structName: structName, properties: properties),
-            generateGeneratedContentProperty(structName: structName, description: description, properties: properties),
-            generateFromGeneratedContentMethod(structName: structName),
-            generateToGeneratedContentMethod(),
-            generateGenerationSchemaProperty(structName: structName, description: description, properties: properties),
-            generateAsPartiallyGeneratedMethod(structName: structName),
-            generateInstructionsRepresentationProperty(),
-            generatePromptRepresentationProperty()
-        ]
     }
     
     // MARK: - ExtensionMacro Implementation
@@ -199,15 +217,70 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
     
     /// Generate init(_:) initializer according to Apple specs
     private static func generateInitFromGeneratedContent(structName: String, properties: [PropertyInfo]) -> DeclSyntax {
+        // Generate property extraction code
+        let propertyExtractions = properties.map { prop in
+            generatePropertyExtraction(propertyName: prop.name, propertyType: prop.type)
+        }.joined(separator: "\n            ")
+        
         return DeclSyntax(stringLiteral: """
-        public init(_ generatedContent: GeneratedContent) {
+        public init(_ generatedContent: GeneratedContent) throws {
             // ✅ CONFIRMED: Apple generates init(_:) initializer
-            // For now, initialize with default values - JSON parsing will be added later
-            \(properties.map { prop in
-                "self.\(prop.name) = \(getDefaultValue(for: prop.type))"
-            }.joined(separator: "\n            "))
+            // Extract properties from GeneratedContent
+            let properties = try generatedContent.properties()
+            
+            \(propertyExtractions)
         }
         """)
+    }
+    
+    /// Generate property extraction from GeneratedContent properties
+    private static func generatePropertyExtraction(propertyName: String, propertyType: String) -> String {
+        switch propertyType {
+        case "String":
+            return "self.\(propertyName) = properties[\"\(propertyName)\"]?.stringValue ?? \"\""
+        case "Int":
+            return """
+            if let value = properties["\(propertyName)"]?.stringValue, let intValue = Int(value) {
+                self.\(propertyName) = intValue
+            } else {
+                self.\(propertyName) = 0
+            }
+            """
+        case "Double":
+            return """
+            if let value = properties["\(propertyName)"]?.stringValue, let doubleValue = Double(value) {
+                self.\(propertyName) = doubleValue
+            } else {
+                self.\(propertyName) = 0.0
+            }
+            """
+        case "Float":
+            return """
+            if let value = properties["\(propertyName)"]?.stringValue, let floatValue = Float(value) {
+                self.\(propertyName) = floatValue
+            } else {
+                self.\(propertyName) = 0.0
+            }
+            """
+        case "Bool":
+            return """
+            if let value = properties["\(propertyName)"]?.stringValue {
+                self.\(propertyName) = value.lowercased() == "true" || value == "1"
+            } else {
+                self.\(propertyName) = false
+            }
+            """
+        default:
+            // For complex types, try to use their init(_:) if they conform to ConvertibleFromGeneratedContent
+            return """
+            if let value = properties["\(propertyName)"] {
+                self.\(propertyName) = try \(propertyType)(value)
+            } else {
+                // TODO: Handle missing property - for now use default
+                self.\(propertyName) = \(getDefaultValue(for: propertyType))
+            }
+            """
+        }
     }
     
     /// Generate generatedContent property according to Apple specs
@@ -226,7 +299,7 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         return DeclSyntax(stringLiteral: """
         public static func from(generatedContent: GeneratedContent) throws -> \(structName) {
             // For now, just create with init - proper parsing will be implemented later
-            return \(structName)(generatedContent)
+            return try \(structName)(generatedContent)
         }
         """)
     }
@@ -346,6 +419,130 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         """)
     }
     
+    // MARK: - Enum Support Methods
+    
+    /// Extract enum cases from enum declaration
+    private static func extractEnumCases(from enumDecl: EnumDeclSyntax) -> [EnumCaseInfo] {
+        var cases: [EnumCaseInfo] = []
+        
+        for member in enumDecl.memberBlock.members {
+            if let caseDecl = member.decl.as(EnumCaseDeclSyntax.self) {
+                for element in caseDecl.elements {
+                    let caseName = element.name.text
+                    var associatedValues: [(label: String?, type: String)] = []
+                    
+                    // Extract associated values if present
+                    if let parameterClause = element.parameterClause {
+                        for parameter in parameterClause.parameters {
+                            let label = parameter.firstName?.text
+                            let type = parameter.type.description.trimmingCharacters(in: .whitespacesAndNewlines)
+                            associatedValues.append((label: label, type: type))
+                        }
+                    }
+                    
+                    // Look for @Guide attributes (if supported on enum cases)
+                    let guideDescription: String? = nil // Enum cases don't typically have @Guide
+                    
+                    cases.append(EnumCaseInfo(
+                        name: caseName,
+                        associatedValues: associatedValues,
+                        guideDescription: guideDescription
+                    ))
+                }
+            }
+        }
+        
+        return cases
+    }
+    
+    /// Generate init(_:) for enums
+    private static func generateEnumInitFromGeneratedContent(enumName: String, cases: [EnumCaseInfo]) -> DeclSyntax {
+        // Generate switch-case based initialization for simple enums
+        let switchCases = cases.map { enumCase in
+            if enumCase.associatedValues.isEmpty {
+                // Simple case without associated values
+                return "case \"\(enumCase.name)\": self = .\(enumCase.name)"
+            } else {
+                // Associated values support - future implementation
+                // For now, skip cases with associated values to avoid compiler crash
+                return """
+                // TODO: Future implementation for associated values
+                // case with associated values: .\(enumCase.name)
+                """
+            }
+        }.joined(separator: "\n            ")
+        
+        return DeclSyntax(stringLiteral: """
+        public init(_ generatedContent: GeneratedContent) throws {
+            // ✅ CONFIRMED: Apple generates init(_:) initializer for enums
+            // Parse enum case from GeneratedContent string value
+            let value = generatedContent.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            switch value {
+            \(switchCases)
+            default:
+                throw GenerationError.decodingFailure(
+                    GenerationError.Context(debugDescription: "Invalid enum case '\\(value)' for \(enumName). Valid cases: [\(cases.filter { $0.associatedValues.isEmpty }.map { $0.name }.joined(separator: ", "))]")
+                )
+            }
+        }
+        """)
+    }
+    
+    /// Generate generatedContent property for enums
+    private static func generateEnumGeneratedContentProperty(enumName: String, description: String?, cases: [EnumCaseInfo]) -> DeclSyntax {
+        // Generate switch cases for simple enums only
+        let switchCases = cases.map { enumCase in
+            if enumCase.associatedValues.isEmpty {
+                return "case .\(enumCase.name): return GeneratedContent(\"\(enumCase.name)\")"
+            } else {
+                // Associated values support - future implementation
+                return """
+                // TODO: Future implementation for associated values
+                // case .\(enumCase.name): // with associated values
+                """
+            }
+        }.joined(separator: "\n            ")
+        
+        return DeclSyntax(stringLiteral: """
+        public var generatedContent: GeneratedContent {
+            // ✅ CONFIRMED: Apple generates generatedContent property for enums
+            // Convert enum case to GeneratedContent string representation
+            switch self {
+            \(switchCases)
+            }
+        }
+        """)
+    }
+    
+    /// Generate from(generatedContent:) static method for enums
+    private static func generateEnumFromGeneratedContentMethod(enumName: String) -> DeclSyntax {
+        return DeclSyntax(stringLiteral: """
+        public static func from(generatedContent: GeneratedContent) throws -> \(enumName) {
+            return try \(enumName)(generatedContent)
+        }
+        """)
+    }
+    
+    /// Generate generationSchema for enums
+    private static func generateEnumGenerationSchemaProperty(enumName: String, description: String?, cases: [EnumCaseInfo]) -> DeclSyntax {
+        // Create anyOf array for simple enum cases only (as strings)
+        let simpleCases = cases.filter { $0.associatedValues.isEmpty }
+        let caseNames = simpleCases.map { "\"\($0.name)\"" }.joined(separator: ", ")
+        
+        return DeclSyntax(stringLiteral: """
+        public static var generationSchema: GenerationSchema {
+            // ✅ CONFIRMED: Apple generates generationSchema for enums
+            // Create schema for simple enum with anyOf containing possible case names
+            return GenerationSchema(
+                type: "string",
+                description: \(description.map { "\"\($0)\"" } ?? "\"Generated \(enumName)\""),
+                anyOf: [\(caseNames)]
+            )
+        }
+        """)
+    }
+    
     
 }
 
@@ -377,6 +574,12 @@ struct PropertyInfo {
     let pattern: String?
 }
 
+struct EnumCaseInfo {
+    let name: String
+    let associatedValues: [(label: String?, type: String)]
+    let guideDescription: String?
+}
+
 enum MacroError: Error, CustomStringConvertible {
     case notApplicableToType
     case invalidSyntax
@@ -385,7 +588,7 @@ enum MacroError: Error, CustomStringConvertible {
     var description: String {
         switch self {
         case .notApplicableToType:
-            return "@Generable can only be applied to structs"
+            return "@Generable can only be applied to structs, actors, or enumerations"
         case .invalidSyntax:
             return "Invalid macro syntax"
         case .missingRequiredParameter:

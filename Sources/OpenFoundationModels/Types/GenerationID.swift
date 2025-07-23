@@ -114,14 +114,16 @@ extension GenerationID: CustomStringConvertible {
 
 // MARK: - Protocol Conformances
 extension GenerationID: InstructionsRepresentable, PromptRepresentable {
-    /// Convert to instructions representation
+    /// An instance that represents the instructions.
+    /// ✅ CONFIRMED: Required by InstructionsRepresentable
     public var instructionsRepresentation: Instructions {
-        return Instructions("A unique identifier: \(description)")
+        return Instructions("A unique identifier: \(value.uuidString)")
     }
     
-    /// Convert to prompt representation
+    /// An instance that represents a prompt.
+    /// ✅ CONFIRMED: Required by PromptRepresentable
     public var promptRepresentation: Prompt {
-        return Prompt(description)
+        return Prompt(value.uuidString)
     }
 }
 
@@ -143,17 +145,17 @@ extension GenerationID: Generable {
     /// 
     /// **Apple Foundation Models Documentation:**
     /// Creates a GenerationID from generated content.
+    /// ✅ CONFIRMED: Required by ConvertibleFromGeneratedContent
     /// 
-    /// - Parameter generatedContent: The generated content
-    /// - Returns: A GenerationID instance
+    /// - Parameter content: The generated content
     /// - Throws: Any conversion errors
-    public static func from(generatedContent: GeneratedContent) throws -> GenerationID {
-        let uuidString = generatedContent.text
+    public init(_ content: GeneratedContent) throws {
+        let uuidString = content.text
         if let uuid = UUID(uuidString: uuidString) {
-            return GenerationID(value: uuid)
+            self.init(value: uuid)
         } else {
             // Generate a new UUID if the content is not a valid UUID
-            return GenerationID()
+            self.init()
         }
     }
     
@@ -161,9 +163,10 @@ extension GenerationID: Generable {
     /// 
     /// **Apple Foundation Models Documentation:**
     /// Converts GenerationID to generated content.
+    /// ✅ CONFIRMED: Required by ConvertibleToGeneratedContent
     /// 
     /// - Returns: The generated content representation
-    public func toGeneratedContent() -> GeneratedContent {
+    public var generatedContent: GeneratedContent {
         return GeneratedContent(value.uuidString)
     }
     

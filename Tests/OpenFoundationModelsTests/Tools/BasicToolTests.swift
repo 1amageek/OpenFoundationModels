@@ -29,14 +29,10 @@ struct BasicToolTests {
         struct Arguments: ConvertibleFromGeneratedContent {
             let city: String
             
-            static func from(generatedContent: GeneratedContent) throws -> Arguments {
+            init(_ content: GeneratedContent) throws {
                 // Simple implementation - parse city from content
-                let content = generatedContent.stringValue
-                return Arguments(city: content.isEmpty ? "Unknown" : content)
-            }
-            
-            private init(city: String) {
-                self.city = city
+                let value = content.stringValue
+                self.city = value.isEmpty ? "Unknown" : value
             }
         }
         
@@ -58,12 +54,8 @@ struct BasicToolTests {
         struct Arguments: ConvertibleFromGeneratedContent {
             let expression: String
             
-            static func from(generatedContent: GeneratedContent) throws -> Arguments {
-                return Arguments(expression: generatedContent.stringValue)
-            }
-            
-            private init(expression: String) {
-                self.expression = expression
+            init(_ content: GeneratedContent) throws {
+                self.expression = content.stringValue
             }
         }
         
@@ -150,7 +142,7 @@ struct BasicToolTests {
     func basicToolExecution() async throws {
         let tool = SimpleWeatherTool()
         let content = GeneratedContent("Tokyo")
-        let args = try SimpleWeatherTool.Arguments.from(generatedContent: content)
+        let args = try SimpleWeatherTool.Arguments(content)
         
         let result = try await tool.call(arguments: args)
         
@@ -176,7 +168,7 @@ struct BasicToolTests {
     func toolErrorHandling() async throws {
         let tool = CalculatorTool()
         let content = GeneratedContent("10/0")
-        let args = try CalculatorTool.Arguments.from(generatedContent: content)
+        let args = try CalculatorTool.Arguments(content)
         
         // Should throw error for division by zero
         do {
@@ -195,7 +187,7 @@ struct BasicToolTests {
     func toolSuccessfulCalculation() async throws {
         let tool = CalculatorTool()
         let content = GeneratedContent("2 + 2")
-        let args = try CalculatorTool.Arguments.from(generatedContent: content)
+        let args = try CalculatorTool.Arguments(content)
         
         let result = try await tool.call(arguments: args)
         let calculation = try result.decode(as: CalculationResult.self)
@@ -272,9 +264,9 @@ struct BasicToolTests {
         let tool = SimpleWeatherTool()
         
         // Execute multiple tool calls concurrently
-        async let result1 = try SimpleWeatherTool.Arguments.from(generatedContent: GeneratedContent("Tokyo"))
-        async let result2 = try SimpleWeatherTool.Arguments.from(generatedContent: GeneratedContent("London"))
-        async let result3 = try SimpleWeatherTool.Arguments.from(generatedContent: GeneratedContent("Paris"))
+        async let result1 = try SimpleWeatherTool.Arguments(GeneratedContent("Tokyo"))
+        async let result2 = try SimpleWeatherTool.Arguments(GeneratedContent("London"))
+        async let result3 = try SimpleWeatherTool.Arguments(GeneratedContent("Paris"))
         
         let args = try await [result1, result2, result3]
         
@@ -302,11 +294,9 @@ struct BasicToolTests {
             let description = "Tool with no meaningful arguments"
             
             struct Arguments: ConvertibleFromGeneratedContent {
-                static func from(generatedContent: GeneratedContent) throws -> Arguments {
-                    return Arguments()
+                init(_ content: GeneratedContent) throws {
+                    // No properties to initialize
                 }
-                
-                private init() {}
             }
             
             func call(arguments: Arguments) async throws -> ToolOutput {
@@ -315,7 +305,7 @@ struct BasicToolTests {
         }
         
         let tool = EmptyArgumentsTool()
-        let args = try EmptyArgumentsTool.Arguments.from(generatedContent: GeneratedContent(""))
+        let args = try EmptyArgumentsTool.Arguments(GeneratedContent(""))
         
         let result = try await tool.call(arguments: args)
         let output = try result.decode(as: SimpleResult.self)

@@ -48,7 +48,8 @@ public struct ToolOutputApple: Codable, Sendable {
         
         let encoder = JSONEncoder()
         let data = try encoder.encode(output)
-        self.output = GeneratedContent(data: data, contentType: .json)
+        let jsonString = String(data: data, encoding: .utf8) ?? "{}"
+        self.output = try GeneratedContent(json: jsonString)
     }
 }
 
@@ -60,19 +61,51 @@ public extension ToolOutputApple {
     /// - Returns: Decoded output
     /// - Throws: DecodingError if decoding fails
     func decodeOutput<T: Decodable>(as type: T.Type) throws -> T {
+        // Convert GeneratedContent back to JSON data
+        let jsonString = output.stringValue
+        guard let data = jsonString.data(using: .utf8) else {
+            throw ToolOutputError.invalidOutputFormat
+        }
         let decoder = JSONDecoder()
-        return try decoder.decode(type, from: output.dataValue)
+        return try decoder.decode(type, from: data)
     }
     
     /// Get output as a dictionary
     /// - Returns: Output as [String: Any] dictionary
     /// - Throws: Error if JSON parsing fails
     func outputDictionary() throws -> [String: Any] {
-        let data = output.dataValue
-        guard let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw ToolOutputError.invalidOutputFormat
+        // For GeneratedContent created from JSON, we need to reconstruct the dictionary
+        let properties = try output.properties()
+        var result: [String: Any] = [:]
+        for (key, value) in properties {
+            // Convert each GeneratedContent value to appropriate Swift type
+            if let nestedProps = try? value.properties() {
+                // Nested object
+                result[key] = try convertToSwiftObject(value)
+            } else if let elements = try? value.elements() {
+                // Array
+                result[key] = try elements.map { try convertToSwiftObject($0) }
+            } else {
+                // Simple value
+                result[key] = value.stringValue
+            }
         }
-        return dict
+        return result
+    }
+    
+    /// Helper to convert GeneratedContent to Swift object
+    private func convertToSwiftObject(_ content: GeneratedContent) throws -> Any {
+        if let properties = try? content.properties() {
+            var dict: [String: Any] = [:]
+            for (key, value) in properties {
+                dict[key] = try convertToSwiftObject(value)
+            }
+            return dict
+        } else if let elements = try? content.elements() {
+            return try elements.map { try convertToSwiftObject($0) }
+        } else {
+            return content.stringValue
+        }
     }
 }
 

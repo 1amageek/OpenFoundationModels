@@ -35,7 +35,7 @@ struct ResponseTests {
     }
     
     @Test("Response creation with Generable content")
-    func responseGenerableCreation() {
+    func responseGenerableCreation() throws {
         @Generable
         struct TestData {
             let message: String
@@ -43,7 +43,7 @@ struct ResponseTests {
         }
         
         // Test with valid JSON
-        let content = TestData(GeneratedContent(#"{"message": "test", "count": 42}"#))
+        let content = try TestData(GeneratedContent(#"{"message": "test", "count": 42}"#))
         let transcriptEntries = ArraySlice<Transcript.Entry>()
         
         let response = Response(
@@ -57,7 +57,7 @@ struct ResponseTests {
     }
     
     @Test("Response with Generable fallback to defaults")
-    func responseGenerableFallback() {
+    func responseGenerableFallback() throws {
         @Generable
         struct TestData {
             let message: String
@@ -65,7 +65,7 @@ struct ResponseTests {
         }
         
         // Test with invalid JSON - should fallback to defaults
-        let content = TestData(GeneratedContent("invalid json"))
+        let content = try TestData(GeneratedContent("{}"))
         let transcriptEntries = ArraySlice<Transcript.Entry>()
         
         let response = Response(

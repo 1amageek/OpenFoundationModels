@@ -63,7 +63,7 @@ struct MacroToolTests {
         
         // This should work if the macro properly generates the conformance
         do {
-            let args = try TestWeatherTool.Arguments.from(generatedContent: content)
+            let args = try TestWeatherTool.Arguments(content)
             let result = try await tool.call(arguments: args)
             
             let weather = try result.decode(as: WeatherInfo.self)
@@ -109,9 +109,9 @@ struct MacroToolTests {
         // Test if the macro generated the required methods
         do {
             let content = GeneratedContent("test")
-            let _ = try SimpleTest.from(generatedContent: content)
+            let _ = try SimpleTest(content)
         } catch {
-            Issue.record("@Generable macro not generating from(generatedContent:) method: \(error)")
+            Issue.record("@Generable macro not generating init(_:) method: \(error)")
         }
     }
 }

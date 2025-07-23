@@ -147,7 +147,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         
         let text = try await model.generate(prompt: schemaPrompt, options: options)
         let generatedContent = GeneratedContent(text)
-        let content = try Content.from(generatedContent: generatedContent)
+        let content = try Content(generatedContent)
         let duration = Date().timeIntervalSince(startTime)
         
         // Create transcript entry
@@ -319,7 +319,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                     
                     // For now, create partial responses with string content
                     // TODO: Implement proper Generable partial parsing when needed
-                    if let partialData = try? Content.from(generatedContent: partialContent) {
+                    if let partialData = try? Content(partialContent) {
                         let partial = Response<Content>.Partial(
                             content: partialData,
                             isComplete: false
@@ -330,7 +330,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 
                 // Final complete partial
                 let finalContent = GeneratedContent(accumulatedText)
-                if let finalData = try? Content.from(generatedContent: finalContent) {
+                if let finalData = try? Content(finalContent) {
                     let partial = Response<Content>.Partial(
                         content: finalData,
                         isComplete: true

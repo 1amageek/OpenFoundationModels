@@ -74,7 +74,7 @@ struct ConcurrentGenerationTests {
     }
     
     @Test("Concurrent schema generation", .timeLimit(.minutes(1)))
-    func concurrentSchemaGeneration() async {
+    func concurrentSchemaGeneration() async throws {
         // Define multiple schema types
         @Generable
         struct SchemaType1 {
@@ -98,7 +98,7 @@ struct ConcurrentGenerationTests {
         let startTime = Date()
         
         // Generate schemas concurrently
-        let results = await withTaskGroup(of: (String, String).self) { group in
+        let results = try await withThrowingTaskGroup(of: (String, String).self) { group in
             for i in 0..<concurrencyLevel {
                 group.addTask {
                     let schema1 = SchemaType1.generationSchema
@@ -110,7 +110,7 @@ struct ConcurrentGenerationTests {
             }
             
             var collectedResults: [(String, String)] = []
-            for await result in group {
+            for try await result in group {
                 collectedResults.append(result)
             }
             return collectedResults
@@ -132,7 +132,7 @@ struct ConcurrentGenerationTests {
     }
     
     @Test("Concurrent instance creation with different types", .timeLimit(.minutes(1)))
-    func concurrentInstanceCreationWithDifferentTypes() async {
+    func concurrentInstanceCreationWithDifferentTypes() async throws {
         @Generable
         struct TypeA {
             @Guide(description: "Name") let name: String
@@ -155,11 +155,11 @@ struct ConcurrentGenerationTests {
         let startTime = Date()
         
         // Create instances concurrently
-        let results = await withTaskGroup(of: String.self) { group in
+        let results = try await withThrowingTaskGroup(of: String.self) { group in
             // Type A instances
             for i in 0..<instancesPerType {
                 group.addTask {
-                    let instance = TypeA(GeneratedContent("typeA-\(i)"))
+                    let instance = try TypeA(GeneratedContent("typeA-\(i)"))
                     return "A:\(instance.name):\(instance.count)"
                 }
             }
@@ -167,7 +167,7 @@ struct ConcurrentGenerationTests {
             // Type B instances
             for i in 0..<instancesPerType {
                 group.addTask {
-                    let instance = TypeB(GeneratedContent("typeB-\(i)"))
+                    let instance = try TypeB(GeneratedContent("typeB-\(i)"))
                     return "B:\(instance.value):\(instance.score)"
                 }
             }
@@ -175,13 +175,13 @@ struct ConcurrentGenerationTests {
             // Type C instances
             for i in 0..<instancesPerType {
                 group.addTask {
-                    let instance = TypeC(GeneratedContent("typeC-\(i)"))
+                    let instance = try TypeC(GeneratedContent("typeC-\(i)"))
                     return "C:\(instance.id):\(instance.active)"
                 }
             }
             
             var collectedResults: [String] = []
-            for await result in group {
+            for try await result in group {
                 collectedResults.append(result)
             }
             return collectedResults
@@ -217,7 +217,7 @@ struct ConcurrentGenerationTests {
     }
     
     @Test("Concurrent streaming with error handling", .timeLimit(.minutes(1)))
-    func concurrentStreamingWithErrorHandling() async {
+    func concurrentStreamingWithErrorHandling() async throws {
         let successStreamCount = 5
         let errorStreamCount = 3
         
@@ -246,7 +246,7 @@ struct ConcurrentGenerationTests {
         let startTime = Date()
         
         // Process streams concurrently with error handling
-        let results = await withTaskGroup(of: Result<String, Error>.self) { group in
+        let results = try await withThrowingTaskGroup(of: Result<String, Error>.self) { group in
             for (index, stream) in responseStreams.enumerated() {
                 group.addTask {
                     do {
@@ -259,7 +259,7 @@ struct ConcurrentGenerationTests {
             }
             
             var collectedResults: [Result<String, Error>] = []
-            for await result in group {
+            for try await result in group {
                 collectedResults.append(result)
             }
             return collectedResults
@@ -294,7 +294,7 @@ struct ConcurrentGenerationTests {
     }
     
     @Test("High-load concurrent operations", .timeLimit(.minutes(2)))
-    func highLoadConcurrentOperations() async {
+    func highLoadConcurrentOperations() async throws {
         @Generable
         struct LoadTestType {
             @Guide(description: "ID") let id: String
@@ -312,19 +312,19 @@ struct ConcurrentGenerationTests {
         for batchStart in stride(from: 0, to: totalOperations, by: batchSize) {
             let batchEnd = min(batchStart + batchSize, totalOperations)
             
-            let batchResults = await withTaskGroup(of: String.self) { group in
+            let batchResults = try await withThrowingTaskGroup(of: String.self) { group in
                 for i in batchStart..<batchEnd {
                     group.addTask {
                         // Mix of operations: schema access and instance creation
                         let schema = LoadTestType.generationSchema
-                        let instance = LoadTestType(GeneratedContent("batch-\(i)"))
+                        let instance = try LoadTestType(GeneratedContent("batch-\(i)"))
                         
                         return "op-\(i):\(schema.type):\(instance.id):\(instance.index)"
                     }
                 }
                 
                 var batchCollected: [String] = []
-                for await result in group {
+                for try await result in group {
                     batchCollected.append(result)
                 }
                 return batchCollected
@@ -352,7 +352,7 @@ struct ConcurrentGenerationTests {
     }
     
     @Test("Resource contention test", .timeLimit(.minutes(1)))
-    func resourceContentionTest() async {
+    func resourceContentionTest() async throws {
         @Generable
         struct SharedResourceType {
             @Guide(description: "Resource ID") let resourceId: String
@@ -364,15 +364,15 @@ struct ConcurrentGenerationTests {
         let startTime = Date()
         
         // Test concurrent access to the same schema and type
-        let results = await withTaskGroup(of: (Int, String, String).self) { group in
+        let results = try await withThrowingTaskGroup(of: (Int, String, String).self) { group in
             for i in 0..<concurrentAccesses {
                 group.addTask {
                     // Multiple operations on the same type to test resource contention
                     let schema1 = SharedResourceType.generationSchema
-                    let instance1 = SharedResourceType(GeneratedContent("access-\(i)-1"))
+                    let instance1 = try SharedResourceType(GeneratedContent("access-\(i)-1"))
                     
                     let schema2 = SharedResourceType.generationSchema
-                    let _ = SharedResourceType(GeneratedContent("access-\(i)-2"))
+                    let _ = try SharedResourceType(GeneratedContent("access-\(i)-2"))
                     
                     // Verify schemas are consistent
                     let schemasMatch = (schema1.type == schema2.type)
@@ -382,7 +382,7 @@ struct ConcurrentGenerationTests {
             }
             
             var collectedResults: [(Int, String, String)] = []
-            for await result in group {
+            for try await result in group {
                 collectedResults.append(result)
             }
             return collectedResults

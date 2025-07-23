@@ -17,7 +17,7 @@ import Foundation
 struct LargeSchemaTests {
     
     @Test("Large schema with many simple properties", .timeLimit(.minutes(1)))
-    func largeSchemaWithManySimpleProperties() {
+    func largeSchemaWithManySimpleProperties() throws {
         // Test macro performance with many properties
         @Generable
         struct LargeUserProfile {
@@ -66,7 +66,7 @@ struct LargeSchemaTests {
         
         // Test instance creation performance
         let resetTime = Date()
-        let instance = LargeUserProfile(GeneratedContent("{}"))
+        let instance = try LargeUserProfile(GeneratedContent("{}"))
         let instanceTime = Date().timeIntervalSince(resetTime)
         
         // Verify basic functionality
@@ -84,7 +84,7 @@ struct LargeSchemaTests {
     }
     
     @Test("Schema generation with complex constraints", .timeLimit(.minutes(1)))
-    func schemaGenerationWithComplexConstraints() {
+    func schemaGenerationWithComplexConstraints() throws {
         @Generable
         struct ComplexConstrainedType {
             @Guide(description: "Username", .pattern("[a-zA-Z0-9_]{3,20}"))
@@ -116,7 +116,7 @@ struct LargeSchemaTests {
         
         // Test constraint processing performance
         let schema = ComplexConstrainedType.generationSchema
-        let instance = ComplexConstrainedType(GeneratedContent("{}"))
+        let instance = try ComplexConstrainedType(GeneratedContent("{}"))
         
         let totalTime = Date().timeIntervalSince(startTime)
         
@@ -134,7 +134,7 @@ struct LargeSchemaTests {
     }
     
     @Test("Multiple large schemas in parallel", .timeLimit(.minutes(2)))
-    func multipleLargeSchemasInParallel() async {
+    func multipleLargeSchemasInParallel() async throws {
         // Define multiple large schema types
         @Generable
         struct ProductCatalog {
@@ -191,13 +191,13 @@ struct LargeSchemaTests {
         async let orderSchema = Task { OrderDetails.generationSchema }
         async let customerSchema = Task { CustomerProfile.generationSchema }
         
-        async let productInstance = Task { ProductCatalog(GeneratedContent("{}")) }
-        async let orderInstance = Task { OrderDetails(GeneratedContent("{}")) }
-        async let customerInstance = Task { CustomerProfile(GeneratedContent("{}")) }
+        async let productInstance = Task { try ProductCatalog(GeneratedContent("{}")) }
+        async let orderInstance = Task { try OrderDetails(GeneratedContent("{}")) }
+        async let customerInstance = Task { try CustomerProfile(GeneratedContent("{}")) }
         
         // Await all results
         let (pSchema, oSchema, cSchema) = await (productSchema.value, orderSchema.value, customerSchema.value)
-        let (pInstance, oInstance, cInstance) = await (productInstance.value, orderInstance.value, customerInstance.value)
+        let (pInstance, oInstance, cInstance) = try await (productInstance.value, orderInstance.value, customerInstance.value)
         
         let totalTime = Date().timeIntervalSince(startTime)
         
@@ -216,7 +216,7 @@ struct LargeSchemaTests {
     }
     
     @Test("Schema memory efficiency with repeated access", .timeLimit(.minutes(1)))
-    func schemaMemoryEfficiencyWithRepeatedAccess() {
+    func schemaMemoryEfficiencyWithRepeatedAccess() throws {
         @Generable
         struct RepeatedAccessType {
             @Guide(description: "Field 1") let field1: String
@@ -242,7 +242,7 @@ struct LargeSchemaTests {
         var instances: [RepeatedAccessType] = []
         
         for i in 0..<100 { // Fewer instances to avoid memory issues
-            let instance = RepeatedAccessType(GeneratedContent("test-\(i)"))
+            let instance = try RepeatedAccessType(GeneratedContent("test-\(i)"))
             instances.append(instance)
         }
         
@@ -263,7 +263,7 @@ struct LargeSchemaTests {
     }
     
     @Test("Large schema compilation performance", .timeLimit(.minutes(2)))
-    func largeSchemaCompilationPerformance() {
+    func largeSchemaCompilationPerformance() throws {
         // Test that large schemas compile in reasonable time
         @Generable
         struct VeryLargeSchema {
@@ -324,7 +324,7 @@ struct LargeSchemaTests {
         let startTime = Date()
         
         let schema = VeryLargeSchema.generationSchema
-        let instance = VeryLargeSchema(GeneratedContent("{}"))
+        let instance = try VeryLargeSchema(GeneratedContent("{}"))
         
         let totalTime = Date().timeIntervalSince(startTime)
         
@@ -341,7 +341,7 @@ struct LargeSchemaTests {
     }
     
     @Test("Batch schema operations performance", .timeLimit(.minutes(1)))
-    func batchSchemaOperationsPerformance() {
+    func batchSchemaOperationsPerformance() throws {
         @Generable
         struct BatchTestType {
             @Guide(description: "ID") let id: String
@@ -358,7 +358,7 @@ struct LargeSchemaTests {
         instances.reserveCapacity(batchSize)
         
         for i in 0..<batchSize {
-            let instance = BatchTestType(GeneratedContent("batch-\(i)"))
+            let instance = try BatchTestType(GeneratedContent("batch-\(i)"))
             instances.append(instance)
         }
         

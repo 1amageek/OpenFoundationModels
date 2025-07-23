@@ -52,7 +52,7 @@ struct GeneratedContentTests {
     // MARK: - JSON Content Tests
     
     @Test("GeneratedContent with JSON string")
-    func generatedContentJSON() {
+    func generatedContentJSON() throws {
         let jsonString = """
         {
             "name": "John Doe",
@@ -61,16 +61,17 @@ struct GeneratedContentTests {
         }
         """
         
-        let content = GeneratedContent(jsonString)
+        let content = try GeneratedContent(json: jsonString)
         
-        #expect(content.stringValue == jsonString)
-        #expect(content.stringValue.contains("John Doe"))
-        #expect(content.stringValue.contains("30"))
-        #expect(content.stringValue.contains("john@example.com"))
+        // JSON parsing converts to structured data, not raw string
+        let properties = try content.properties()
+        #expect(properties["name"]?.stringValue == "John Doe")
+        #expect(properties["age"]?.stringValue == "30")
+        #expect(properties["email"]?.stringValue == "john@example.com")
     }
     
     @Test("GeneratedContent with structured JSON data")
-    func generatedContentStructuredJSON() {
+    func generatedContentStructuredJSON() throws {
         let jsonString = """
         {
             "title": "Sample Article",
@@ -80,14 +81,22 @@ struct GeneratedContentTests {
         }
         """
         
-        let content = GeneratedContent(jsonString)
+        let content = try GeneratedContent(json: jsonString)
         
-        #expect(content.stringValue.contains("Sample Article"))
-        #expect(!content.stringValue.isEmpty)
+        let properties = try content.properties()
+        #expect(properties["title"]?.stringValue == "Sample Article")
+        #expect(properties["wordCount"]?.stringValue == "500")
+        #expect(properties["published"]?.stringValue == "true")
+        
+        let tags = try properties["tags"]?.elements()
+        #expect(tags?.count == 3)
+        #expect(tags?[0].stringValue == "technology")
+        #expect(tags?[1].stringValue == "AI")
+        #expect(tags?[2].stringValue == "swift")
     }
     
     @Test("GeneratedContent with nested JSON structure")
-    func generatedContentNestedJSON() {
+    func generatedContentNestedJSON() throws {
         let nestedJSON = """
         {
             "user": {
@@ -102,12 +111,20 @@ struct GeneratedContentTests {
         }
         """
         
-        let content = GeneratedContent(nestedJSON)
+        let content = try GeneratedContent(json: nestedJSON)
         
-        #expect(!content.stringValue.isEmpty)
-        #expect(content.stringValue.contains("Alice"))
-        #expect(content.stringValue.contains("dark"))
-        #expect(content.stringValue.count > 10)
+        let properties = try content.properties()
+        let userContent = properties["user"]
+        let userProperties = try userContent?.properties()
+        let profileContent = userProperties?["profile"]
+        let profileProperties = try profileContent?.properties()
+        
+        #expect(profileProperties?["name"]?.stringValue == "Alice")
+        
+        let settingsContent = profileProperties?["settings"]
+        let settingsProperties = try settingsContent?.properties()
+        #expect(settingsProperties?["theme"]?.stringValue == "dark")
+        #expect(settingsProperties?["notifications"]?.stringValue == "true")
     }
     
     // MARK: - Protocol Conformance Tests
@@ -127,7 +144,7 @@ struct GeneratedContentTests {
         let originalContent = GeneratedContent("Original content")
         
         // Should be able to convert from itself
-        let convertedContent = try GeneratedContent.from(generatedContent: originalContent)
+        let convertedContent = try GeneratedContent(originalContent)
         
         #expect(convertedContent.stringValue == originalContent.stringValue)
         #expect(convertedContent.text == originalContent.text)
@@ -138,7 +155,7 @@ struct GeneratedContentTests {
         let content = GeneratedContent("Content to convert")
         
         // Should convert to itself
-        let converted = content.toGeneratedContent()
+        let converted = content.generatedContent
         
         #expect(converted.stringValue == content.stringValue)
         #expect(converted.text == content.text)
@@ -325,13 +342,17 @@ struct GeneratedContentTests {
     }
     
     @Test("GeneratedContent large JSON performance", .timeLimit(.minutes(1)))
-    func generatedContentLargeJSONPerformance() {
+    func generatedContentLargeJSONPerformance() throws {
         let largeJSON = "[" + (1...1000).map { "{\"key\($0)\": \"value\($0)\"}" }.joined(separator: ",") + "]"
         
-        let content = GeneratedContent(largeJSON)
+        let content = try GeneratedContent(json: largeJSON)
         
-        #expect(!content.stringValue.isEmpty)
-        #expect(content.stringValue.count > 1000)
+        let elements = try content.elements()
+        #expect(elements.count == 1000)
+        
+        // Check first element
+        let firstElement = try elements[0].properties()
+        #expect(firstElement["key1"]?.stringValue == "value1")
     }
     
     // MARK: - Integration Tests
