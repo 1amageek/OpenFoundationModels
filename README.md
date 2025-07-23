@@ -4,6 +4,7 @@
 [![Platform](https://img.shields.io/badge/Platform-iOS%20%7C%20macOS%20%7C%20tvOS%20%7C%20watchOS%20%7C%20visionOS-blue.svg)](https://developer.apple.com)
 [![Tests](https://img.shields.io/badge/Tests-154%20passing-brightgreen.svg)](#testing)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/1amageek/OpenFoundationModels)
 
 **100% Apple Foundation Models β SDK Compatible Implementation**
 
