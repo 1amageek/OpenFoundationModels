@@ -457,62 +457,298 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
     
     /// Generate init(_:) for enums
     private static func generateEnumInitFromGeneratedContent(enumName: String, cases: [EnumCaseInfo]) -> DeclSyntax {
-        // Generate switch-case based initialization for simple enums
-        let switchCases = cases.map { enumCase in
-            if enumCase.associatedValues.isEmpty {
-                // Simple case without associated values
-                return "case \"\(enumCase.name)\": self = .\(enumCase.name)"
-            } else {
-                // Associated values support - future implementation
-                // For now, skip cases with associated values to avoid compiler crash
-                return """
-                // TODO: Future implementation for associated values
-                // case with associated values: .\(enumCase.name)
-                """
-            }
-        }.joined(separator: "\n            ")
+        let hasAnyAssociatedValues = cases.contains { $0.hasAssociatedValues }
         
-        return DeclSyntax(stringLiteral: """
-        public init(_ generatedContent: GeneratedContent) throws {
-            // ✅ CONFIRMED: Apple generates init(_:) initializer for enums
-            // Parse enum case from GeneratedContent string value
-            let value = generatedContent.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if hasAnyAssociatedValues {
+            // Mixed enum with associated values - use discriminated union approach
+            let switchCases = cases.map { enumCase in
+                if enumCase.associatedValues.isEmpty {
+                    // Simple case
+                    return """
+                    case "\(enumCase.name)":
+                        self = .\(enumCase.name)
+                    """
+                } else if enumCase.isSingleUnlabeledValue {
+                    // Single unlabeled associated value: case text(String)
+                    let valueType = enumCase.associatedValues[0].type
+                    return generateSingleValueCase(caseName: enumCase.name, valueType: valueType)
+                } else {
+                    // Multiple or labeled associated values: case video(url: String, duration: Int)
+                    return generateMultipleValueCase(caseName: enumCase.name, associatedValues: enumCase.associatedValues)
+                }
+            }.joined(separator: "\n                ")
             
-            switch value {
-            \(switchCases)
+            return DeclSyntax(stringLiteral: """
+            public init(_ generatedContent: GeneratedContent) throws {
+                // ✅ CONFIRMED: Apple generates init(_:) initializer for enums with associated values
+                // Parse discriminated union: {"case": "caseName", "value": associatedData}
+                
+                do {
+                    let properties = try generatedContent.properties()
+                    
+                    guard let caseValue = properties["case"]?.stringValue else {
+                        throw GenerationError.decodingFailure(
+                            GenerationError.Context(debugDescription: "Missing 'case' property in enum data for \(enumName)")
+                        )
+                    }
+                    
+                    let valueContent = properties["value"]
+                    
+                    switch caseValue {
+                    \(switchCases)
+                    default:
+                        throw GenerationError.decodingFailure(
+                            GenerationError.Context(debugDescription: "Invalid enum case '\\(caseValue)' for \(enumName). Valid cases: [\(cases.map { $0.name }.joined(separator: ", "))]")
+                        )
+                    }
+                } catch {
+                    // Fallback: try simple string parsing for backward compatibility
+                    let value = generatedContent.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                    switch value {
+                    \(cases.filter { !$0.hasAssociatedValues }.map { "case \"\($0.name)\": self = .\($0.name)" }.joined(separator: "\n                    "))
+                    default:
+                        throw GenerationError.decodingFailure(
+                            GenerationError.Context(debugDescription: "Invalid enum case '\\(value)' for \(enumName). Valid cases: [\(cases.map { $0.name }.joined(separator: ", "))]")
+                        )
+                    }
+                }
+            }
+            """)
+        } else {
+            // Simple enum cases only (existing logic)
+            let switchCases = cases.map { enumCase in
+                "case \"\(enumCase.name)\": self = .\(enumCase.name)"
+            }.joined(separator: "\n            ")
+            
+            return DeclSyntax(stringLiteral: """
+            public init(_ generatedContent: GeneratedContent) throws {
+                // ✅ CONFIRMED: Apple generates init(_:) initializer for simple enums
+                // Parse enum case from GeneratedContent string value
+                let value = generatedContent.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                switch value {
+                \(switchCases)
+                default:
+                    throw GenerationError.decodingFailure(
+                        GenerationError.Context(debugDescription: "Invalid enum case '\\(value)' for \(enumName). Valid cases: [\(cases.map { $0.name }.joined(separator: ", "))]")
+                    )
+                }
+            }
+            """)
+        }
+    }
+    
+    /// Generate switch case for single unlabeled associated value
+    private static func generateSingleValueCase(caseName: String, valueType: String) -> String {
+        switch valueType {
+        case "String":
+            return """
+            case "\(caseName)":
+                if let valueContent = valueContent {
+                    let stringValue = valueContent.stringValue
+                    self = .\(caseName)(stringValue)
+                } else {
+                    self = .\(caseName)("")
+                }
+            """
+        case "Int":
+            return """
+            case "\(caseName)":
+                if let valueContent = valueContent,
+                   let intValue = Int(valueContent.stringValue) {
+                    self = .\(caseName)(intValue)
+                } else {
+                    self = .\(caseName)(0)
+                }
+            """
+        case "Double":
+            return """
+            case "\(caseName)":
+                if let valueContent = valueContent,
+                   let doubleValue = Double(valueContent.stringValue) {
+                    self = .\(caseName)(doubleValue)
+                } else {
+                    self = .\(caseName)(0.0)
+                }
+            """
+        case "Bool":
+            return """
+            case "\(caseName)":
+                if let valueContent = valueContent {
+                    let boolValue = valueContent.stringValue.lowercased() == "true"
+                    self = .\(caseName)(boolValue)
+                } else {
+                    self = .\(caseName)(false)
+                }
+            """
+        default:
+            // For custom types that conform to ConvertibleFromGeneratedContent
+            return """
+            case "\(caseName)":
+                if let valueContent = valueContent {
+                    let associatedValue = try \(valueType)(valueContent)
+                    self = .\(caseName)(associatedValue)
+                } else {
+                    throw GenerationError.decodingFailure(
+                        GenerationError.Context(debugDescription: "Missing value for enum case '\(caseName)' with associated type \(valueType)")
+                    )
+                }
+            """
+        }
+    }
+    
+    /// Generate switch case for multiple or labeled associated values
+    private static func generateMultipleValueCase(caseName: String, associatedValues: [(label: String?, type: String)]) -> String {
+        let valueExtractions = associatedValues.enumerated().map { index, assocValue in
+            let label = assocValue.label ?? "param\(index)"
+            let type = assocValue.type
+            
+            switch type {
+            case "String":
+                return "let \(label) = valueProperties[\"\(label)\"]?.stringValue ?? \"\""
+            case "Int":
+                return "let \(label) = Int(valueProperties[\"\(label)\"]?.stringValue ?? \"0\") ?? 0"
+            case "Double":
+                return "let \(label) = Double(valueProperties[\"\(label)\"]?.stringValue ?? \"0.0\") ?? 0.0"
+            case "Bool":
+                return "let \(label) = valueProperties[\"\(label)\"]?.stringValue?.lowercased() == \"true\""
             default:
+                return "let \(label) = try \(type)(valueProperties[\"\(label)\"] ?? GeneratedContent(\"{}\"))"
+            }
+        }.joined(separator: "\n                    ")
+        
+        let parameterList = associatedValues.enumerated().map { index, assocValue in
+            let label = assocValue.label ?? "param\(index)"
+            if assocValue.label != nil {
+                return "\(label): \(label)"
+            } else {
+                return label
+            }
+        }.joined(separator: ", ")
+        
+        return """
+        case "\(caseName)":
+            if let valueContent = valueContent {
+                let valueProperties = try valueContent.properties()
+                \(valueExtractions)
+                self = .\(caseName)(\(parameterList))
+            } else {
                 throw GenerationError.decodingFailure(
-                    GenerationError.Context(debugDescription: "Invalid enum case '\\(value)' for \(enumName). Valid cases: [\(cases.filter { $0.associatedValues.isEmpty }.map { $0.name }.joined(separator: ", "))]")
+                    GenerationError.Context(debugDescription: "Missing value data for enum case '\(caseName)' with associated values")
                 )
             }
-        }
-        """)
+        """
     }
     
     /// Generate generatedContent property for enums
     private static func generateEnumGeneratedContentProperty(enumName: String, description: String?, cases: [EnumCaseInfo]) -> DeclSyntax {
-        // Generate switch cases for simple enums only
-        let switchCases = cases.map { enumCase in
-            if enumCase.associatedValues.isEmpty {
-                return "case .\(enumCase.name): return GeneratedContent(\"\(enumCase.name)\")"
-            } else {
-                // Associated values support - future implementation
-                return """
-                // TODO: Future implementation for associated values
-                // case .\(enumCase.name): // with associated values
-                """
-            }
-        }.joined(separator: "\n            ")
+        let hasAnyAssociatedValues = cases.contains { $0.hasAssociatedValues }
         
-        return DeclSyntax(stringLiteral: """
-        public var generatedContent: GeneratedContent {
-            // ✅ CONFIRMED: Apple generates generatedContent property for enums
-            // Convert enum case to GeneratedContent string representation
-            switch self {
-            \(switchCases)
+        if hasAnyAssociatedValues {
+            // Mixed enum with associated values - generate discriminated union
+            let switchCases = cases.map { enumCase in
+                if enumCase.associatedValues.isEmpty {
+                    // Simple case
+                    return """
+                    case .\(enumCase.name):
+                        return GeneratedContent(properties: [
+                            "case": GeneratedContent("\(enumCase.name)"),
+                            "value": GeneratedContent("")
+                        ])
+                    """
+                } else if enumCase.isSingleUnlabeledValue {
+                    // Single unlabeled associated value - store value directly
+                    return """
+                    case .\\(enumCase.name)(let value):
+                        return GeneratedContent(properties: [
+                            "case": GeneratedContent("\\(enumCase.name)"),
+                            "value": GeneratedContent("\\\\(value)")
+                        ])
+                    """
+                } else {
+                    // Multiple or labeled associated values
+                    return generateMultipleValueSerialization(caseName: enumCase.name, associatedValues: enumCase.associatedValues)
+                }
+            }.joined(separator: "\n            ")
+            
+            return DeclSyntax(stringLiteral: """
+            public var generatedContent: GeneratedContent {
+                // ✅ CONFIRMED: Apple generates generatedContent property for enums with associated values
+                // Convert enum case to discriminated union: {"case": "caseName", "value": associatedData}
+                switch self {
+                \(switchCases)
+                }
             }
+            """)
+        } else {
+            // Simple enum cases only (existing logic)
+            let switchCases = cases.map { enumCase in
+                "case .\(enumCase.name): return GeneratedContent(\"\(enumCase.name)\")"
+            }.joined(separator: "\n            ")
+            
+            return DeclSyntax(stringLiteral: """
+            public var generatedContent: GeneratedContent {
+                // ✅ CONFIRMED: Apple generates generatedContent property for simple enums
+                // Convert enum case to GeneratedContent string representation
+                switch self {
+                \(switchCases)
+                }
+            }
+            """)
         }
-        """)
+    }
+    
+    /// Generate serialization for single unlabeled associated value
+    private static func generateSingleValueSerialization(caseName: String, valueType: String) -> String {
+        switch valueType {
+        case "String", "Int", "Double", "Bool":
+            return """
+            case .\(caseName)(let value):
+                return GeneratedContent(properties: [
+                    "case": GeneratedContent("\(caseName)"),
+                    "value": GeneratedContent("\\(value)")
+                ])
+            """
+        default:
+            // For custom types that conform to ConvertibleToGeneratedContent
+            return """
+            case .\(caseName)(let value):
+                return GeneratedContent(properties: [
+                    "case": GeneratedContent("\(caseName)"),
+                    "value": value.generatedContent
+                ])
+            """
+        }
+    }
+    
+    /// Generate serialization for multiple or labeled associated values
+    private static func generateMultipleValueSerialization(caseName: String, associatedValues: [(label: String?, type: String)]) -> String {
+        let parameterList = associatedValues.enumerated().map { index, assocValue in
+            let label = assocValue.label ?? "param\(index)"
+            return "let \(label)"
+        }.joined(separator: ", ")
+        
+        let propertyMappings = associatedValues.enumerated().map { index, assocValue in
+            let label = assocValue.label ?? "param\(index)"
+            let type = assocValue.type
+            
+            switch type {
+            case "String", "Int", "Double", "Bool":
+                return "\"\(label)\": GeneratedContent(\"\\(\(label))\")"
+            default:
+                return "\"\(label)\": \(label).generatedContent"
+            }
+        }.joined(separator: ",\n                        ")
+        
+        return """
+        case .\(caseName)(\(parameterList)):
+            return GeneratedContent(properties: [
+                "case": GeneratedContent("\(caseName)"),
+                "value": GeneratedContent(properties: [
+                    \(propertyMappings)
+                ])
+            ])
+        """
     }
     
     /// Generate from(generatedContent:) static method for enums
@@ -526,21 +762,41 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
     
     /// Generate generationSchema for enums
     private static func generateEnumGenerationSchemaProperty(enumName: String, description: String?, cases: [EnumCaseInfo]) -> DeclSyntax {
-        // Create anyOf array for simple enum cases only (as strings)
-        let simpleCases = cases.filter { $0.associatedValues.isEmpty }
-        let caseNames = simpleCases.map { "\"\($0.name)\"" }.joined(separator: ", ")
+        let hasAnyAssociatedValues = cases.contains { $0.hasAssociatedValues }
         
-        return DeclSyntax(stringLiteral: """
-        public static var generationSchema: GenerationSchema {
-            // ✅ CONFIRMED: Apple generates generationSchema for enums
-            // Create schema for simple enum with anyOf containing possible case names
-            return GenerationSchema(
-                type: "string",
-                description: \(description.map { "\"\($0)\"" } ?? "\"Generated \(enumName)\""),
-                anyOf: [\(caseNames)]
-            )
+        if hasAnyAssociatedValues {
+            // Mixed enum with both simple and associated value cases
+            // Use object type with discriminated union approach
+            return DeclSyntax(stringLiteral: """
+            public static var generationSchema: GenerationSchema {
+                // ✅ CONFIRMED: Apple generates discriminated union schema for enums with associated values
+                // Each case becomes an object with "case" and "value" properties
+                return GenerationSchema(
+                    type: "object",
+                    description: \(description.map { "\"\($0)\"" } ?? "\"Generated \(enumName)\""),
+                    properties: [
+                        "case": GenerationSchema(type: "string", description: "Enum case identifier", anyOf: [\(cases.map { "\"\($0.name)\"" }.joined(separator: ", "))]),
+                        "value": GenerationSchema(type: "object", description: "Associated value data", properties: [:])
+                    ]
+                )
+            }
+            """)
+        } else {
+            // Simple enum cases only (existing logic)
+            let caseNames = cases.map { "\"\($0.name)\"" }.joined(separator: ", ")
+            
+            return DeclSyntax(stringLiteral: """
+            public static var generationSchema: GenerationSchema {
+                // ✅ CONFIRMED: Apple generates generationSchema for simple enums
+                // Create schema for simple enum with anyOf containing possible case names
+                return GenerationSchema(
+                    type: "string",
+                    description: \(description.map { "\"\($0)\"" } ?? "\"Generated \(enumName)\""),
+                    anyOf: [\(caseNames)]
+                )
+            }
+            """)
         }
-        """)
     }
     
     
@@ -578,6 +834,19 @@ struct EnumCaseInfo {
     let name: String
     let associatedValues: [(label: String?, type: String)]
     let guideDescription: String?
+    
+    // Associated values support helpers
+    var hasAssociatedValues: Bool { 
+        !associatedValues.isEmpty 
+    }
+    
+    var isSingleUnlabeledValue: Bool { 
+        associatedValues.count == 1 && associatedValues[0].label == nil 
+    }
+    
+    var isMultipleLabeledValues: Bool {
+        associatedValues.count > 1 || (associatedValues.count == 1 && associatedValues[0].label != nil)
+    }
 }
 
 enum MacroError: Error, CustomStringConvertible {

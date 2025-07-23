@@ -68,74 +68,122 @@ struct GenerableMacroTests {
         #expect(statusFromContent == .pending)
     }
     
-    // TODO: Fix enum support - currently causing compiler crash
-    // @Test("@Generable macro works with enum with raw values")
-    // func generableMacroEnumWithRawValues() {
-    //     @Generable(description: "Priority levels")
-    //     enum Priority: String {
-    //         case high = "HIGH"
-    //         case medium = "MEDIUM"
-    //         case low = "LOW"
-    //     }
-    //     
-    //     // Verify enum compiles
-    //     #expect(Priority.self is Priority.Type)
-    //     
-    //     // Test conversion
-    //     let highPriority = Priority.high
-    //     let content = highPriority.generatedContent
-    //     #expect(content.stringValue == "high")
-    // }
-    // 
-    // @Test("@Generable macro works with enum with associated values")
-    // func generableMacroEnumWithAssociatedValues() {
-    //     @Generable(description: "Task result")
-    //     enum TaskResult {
-    //         case success(message: String)
-    //         case failure(error: String, code: Int)
-    //         case pending
-    //     }
-    //     
-    //     // Verify enum compiles
-    //     #expect(TaskResult.self is TaskResult.Type)
-    //     
-    //     // Verify schema
-    //     let schema = TaskResult.generationSchema
-    //     #expect(schema.type == "string")
-    //     
-    //     // Test simple case
-    //     let pendingResult = TaskResult.pending
-    //     let pendingContent = pendingResult.generatedContent
-    //     #expect(pendingContent.stringValue == "pending")
-    //     
-    //     // Test associated values case (currently TODO in implementation)
-    //     let successResult = TaskResult.success(message: "Operation completed")
-    //     let successContent = successResult.generatedContent
-    //     #expect(successContent.stringValue.contains("success"))
-    // }
-    // 
-    // @Test("@Generable macro generates init from GeneratedContent for enum")
-    // func generableMacroEnumInitFromGeneratedContent() throws {
-    //     @Generable
-    //     enum Color {
-    //         case red
-    //         case green
-    //         case blue
-    //     }
-    //     
-    //     // Test initialization from GeneratedContent
-    //     let redContent = GeneratedContent("red")
-    //     let redColor = try Color(redContent)
-    //     #expect(redColor == .red)
-    //     
-    //     let blueContent = GeneratedContent("blue")
-    //     let blueColor = try Color(blueContent)
-    //     #expect(blueColor == .blue)
-    //     
-    //     // Test invalid case
-    //     let invalidContent = GeneratedContent("yellow")
-    //     #expect(throws: Error.self) {
-    //         _ = try Color(invalidContent)
-    //     }
-    // }
+    @Test("@Generable macro works with enum with associated values")
+    func generableMacroEnumWithAssociatedValues() throws {
+        @Generable(description: "Task result")
+        enum TaskResult {
+            case success(message: String)
+            case failure(error: String, code: Int)
+            case pending
+        }
+        
+        // Verify enum compiles
+        #expect(TaskResult.self is TaskResult.Type)
+        
+        // Verify schema is object type for discriminated union
+        let schema = TaskResult.generationSchema
+        #expect(schema.type == "object")
+        
+        // Test simple case - no associated values
+        let pendingResult = TaskResult.pending
+        let pendingContent = pendingResult.generatedContent
+        let pendingProps = try pendingContent.properties()
+        #expect(pendingProps["case"]?.stringValue == "pending")
+        
+        // Test labeled associated value case (treated as multiple values)
+        let successResult = TaskResult.success(message: "Operation completed")
+        let successContent = successResult.generatedContent
+        let successProps = try successContent.properties()
+        #expect(successProps["case"]?.stringValue == "success")
+        
+        // For labeled parameters, value is an object with properties
+        let valueProps = try successProps["value"]?.properties()
+        #expect(valueProps?["message"]?.stringValue == "Operation completed")
+        
+        // Test multiple associated values case
+        let failureResult = TaskResult.failure(error: "Network error", code: 500)
+        let failureContent = failureResult.generatedContent
+        let failureProps = try failureContent.properties()
+        #expect(failureProps["case"]?.stringValue == "failure")
+        let failureValueProps = try failureProps["value"]?.properties()
+        #expect(failureValueProps?["error"]?.stringValue == "Network error")
+        #expect(failureValueProps?["code"]?.stringValue == "500")
+    }
+    
+    @Test("@Generable macro generates init from GeneratedContent for enum with associated values")
+    func generableMacroEnumInitFromGeneratedContent() throws {
+        @Generable
+        enum TaskResult {
+            case success(message: String)
+            case failure(error: String, code: Int)
+            case pending
+        }
+        
+        // Test simple case initialization
+        let pendingJson = """
+        {"case": "pending", "value": ""}
+        """
+        let pendingContent = GeneratedContent(pendingJson)
+        let pendingResult = try TaskResult(pendingContent)
+        if case .pending = pendingResult {
+            // Test passes - correct case parsed
+        } else {
+            #expect(Bool(false), "Expected pending case")
+        }
+        
+        // Test labeled associated value initialization (single labeled parameter)
+        let successJson = """
+        {"case": "success", "value": {"message": "Operation completed"}}
+        """
+        let successContent = GeneratedContent(successJson)
+        let successResult = try TaskResult(successContent)
+        if case .success(let message) = successResult {
+            #expect(message == "Operation completed")
+        } else {
+            #expect(Bool(false), "Expected success case")
+        }
+        
+        // Test multiple associated values initialization
+        let failureJson = """
+        {"case": "failure", "value": {"error": "Network error", "code": "500"}}
+        """
+        let failureContent = GeneratedContent(failureJson)
+        let failureResult = try TaskResult(failureContent)
+        if case .failure(let error, let code) = failureResult {
+            #expect(error == "Network error")
+            #expect(code == 500)
+        } else {
+            #expect(Bool(false), "Expected failure case")
+        }
+    }
+    
+    // TODO: Add test for truly unlabeled single associated value
+    // Currently causes compiler crash - needs investigation
+    // @Test("@Generable macro works with truly unlabeled single associated value")
+    // func generableMacroEnumWithUnlabeledSingleValue() throws { ... }
+    
+    @Test("@Generable macro generates init from GeneratedContent for simple enum")
+    func generableMacroEnumInitFromGeneratedContentSimple() throws {
+        @Generable
+        enum Color: Equatable {
+            case red
+            case green
+            case blue
+        }
+        
+        // Test initialization from GeneratedContent
+        let redContent = GeneratedContent("red")
+        let redColor = try Color(redContent)
+        #expect(redColor == .red)
+        
+        let blueContent = GeneratedContent("blue")
+        let blueColor = try Color(blueContent)
+        #expect(blueColor == .blue)
+        
+        // Test invalid case
+        let invalidContent = GeneratedContent("yellow")
+        #expect(throws: Error.self) {
+            _ = try Color(invalidContent)
+        }
+    }
 }
