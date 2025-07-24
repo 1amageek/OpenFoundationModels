@@ -17,17 +17,16 @@ import Foundation
 public final class LanguageModelSession: Observable, @unchecked Sendable {
     
     /// The underlying language model
-    /// ✅ CONFIRMED: Uses SystemLanguageModel as default
-    /// ✅ PHASE 4.1: Now uses LanguageModel protocol for dependency injection
-    private let model: LanguageModel
+    /// ✅ CONFIRMED: Uses any LanguageModel for flexibility
+    private var model: any LanguageModel
     
     /// Session instructions
     /// ✅ CONFIRMED: Instructions property exists
-    public let instructions: Instructions?
+    public private(set) var instructions: Instructions?
     
     /// Available tools for the session
     /// ✅ CONFIRMED: Tools array property
-    public let tools: [any Tool]
+    public private(set) var tools: [any Tool]
     
     /// Conversation transcript
     /// ✅ CONFIRMED: Transcript property
@@ -42,12 +41,15 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
     /// Apple's official convenience initializer
     /// ✅ APPLE SPEC: convenience init(model:guardrails:tools:instructions:)
     public convenience init(
-        model: SystemLanguageModel = SystemLanguageModel.default,
+        model: any LanguageModel = SystemLanguageModel.default,
         guardrails: LanguageModelSession.Guardrails = .default,
         tools: [any Tool] = [],
         instructions: Instructions? = nil
     ) {
-        self.init(model: model as LanguageModel)
+        self.init()
+        self.model = model
+        self.instructions = instructions
+        self.tools = tools
         // Store guardrails and other parameters
         // Note: Guardrails implementation needed
     }
@@ -55,12 +57,14 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
     /// Apple's official convenience initializer with transcript
     /// ✅ APPLE SPEC: convenience init(model:guardrails:tools:transcript:)
     public convenience init(
-        model: SystemLanguageModel = SystemLanguageModel.default,
+        model: any LanguageModel = SystemLanguageModel.default,
         guardrails: Guardrails = .default,
         tools: [any Tool] = [],
         transcript: Transcript
     ) {
-        self.init(model: model as LanguageModel)
+        self.init()
+        self.model = model
+        self.tools = tools
         self.transcript = transcript
         // Store guardrails and other parameters
         // Note: Guardrails implementation needed
@@ -77,15 +81,12 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
     
     /// Initialize session with any LanguageModel
     /// ✅ PHASE 4.1: Dependency injection with LanguageModel protocol
-    public init(model: LanguageModel) {
+    public init(model: any LanguageModel) {
         self.model = model
         self.instructions = nil
         self.tools = []
         self.transcript = Transcript()
     }
-    
-    
-    
     
     /// Initialize session with instructions using result builder
     /// ✅ CONFIRMED: @InstructionsBuilder pattern from Apple docs
