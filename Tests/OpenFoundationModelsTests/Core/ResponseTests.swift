@@ -19,9 +19,14 @@ struct ResponseTests {
     func responseStringCreation() {
         // Test Response creation with String content
         let content = "Hello, world!"
-        let textSegment = Transcript.TextSegment(content: "test prompt")
+        let textSegment = Transcript.TextSegment(id: UUID().uuidString, content: "test prompt")
         let segment = Transcript.Segment.text(textSegment)
-        let prompt = Transcript.Prompt(segments: [segment])
+        let prompt = Transcript.Prompt(
+            id: UUID().uuidString,
+            segments: [segment],
+            options: .default,
+            responseFormat: nil
+        )
         let transcriptEntry = Transcript.Entry.prompt(prompt)
         let transcriptEntries = ArraySlice([transcriptEntry])
         
@@ -83,14 +88,28 @@ struct ResponseTests {
         let content = "Response content"
         
         // Create proper transcript entries
-        let firstPromptSegment = Transcript.TextSegment(content: "First prompt")
-        let firstPrompt = Transcript.Prompt(segments: [.text(firstPromptSegment)])
+        let firstPromptSegment = Transcript.TextSegment(id: UUID().uuidString, content: "First prompt")
+        let firstPrompt = Transcript.Prompt(
+            id: UUID().uuidString,
+            segments: [.text(firstPromptSegment)],
+            options: .default,
+            responseFormat: nil
+        )
         
-        let firstResponseSegment = Transcript.TextSegment(content: "First response")
-        let firstResponse = Transcript.Response(segments: [.text(firstResponseSegment)])
+        let firstResponseSegment = Transcript.TextSegment(id: UUID().uuidString, content: "First response")
+        let firstResponse = Transcript.Response(
+            id: UUID().uuidString,
+            assetIDs: [],
+            segments: [.text(firstResponseSegment)]
+        )
         
-        let secondPromptSegment = Transcript.TextSegment(content: "Second prompt")
-        let secondPrompt = Transcript.Prompt(segments: [.text(secondPromptSegment)])
+        let secondPromptSegment = Transcript.TextSegment(id: UUID().uuidString, content: "Second prompt")
+        let secondPrompt = Transcript.Prompt(
+            id: UUID().uuidString,
+            segments: [.text(secondPromptSegment)],
+            options: .default,
+            responseFormat: nil
+        )
         
         let entries = [
             Transcript.Entry.prompt(firstPrompt),

@@ -43,7 +43,7 @@ struct GenerationSchemaTests {
     
     @Test("GenerationSchema property creation")
     func generationSchemaProperty() {
-        // Test Property creation
+        // Test Property creation using legacy initializer
         let property = GenerationSchema.Property(
             name: "testProperty",
             type: "string",
@@ -51,13 +51,13 @@ struct GenerationSchemaTests {
         )
         
         #expect(property.name == "testProperty")
-        #expect(property.type == "string")
+        #expect(property.typeDescription == "String")
         #expect(property.propertyDescription == "A test property")
     }
     
     @Test("GenerationSchema property with pattern constraint")
     func generationSchemaPropertyWithPattern() {
-        // Test Property with pattern constraint
+        // Test Property with pattern constraint using legacy initializer
         let property = GenerationSchema.Property(
             name: "username",
             type: "string",
@@ -66,7 +66,8 @@ struct GenerationSchemaTests {
         )
         
         #expect(property.name == "username")
-        #expect(property.pattern == "[a-zA-Z0-9]+")
+        #expect(!property.regexPatterns.isEmpty)
+        #expect(property.regexPatterns.first == "[a-zA-Z0-9]+")
     }
     
     @Test("GenerationSchema debug description")

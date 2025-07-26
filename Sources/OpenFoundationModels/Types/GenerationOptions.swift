@@ -3,7 +3,7 @@ import Foundation
 /// Options that control how the model generates its response to a prompt
 /// ✅ APPLE SPEC: GenerationOptions structure
 /// Referenced in Apple Foundation Models documentation
-public struct GenerationOptions: Sendable {
+public struct GenerationOptions: Sendable, Codable {
     /// Sampling strategy for generation
     /// ✅ APPLE SPEC: sampling property
     public let sampling: Sampling
@@ -44,7 +44,7 @@ public struct GenerationOptions: Sendable {
 extension GenerationOptions {
     /// Sampling strategy for text generation
     /// ✅ APPLE SPEC: Sampling enum
-    public enum Sampling: Sendable {
+    public enum Sampling: Sendable, Codable {
         /// Greedy decoding - always pick the most likely token
         /// ✅ APPLE SPEC: greedy case
         case greedy

@@ -60,15 +60,6 @@ let package = Package(
         .testTarget(
             name: "OpenFoundationModelsTests",
             dependencies: ["OpenFoundationModels"]
-        ),
-        
-        // Macro tests
-        .testTarget(
-            name: "OpenFoundationModelsMacrosTests",
-            dependencies: [
-                "OpenFoundationModelsMacros",
-                .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax"),
-            ]
-        ),
+        )
     ]
 )

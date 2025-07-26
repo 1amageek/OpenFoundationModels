@@ -7,6 +7,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 OSS implementation of Apple's Foundation Models framework (iOS 26/macOS 15 Xcode 17b3), providing on-device LLM capabilities with structured generation, tool calling, and streaming support.
 
+## Implementation Policy
+
+### Deprecated API Handling
+- **Deprecated APIは実装しない**: Apple Foundation ModelsのDeprecatedとマークされたAPIは追加しません
+- **不要になったものは削除**: 古くなったAPIは削除して対応します
+- **ベータ版への対応**: Foundation Modelsはベータ版のため、厳密な互換性追従は不要です
+
+### Development Principles
+1. **実用性を重視**: 100%の互換性よりも、実際に動作する実装を優先
+2. **クリーンなAPI**: Deprecatedなものを含めず、モダンで使いやすいAPIを提供
+3. **前向きな進化**: ベータ版の変更に柔軟に対応し、常に最新のベストプラクティスに従う
+
 ## Build Commands
 - Build: `swift build`
 - Test: `swift test`

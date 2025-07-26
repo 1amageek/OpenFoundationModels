@@ -29,14 +29,18 @@ struct MacroToolTests {
             let unit: String
         }
         
-        func call(arguments: Arguments) async throws -> ToolOutput {
+        typealias Output = String
+        
+        func call(arguments: Arguments) async throws -> String {
             let weather = WeatherInfo(
                 city: arguments.city,
                 temperature: 22,
                 unit: arguments.unit,
                 condition: "sunny"
             )
-            return ToolOutput(weather)
+            let encoder = JSONEncoder()
+            let data = try encoder.encode(weather)
+            return String(data: data, encoding: .utf8) ?? "{}"
         }
     }
     
@@ -66,7 +70,8 @@ struct MacroToolTests {
             let args = try TestWeatherTool.Arguments(content)
             let result = try await tool.call(arguments: args)
             
-            let weather = try result.decode(as: WeatherInfo.self)
+            let data = result.data(using: .utf8)!
+            let weather = try JSONDecoder().decode(WeatherInfo.self, from: data)
             // Note: Current macro implementation uses default values until JSON parsing is added
             #expect(weather.city.isEmpty || !weather.city.isEmpty) // Always pass - implementation pending
             #expect(weather.temperature == 22)

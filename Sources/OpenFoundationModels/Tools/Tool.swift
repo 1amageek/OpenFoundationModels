@@ -43,13 +43,16 @@ import Foundation
 ///         let count: Int
 ///     }
 ///     
-///     func call(arguments: Arguments) async throws -> ToolOutput {
+///     // Define the output type
+///     typealias Output = String
+///     
+///     func call(arguments: Arguments) async throws -> String {
 ///         var contacts: [CNContact] = []
 ///         // Fetch a number of contacts using the arguments.
 ///         let formattedContacts = contacts.map {
 ///             "\($0.givenName) \($0.familyName)"
 ///         }
-///         return ToolOutput(GeneratedContent(properties: ["contactNames": formattedContacts]))
+///         return formattedContacts.joined(separator: ", ")
 ///     }
 /// }
 /// ```
@@ -67,6 +70,20 @@ public protocol Tool: Sendable, SendableMetatype {
     /// 
     /// **Note:** Arguments typically are Generable types for schema generation
     associatedtype Arguments: ConvertibleFromGeneratedContent
+    
+    /// The output that this tool generates.
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// The output that this tool generates.
+    /// 
+    /// **Source:** https://developer.apple.com/documentation/foundationmodels/tool/output
+    /// 
+    /// **Apple Official API:** `associatedtype Output : PromptRepresentable`
+    /// 
+    /// **Required**
+    /// 
+    /// **Note:** Output must be representable as a prompt for the model
+    associatedtype Output: PromptRepresentable
     
     /// A unique name for the tool, such as "get_weather", "toggleDarkMode", or "search contacts".
     /// 
@@ -124,42 +141,16 @@ public protocol Tool: Sendable, SendableMetatype {
     /// 
     /// **Source:** https://developer.apple.com/documentation/foundationmodels/tool/call(arguments:)
     /// 
-    /// **Apple Official API:** `func call(arguments: Self.Arguments) async throws -> ToolOutput`
+    /// **Apple Official API:** `func call(arguments: Self.Arguments) async throws -> Self.Output`
     /// 
     /// **Required**
     /// 
     /// - Parameter arguments: The arguments for the tool call
     /// - Returns: The output of the tool execution
     /// - Throws: Any error that occurs during tool execution
-    func call(arguments: Arguments) async throws -> ToolOutput
+    func call(arguments: Arguments) async throws -> Output
 }
 
-// ✅ CONFIRMED: ToolOutput moved to separate file based on Apple specs
-// See: Sources/OpenFoundationModels/Foundation/ToolOutput.swift
-
-// 🚨 TYPE NAMESPACE CONFLICT RESOLVED:
-// This top-level ToolCall is different from Transcript.ToolCall
-// Renaming to avoid confusion with Apple's nested types
-
-/// Represents a tool call request (top-level type)
-/// ⚠️ INFERRED: Structure not confirmed from Apple docs
-/// 🚨 NOTE: Different from Transcript.ToolCall (Apple's nested type)
-public struct ToolCallRequest: Sendable {
-    /// The name of the tool to call
-    public let name: String
-    
-    /// The arguments for the tool (as JSON)
-    public let arguments: String
-    
-    /// Unique identifier for this tool call
-    public let id: String
-    
-    public init(name: String, arguments: String, id: String = UUID().uuidString) {
-        self.name = name
-        self.arguments = arguments
-        self.id = id
-    }
-}
 
 // MARK: - Default Implementations
 /// **Apple Foundation Models Documentation:**
@@ -191,10 +182,13 @@ extension Tool {
             return generableType.generationSchema
         }
         // Otherwise, create a basic schema for ConvertibleFromGeneratedContent types
+        // Note: Even though String conforms to Generable, when used as typealias Arguments = String,
+        // the cast above may fail due to Swift type system limitations
+        // For now, return object type as default
         return GenerationSchema(
-            type: "string",
+            type: "object", 
             description: "Tool arguments for \(name)",
-            anyOf: []
+            properties: [:] // Empty properties for object type
         )
     }
     

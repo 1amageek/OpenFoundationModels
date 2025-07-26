@@ -363,16 +363,6 @@ struct GeneratedContentTests {
     
     // MARK: - Integration Tests
     
-    @Test("GeneratedContent with ToolOutput integration")
-    func generatedContentToolOutputIntegration() {
-        let content = GeneratedContent("Tool output content")
-        let toolOutput = ToolOutput.from(generatedContent: content)
-        
-        let convertedBack = toolOutput.toGeneratedContent()
-        
-        #expect(convertedBack.stringValue.contains("Tool output content"))
-    }
-    
     @Test("GeneratedContent Sendable conformance")
     func generatedContentSendableConformance() {
         let content = GeneratedContent("Sendable test")
