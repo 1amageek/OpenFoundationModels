@@ -16,6 +16,10 @@ let package = Package(
         .visionOS(.v2)        // Target: visionOS 26.0+ Beta
     ],
     products: [
+        // Core library with protocols and basic types
+        .library(
+            name: "OpenFoundationModelsCore",
+            targets: ["OpenFoundationModelsCore"]),
         // Main library
         .library(
             name: "OpenFoundationModels",
@@ -32,10 +36,17 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.0.0"),
     ],
     targets: [
+        // Core library with protocols and basic types (no dependencies)
+        .target(
+            name: "OpenFoundationModelsCore",
+            dependencies: []
+        ),
+        
         // Main library target
         .target(
             name: "OpenFoundationModels",
             dependencies: [
+                "OpenFoundationModelsCore",
                 "OpenFoundationModelsMacros",
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
             ]
@@ -53,7 +64,10 @@ let package = Package(
         // Macro library
         .target(
             name: "OpenFoundationModelsMacros",
-            dependencies: ["OpenFoundationModelsMacrosImpl"]
+            dependencies: [
+                "OpenFoundationModelsMacrosImpl",
+                "OpenFoundationModelsCore"
+            ]
         ),
         
         // Tests

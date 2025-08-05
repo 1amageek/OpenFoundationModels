@@ -332,7 +332,11 @@ extension GeneratedContent: ConvertibleFromGeneratedContent {
 /// ✅ CONFIRMED: GeneratedContent conforms to ConvertibleToGeneratedContent
 extension GeneratedContent: ConvertibleToGeneratedContent {
     // generatedContent property already defined in main struct
-    // instructionsRepresentation property already defined in ProtocolConformances.swift
+    
+    /// Convert to instructions representation
+    public var instructionsRepresentation: Instructions {
+        return Instructions(self.stringValue)
+    }
     
     /// An instance that represents a prompt.
     /// ✅ CONFIRMED: Required by PromptRepresentable (inherited from ConvertibleToGeneratedContent)

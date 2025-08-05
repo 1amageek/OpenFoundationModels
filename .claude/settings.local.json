@@ -17,7 +17,8 @@
       "Bash(swift test:*)",
       "Bash(find:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git mv:*)"
     ],
     "deny": []
   }

@@ -1,158 +1,10 @@
 // ProtocolConformances.swift
 // OpenFoundationModels
 //
-// ✅ CONFIRMED: Additional protocols required by Apple Foundation Models API
+// ✅ CONFIRMED: Standard type conformances for Apple Foundation Models API
 
 import Foundation
-
-/// Conforming types represent instructions.
-/// 
-/// **Apple Foundation Models Documentation:**
-/// Conforming types represent instructions.
-/// 
-/// **Source:** https://developer.apple.com/documentation/foundationmodels/instructionsrepresentable
-/// 
-/// **Apple Official API:** `protocol InstructionsRepresentable`
-/// - iOS 26.0+, iPadOS 26.0+, macOS 26.0+, visionOS 26.0+
-/// - Beta Software: Contains preliminary API information
-/// 
-/// **Inherited By:**
-/// - ConvertibleToGeneratedContent
-/// - Generable
-/// 
-/// **Conforming Types:**
-/// - GeneratedContent
-/// - Instructions
-public protocol InstructionsRepresentable {
-    /// An instance that represents the instructions.
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// An instance that represents the instructions.
-    /// 
-    /// **Source:** https://developer.apple.com/documentation/foundationmodels/instructionsrepresentable/instructionsrepresentation
-    /// 
-    /// **Apple Official API:** `var instructionsRepresentation: Instructions`
-    /// **Required** Default implementation provided.
-    var instructionsRepresentation: Instructions { get }
-}
-
-/// Protocol for types that can represent prompts
-/// 
-/// ✅ CONFIRMED: Referenced in Apple documentation for:
-/// - Generable protocol inheritance
-public protocol PromptRepresentable {
-    /// Required property with default implementation
-    /// ✅ CONFIRMED: promptRepresentation property from Apple docs
-    var promptRepresentation: Prompt { get }
-}
-
-/// Protocol for sendable metatypes
-/// 
-/// ✅ CONFIRMED: Referenced in Apple documentation for:
-/// - Generable protocol inheritance
-public protocol SendableMetatype {
-    // ❌ IMPLEMENTATION NEEDED: Protocol requirements not documented
-}
-
-/// A type that represents an instructions builder.
-/// 
-/// **Apple Foundation Models Documentation:**
-/// A type that represents an instructions builder.
-/// 
-/// **Source:** https://developer.apple.com/documentation/foundationmodels/instructionsbuilder
-/// 
-/// **Apple Official API:** `@resultBuilder struct InstructionsBuilder`
-/// - iOS 26.0+, iPadOS 26.0+, macOS 26.0+, visionOS 26.0+
-/// - Beta Software: Contains preliminary API information
-@resultBuilder
-public struct InstructionsBuilder {
-    /// Creates a builder with the an array of prompts.
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Creates a builder with the an array of prompts.
-    /// 
-    /// **Source:** https://developer.apple.com/documentation/foundationmodels/instructionsbuilder/buildarray(_:)
-    /// 
-    /// **Apple Official API:** `static func buildArray([some InstructionsRepresentable]) -> Instructions`
-    public static func buildArray(_ components: [some InstructionsRepresentable]) -> Instructions {
-        let text = components.map { $0.instructionsRepresentation.text }.joined(separator: "\n")
-        return Instructions(text)
-    }
-    
-    /// Creates a builder with the a block.
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Creates a builder with the a block.
-    /// 
-    /// **Source:** https://developer.apple.com/documentation/foundationmodels/instructionsbuilder/buildblock(_:)
-    /// 
-    /// **Apple Official API:** `static func buildBlock<each I>(repeat each I) -> Instructions`
-    public static func buildBlock<each I: InstructionsRepresentable>(_ components: repeat each I) -> Instructions {
-        var texts: [String] = []
-        repeat texts.append((each components).instructionsRepresentation.text)
-        return Instructions(texts.joined(separator: "\n"))
-    }
-    
-    /// Creates a builder with the first component.
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Creates a builder with the first component.
-    /// 
-    /// **Source:** https://developer.apple.com/documentation/foundationmodels/instructionsbuilder/buildeither(first:)
-    /// 
-    /// **Apple Official API:** `static func buildEither(first: some InstructionsRepresentable) -> Instructions`
-    public static func buildEither(first component: some InstructionsRepresentable) -> Instructions {
-        return component.instructionsRepresentation
-    }
-    
-    /// Creates a builder with the second component.
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Creates a builder with the second component.
-    /// 
-    /// **Source:** https://developer.apple.com/documentation/foundationmodels/instructionsbuilder/buildeither(second:)
-    /// 
-    /// **Apple Official API:** `static func buildEither(second: some InstructionsRepresentable) -> Instructions`
-    public static func buildEither(second component: some InstructionsRepresentable) -> Instructions {
-        return component.instructionsRepresentation
-    }
-    
-    /// Creates a builder with a prompt expression.
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Creates a builder with a prompt expression.
-    /// 
-    /// **Source:** https://developer.apple.com/documentation/foundationmodels/instructionsbuilder/buildexpression(_:)
-    /// 
-    /// **Apple Official API:** `static buildExpression(_:)`
-    public static func buildExpression(_ expression: some InstructionsRepresentable) -> Instructions {
-        return expression.instructionsRepresentation
-    }
-    
-    /// Creates a builder with a limited availability prompt.
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Creates a builder with a limited availability prompt.
-    /// 
-    /// **Source:** https://developer.apple.com/documentation/foundationmodels/instructionsbuilder/buildlimitedavailability(_:)
-    /// 
-    /// **Apple Official API:** `static func buildLimitedAvailability(some InstructionsRepresentable) -> Instructions`
-    public static func buildLimitedAvailability(_ component: some InstructionsRepresentable) -> Instructions {
-        return component.instructionsRepresentation
-    }
-    
-    /// Creates a builder with an optional component.
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Creates a builder with an optional component.
-    /// 
-    /// **Source:** https://developer.apple.com/documentation/foundationmodels/instructionsbuilder/buildoptional(_:)
-    /// 
-    /// **Apple Official API:** `static func buildOptional(Instructions?) -> Instructions`
-    public static func buildOptional(_ component: Instructions?) -> Instructions {
-        return component ?? Instructions("")
-    }
-}
+import OpenFoundationModelsCore
 
 // MARK: - Standard Type Conformances
 
@@ -229,19 +81,7 @@ extension String: Generable {
     }
 }
 
-/// GeneratedContent conformance to Generable
-/// 
-/// **Apple Foundation Models Documentation:**
-/// GeneratedContent is the base type for all generated content.
-/// This conformance enables structured generation workflows.
-/// 
-/// **Source:** https://developer.apple.com/documentation/foundationmodels/generatedcontent
-extension GeneratedContent: InstructionsRepresentable {
-    /// Convert to instructions representation
-    public var instructionsRepresentation: Instructions {
-        return Instructions(self.stringValue)
-    }
-}
+// GeneratedContent conformances are already defined in OpenFoundationModelsCore
 
 extension GeneratedContent: Generable {
     /// Partially generated content representation

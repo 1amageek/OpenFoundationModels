@@ -31,7 +31,7 @@ public struct GenerationSchema: CustomDebugStringConvertible, Decodable, Encodab
     
     /// Schema type enumeration
     private indirect enum SchemaType: Sendable {
-        case object(properties: [Property])
+        case object(properties: [GenerationSchema.Property])
         case enumeration(values: [String])
         case dynamic(root: DynamicGenerationSchema, dependencies: [DynamicGenerationSchema])
     }
@@ -43,7 +43,7 @@ public struct GenerationSchema: CustomDebugStringConvertible, Decodable, Encodab
         } else {
             // Convert dictionary properties to Property array
             let propertyArray = properties?.map { key, value in
-                Property(name: key, description: value.description, type: String.self, guides: [])
+                GenerationSchema.Property(name: key, description: value.description, type: String.self, guides: [])
             } ?? []
             self.schemaType = .object(properties: propertyArray)
         }
@@ -385,83 +385,6 @@ extension GenerationSchema {
 
 // MARK: - Related Types (Referenced but Not Documented)
 
-/// Property structure for GenerationSchema
-/// ✅ CONFIRMED: Referenced in Apple docs as GenerationSchema.Property
-public struct Property: Sendable {
-    /// Property name
-    public let name: String
-    
-    /// Property type
-    public let type: any Sendable.Type
-    
-    /// Human-readable description
-    public let description: String?
-    
-    /// Regular expression patterns for string properties
-    /// ✅ APPLE SPEC: Array of regexes from @Guide
-    /// Using String to store regex patterns for Sendable conformance
-    public let regexPatterns: [String]
-    
-    /// Create a property that contains a string type.
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Create a property that contains a string type.
-    /// 
-    /// **Source:** https://developer.apple.com/documentation/foundationmodels/generationschema/property/init(name:description:type:guides:)
-    /// 
-    /// **Apple Official API:** `init<RegexOutput>(name:description:type:guides:)`
-    /// 
-    /// - Parameters:
-    ///   - name: The property's name
-    ///   - description: A natural language description of what content should be generated for this property
-    ///   - type: The type this property represents
-    ///   - guides: An array of regexes to be applied to this string. If there're multiple regexes in the array, only the last one will be applied.
-    public init<RegexOutput>(
-        name: String,
-        description: String? = nil,
-        type: String.Type,
-        guides: [Regex<RegexOutput>] = []
-    ) {
-        self.name = name
-        self.description = description
-        self.type = type
-        self.regexPatterns = guides.map { String(describing: $0) }
-    }
-    
-    /// Create a property that contains any Sendable type
-    /// This is an internal initializer for non-String types
-    internal init(
-        name: String,
-        description: String? = nil,
-        type: any Sendable.Type,
-        guides: [String] = []
-    ) {
-        self.name = name
-        self.description = description
-        self.type = type
-        self.regexPatterns = guides
-    }
-    
-    /// Legacy initializer for compatibility
-    /// @available(*, deprecated, message: "Use init(name:description:type:guides:) instead")
-    public init(name: String, type: String, description: String, guides: [AnyGenerationGuide] = [], pattern: String? = nil) {
-        self.name = name
-        self.type = String.self
-        self.description = description
-        self.regexPatterns = pattern.map { [$0] } ?? []
-    }
-    
-    /// Get type description as string
-    internal var typeDescription: String {
-        return String(describing: type)
-    }
-    
-    /// Get property description (for backward compatibility)
-    internal var propertyDescription: String {
-        return description ?? ""
-    }
-}
-
 /// Schema creation errors
 /// ✅ CONFIRMED: Referenced in Apple docs as GenerationSchema.SchemaError
 /// 
@@ -526,34 +449,36 @@ public enum SchemaError: Error, LocalizedError, Sendable, SendableMetatype {
     /// - Sendable
     /// - SendableMetatype
     public struct Context: CustomDebugStringConvertible, Sendable, SendableMetatype {
-        /// The location or context where the error occurred
-        public let location: String
-        
-        /// Additional contextual information
-        public let additionalInfo: [String: String]
-        
-        /// Creates a new error context
-        /// - Parameters:
-        ///   - location: The location where the error occurred
-        ///   - additionalInfo: Additional contextual information
-        public init(location: String, additionalInfo: [String: String] = [:]) {
-            self.location = location
-            self.additionalInfo = additionalInfo
-        }
-        
         /// A string representation of the debug description.
         /// 
         /// **Apple Foundation Models Documentation:**
         /// A string representation of the debug description.
         /// 
         /// **Source:** https://developer.apple.com/documentation/foundationmodels/generationschema/schemaerror/context/debugdescription
-        public var debugDescription: String {
+        public let debugDescription: String
+        
+        /// Creates a new error context
+        /// 
+        /// **Apple Foundation Models Documentation:**
+        /// Creates a schema error context.
+        /// 
+        /// **Source:** https://developer.apple.com/documentation/foundationmodels/generationschema/schemaerror/context/init(debugdescription:)
+        /// 
+        /// **Apple Official API:** `init(debugDescription:)`
+        /// 
+        /// - Parameter debugDescription: A string representation of the debug description
+        public init(debugDescription: String) {
+            self.debugDescription = debugDescription
+        }
+        
+        /// Internal convenience initializer for backward compatibility
+        internal init(location: String, additionalInfo: [String: String] = [:]) {
             var desc = "Context(location: \(location)"
             if !additionalInfo.isEmpty {
                 desc += ", info: \(additionalInfo)"
             }
             desc += ")"
-            return desc
+            self.debugDescription = desc
         }
     }
     
@@ -566,13 +491,13 @@ public enum SchemaError: Error, LocalizedError, Sendable, SendableMetatype {
     public var errorDescription: String? {
         switch self {
         case .duplicateProperty(let schema, let property, let context):
-            return "Duplicate property '\(property)' found in schema '\(schema)' at \(context.location)"
+            return "Duplicate property '\(property)' found in schema '\(schema)': \(context.debugDescription)"
         case .duplicateType(let schema, let type, let context):
-            return "Duplicate type '\(type)' found\(schema.map { " in schema '\($0)'" } ?? "") at \(context.location)"
+            return "Duplicate type '\(type)' found\(schema.map { " in schema '\($0)'" } ?? ""): \(context.debugDescription)"
         case .emptyTypeChoices(let schema, let context):
-            return "Empty type choices in anyOf schema '\(schema)' at \(context.location)"
+            return "Empty type choices in anyOf schema '\(schema)': \(context.debugDescription)"
         case .undefinedReferences(let schema, let references, let context):
-            return "Undefined references \(references) found\(schema.map { " in schema '\($0)'" } ?? "") at \(context.location)"
+            return "Undefined references \(references) found\(schema.map { " in schema '\($0)'" } ?? ""): \(context.debugDescription)"
         }
     }
     
@@ -1293,7 +1218,7 @@ public struct DynamicGenerationSchema: Sendable, SendableMetatype {
         case .array(let elementSchema, _, _):
             // Convert DynamicGenerationSchema to GenerationSchema
             // This is a simplified conversion - in production would need proper mapping
-            return GenerationSchema(type: String.self, description: elementSchema.description, properties: [])
+            return GenerationSchema(type: "array", description: elementSchema.description, properties: [:])
         default:
             return nil
         }
@@ -1375,13 +1300,84 @@ extension DynamicGenerationSchema: CustomDebugStringConvertible {
 }
 
 // MARK: - Extension for Nested Types
+
 extension GenerationSchema {
-    /// Nested Property type
-    /// ✅ CONFIRMED: Exists as GenerationSchema.Property in Apple docs
-    public typealias Property = OpenFoundationModels.Property
-    
-    /// Nested SchemaError type
-    /// ✅ CONFIRMED: Exists as GenerationSchema.SchemaError in Apple docs
-    public typealias SchemaError = OpenFoundationModels.SchemaError
+    /// A property that belongs to a generation schema.
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// Fields are named members of object types. Fields are strongly typed and have optional 
+    /// descriptions and guides.
+    /// 
+    /// **Source:** https://developer.apple.com/documentation/foundationmodels/generationschema/property
+    /// 
+    /// **Apple Official API:** `struct Property`
+    /// - iOS 26.0+, iPadOS 26.0+, macOS 26.0+, visionOS 26.0+
+    /// - Beta Software: Contains preliminary API information
+    /// 
+    /// **Conformances:**
+    /// - Sendable
+    /// - SendableMetatype
+    public struct Property: Sendable, SendableMetatype {
+        /// The property's name
+        public let name: String
+        
+        /// The type this property represents
+        public let type: any Sendable.Type
+        
+        /// A natural language description of what content should be generated for this property
+        public let description: String?
+        
+        /// Regular expression patterns for string properties (internal storage)
+        internal let regexPatterns: [String]
+        
+        /// Create a property that contains a string type.
+        /// 
+        /// **Apple Foundation Models Documentation:**
+        /// Create a property that contains a string type.
+        /// 
+        /// **Source:** https://developer.apple.com/documentation/foundationmodels/generationschema/property/init(name:description:type:guides:)
+        /// 
+        /// **Apple Official API:** `init<RegexOutput>(name:description:type:guides:)`
+        /// 
+        /// - Parameters:
+        ///   - name: The property's name
+        ///   - description: A natural language description of what content should be generated for this property
+        ///   - type: The type this property represents
+        ///   - guides: An array of regexes to be applied to this string. If there're multiple regexes in the array, only the last one will be applied.
+        public init<RegexOutput>(
+            name: String,
+            description: String? = nil,
+            type: String.Type,
+            guides: [Regex<RegexOutput>] = []
+        ) {
+            self.name = name
+            self.description = description
+            self.type = type
+            self.regexPatterns = guides.map { String(describing: $0) }
+        }
+        
+        /// Internal initializer for non-String types
+        internal init(
+            name: String,
+            description: String? = nil,
+            type: any Sendable.Type,
+            guides: [String] = []
+        ) {
+            self.name = name
+            self.description = description
+            self.type = type
+            self.regexPatterns = guides
+        }
+        
+        /// Get type description as string (internal use)
+        internal var typeDescription: String {
+            return String(describing: type)
+        }
+        
+        /// Get property description (internal use)
+        internal var propertyDescription: String {
+            return description ?? ""
+        }
+    }
 }
 

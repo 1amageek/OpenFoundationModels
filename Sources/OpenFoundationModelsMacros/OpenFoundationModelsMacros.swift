@@ -3,14 +3,17 @@
 //
 // ✅ CONFIRMED: Based on Apple Foundation Models API specification
 
+import OpenFoundationModelsCore
+
 /// Conforms a type to generable
 /// 
 /// ✅ CONFIRMED: From Apple Developer Documentation
-/// - @attached(extension, conformances: Generable) - adds Generable protocol conformance
+/// - @attached(extension, conformances: Generable, names: named(init(_:)), named(generatedContent))
 /// - @attached(member, names: arbitrary) - generates required members
 /// - Generates init(_:) and generatedContent members
 /// - Optional description parameter for schema documentation
-@attached(member, names: named(init(_:)), named(generatedContent), named(from(generatedContent:)), named(toGeneratedContent), named(generationSchema), named(asPartiallyGenerated), named(instructionsRepresentation), named(promptRepresentation))
+@attached(extension, conformances: Generable, names: named(init(_:)), named(generatedContent))
+@attached(member, names: arbitrary)
 public macro Generable(description: String? = nil) = #externalMacro(module: "OpenFoundationModelsMacrosImpl", type: "GenerableMacro")
 
 /// Provides guidance for property generation in Generable types
