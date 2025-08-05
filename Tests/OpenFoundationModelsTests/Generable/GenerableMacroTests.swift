@@ -11,31 +11,71 @@ import Testing
 /// for structured generation with Apple's Foundation Models.
 ///
 /// **Reference:** https://developer.apple.com/documentation/foundationmodels/generating-swift-data-structures-with-guided-generation
+
+// MARK: - Test Types (moved from local scope to top level)
+
+@Generable
+struct TestSimpleStruct {
+    let value: String
+}
+
+@Generable
+struct TestGenerablePerson {
+    let name: String
+    let age: Int
+}
+
+@Generable(description: "User activity status")
+enum TestGenerableStatus {
+    case active
+    case inactive
+    case pending
+}
+
+@Generable(description: "Task result")
+enum TestTaskResult {
+    case success(message: String)
+    case failure(error: String, code: Int)
+    case pending
+}
+
+@Generable
+enum TestTaskResultInit {
+    case success(message: String)
+    case failure(error: String, code: Int)
+    case pending
+}
+
+@Generable
+enum TestColor: Equatable {
+    case red
+    case green
+    case blue
+}
+
 @Suite("Generable Macro Tests", .tags(.generable, .macros))
 struct GenerableMacroTests {
     
     @Test("@Generable macro compiles without errors")
-    func generableMacroCompilation() {
-        // Test that the macro can be applied and compiles
-        @Generable
-        struct SimpleStruct {
-            let value: String
-        }
+    func generableMacroCompilation() throws {
+        // Test that the macro generates required functionality
+        // Create instance from GeneratedContent to verify init(_:) was generated
+        let content = GeneratedContent("{\"value\": \"test\"}")
+        let instance = try TestSimpleStruct(content)
         
-        // Basic verification that the type exists
-        #expect(SimpleStruct.self is SimpleStruct.Type)
+        // Verify generatedContent property was generated
+        let generated = instance.generatedContent
+        #expect(generated.text.contains("test") || generated.text.contains("{}"))
+        
+        // Verify generationSchema exists and is valid
+        let schema = TestSimpleStruct.generationSchema
+        #expect(schema.type == "object")
     }
     
     @Test("@Generable macro generates required members")
     func generableMacroGeneratesMembers() {
-        @Generable
-        struct Person {
-            let name: String
-            let age: Int
-        }
-        
         // Verify generationSchema property exists
-        let schema = Person.generationSchema
+        let schema = TestGenerablePerson.generationSchema
         #expect(schema.type == "object")
         
         // Test will pass if macro generates required members successfully
@@ -43,55 +83,46 @@ struct GenerableMacroTests {
     
     @Test("@Generable macro works with simple enum")
     func generableMacroSimpleEnum() throws {
-        @Generable(description: "User activity status")
-        enum Status {
-            case active
-            case inactive
-            case pending
-        }
-        
-        // Verify enum compiles with @Generable
-        #expect(Status.self is Status.Type)
+        // Test that macro generates required functionality for enums
+        // Create enum from GeneratedContent
+        let activeFromContent = try TestGenerableStatus(GeneratedContent("active"))
+        #expect(activeFromContent == .active)
         
         // Verify generationSchema property exists
-        let schema = Status.generationSchema
+        let schema = TestGenerableStatus.generationSchema
         #expect(schema.type == "string")
         // Note: anyOf is stored internally but not directly accessible in current implementation
         
         // Test enum case to GeneratedContent conversion
-        let activeStatus = Status.active
+        let activeStatus = TestGenerableStatus.active
         let content = activeStatus.generatedContent
         #expect(content.stringValue == "active")
         
         // Test GeneratedContent to enum conversion
-        let statusFromContent = try Status(GeneratedContent("pending"))
+        let statusFromContent = try TestGenerableStatus(GeneratedContent("pending"))
         #expect(statusFromContent == .pending)
     }
     
     @Test("@Generable macro works with enum with associated values")
     func generableMacroEnumWithAssociatedValues() throws {
-        @Generable(description: "Task result")
-        enum TaskResult {
-            case success(message: String)
-            case failure(error: String, code: Int)
-            case pending
-        }
-        
-        // Verify enum compiles
-        #expect(TaskResult.self is TaskResult.Type)
+        // Test that macro generates functionality for enums with associated values
+        // Create enum instance and convert to GeneratedContent
+        let pending = TestTaskResult.pending
+        let content = pending.generatedContent
+        #expect(content.text != "")  // Should have content
         
         // Verify schema is object type for discriminated union
-        let schema = TaskResult.generationSchema
+        let schema = TestTaskResult.generationSchema
         #expect(schema.type == "object")
         
         // Test simple case - no associated values
-        let pendingResult = TaskResult.pending
+        let pendingResult = TestTaskResult.pending
         let pendingContent = pendingResult.generatedContent
         let pendingProps = try pendingContent.properties()
         #expect(pendingProps["case"]?.stringValue == "pending")
         
         // Test labeled associated value case (treated as multiple values)
-        let successResult = TaskResult.success(message: "Operation completed")
+        let successResult = TestTaskResult.success(message: "Operation completed")
         let successContent = successResult.generatedContent
         let successProps = try successContent.properties()
         #expect(successProps["case"]?.stringValue == "success")
@@ -101,7 +132,7 @@ struct GenerableMacroTests {
         #expect(valueProps?["message"]?.stringValue == "Operation completed")
         
         // Test multiple associated values case
-        let failureResult = TaskResult.failure(error: "Network error", code: 500)
+        let failureResult = TestTaskResult.failure(error: "Network error", code: 500)
         let failureContent = failureResult.generatedContent
         let failureProps = try failureContent.properties()
         #expect(failureProps["case"]?.stringValue == "failure")
@@ -112,19 +143,12 @@ struct GenerableMacroTests {
     
     @Test("@Generable macro generates init from GeneratedContent for enum with associated values")
     func generableMacroEnumInitFromGeneratedContent() throws {
-        @Generable
-        enum TaskResult {
-            case success(message: String)
-            case failure(error: String, code: Int)
-            case pending
-        }
-        
         // Test simple case initialization
         let pendingJson = """
         {"case": "pending", "value": ""}
         """
         let pendingContent = GeneratedContent(pendingJson)
-        let pendingResult = try TaskResult(pendingContent)
+        let pendingResult = try TestTaskResultInit(pendingContent)
         if case .pending = pendingResult {
             // Test passes - correct case parsed
         } else {
@@ -136,7 +160,7 @@ struct GenerableMacroTests {
         {"case": "success", "value": {"message": "Operation completed"}}
         """
         let successContent = GeneratedContent(successJson)
-        let successResult = try TaskResult(successContent)
+        let successResult = try TestTaskResultInit(successContent)
         if case .success(let message) = successResult {
             #expect(message == "Operation completed")
         } else {
@@ -148,7 +172,7 @@ struct GenerableMacroTests {
         {"case": "failure", "value": {"error": "Network error", "code": "500"}}
         """
         let failureContent = GeneratedContent(failureJson)
-        let failureResult = try TaskResult(failureContent)
+        let failureResult = try TestTaskResultInit(failureContent)
         if case .failure(let error, let code) = failureResult {
             #expect(error == "Network error")
             #expect(code == 500)
@@ -164,26 +188,19 @@ struct GenerableMacroTests {
     
     @Test("@Generable macro generates init from GeneratedContent for simple enum")
     func generableMacroEnumInitFromGeneratedContentSimple() throws {
-        @Generable
-        enum Color: Equatable {
-            case red
-            case green
-            case blue
-        }
-        
         // Test initialization from GeneratedContent
         let redContent = GeneratedContent("red")
-        let redColor = try Color(redContent)
+        let redColor = try TestColor(redContent)
         #expect(redColor == .red)
         
         let blueContent = GeneratedContent("blue")
-        let blueColor = try Color(blueContent)
+        let blueColor = try TestColor(blueContent)
         #expect(blueColor == .blue)
         
         // Test invalid case
         let invalidContent = GeneratedContent("yellow")
         #expect(throws: Error.self) {
-            _ = try Color(invalidContent)
+            _ = try TestColor(invalidContent)
         }
     }
 }

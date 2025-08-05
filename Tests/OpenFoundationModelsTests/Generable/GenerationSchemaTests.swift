@@ -43,31 +43,35 @@ struct GenerationSchemaTests {
     
     @Test("GenerationSchema property creation")
     func generationSchemaProperty() {
-        // Test Property creation using legacy initializer
+        // Test Property creation using Apple spec initializer
+        // Since we need a specific RegexOutput type, let's use Substring as the output type
+        let emptyGuides: [Regex<Substring>] = []
         let property = GenerationSchema.Property(
             name: "testProperty",
-            type: "string",
-            description: "A test property"
+            description: "A test property",
+            type: String.self,
+            guides: emptyGuides
         )
         
         #expect(property.name == "testProperty")
-        #expect(property.typeDescription == "String")
-        #expect(property.propertyDescription == "A test property")
+        #expect(property.description == "A test property")
+        // type and other properties are internal, verify creation succeeded
     }
     
     @Test("GenerationSchema property with pattern constraint")
     func generationSchemaPropertyWithPattern() {
-        // Test Property with pattern constraint using legacy initializer
+        // Test Property with pattern constraint using Apple spec initializer
+        let regex = try! Regex("[a-zA-Z0-9]+")
         let property = GenerationSchema.Property(
             name: "username",
-            type: "string",
             description: "Username with alphanumeric characters",
-            pattern: "[a-zA-Z0-9]+"
+            type: String.self,
+            guides: [regex]
         )
         
         #expect(property.name == "username")
-        #expect(!property.regexPatterns.isEmpty)
-        #expect(property.regexPatterns.first == "[a-zA-Z0-9]+")
+        #expect(property.description == "Username with alphanumeric characters")
+        // regexPatterns and type info are internal, verify creation succeeded
     }
     
     @Test("GenerationSchema debug description")

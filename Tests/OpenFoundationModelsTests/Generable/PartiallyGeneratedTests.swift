@@ -13,19 +13,56 @@ import Foundation
 /// allowing real-time updates as content is generated progressively.
 ///
 /// **Reference:** https://developer.apple.com/documentation/foundationmodels/generable/partiallygenerated
+
+// MARK: - Test Types (moved from local scope to top level)
+
+@Generable
+struct TestUserInfo {
+    let name: String
+    let age: Int
+}
+
+@Generable
+struct TestMessage {
+    let content: String
+    let timestamp: Int
+}
+
+@Generable
+struct TestProduct {
+    @Guide(description: "Product name")
+    let name: String
+    
+    @Guide(description: "Price in USD")
+    let price: Double
+    
+    @Guide(description: "In stock")
+    let inStock: Bool
+}
+
+@Generable
+struct TestSafeData {
+    let message: String
+    let value: Int
+}
+
+@Generable
+struct TestTypeA {
+    let valueA: String
+}
+
+@Generable
+struct TestTypeB {
+    let valueB: Int
+}
+
 @Suite("PartiallyGenerated Tests", .tags(.generable, .streaming, .integration))
 struct PartiallyGeneratedTests {
     
     @Test("Basic PartiallyGenerated with simple types")
     func basicPartiallyGeneratedSimpleTypes() throws {
-        @Generable
-        struct UserInfo {
-            let name: String
-            let age: Int
-        }
-        
         // Test asPartiallyGenerated method exists and works
-        let userInfo = try UserInfo(GeneratedContent("{}"))
+        let userInfo = try TestUserInfo(GeneratedContent("{}"))
         let partial = userInfo.asPartiallyGenerated()
         
         // Verify partial has same values as original (basic implementation)
@@ -35,21 +72,15 @@ struct PartiallyGeneratedTests {
     
     @Test("Partial Response creation and isComplete flag")
     func partialResponseCreationAndCompleteness() throws {
-        @Generable
-        struct Message {
-            let content: String
-            let timestamp: Int
-        }
-        
-        let message = try Message(GeneratedContent("{}"))
+        let message = try TestMessage(GeneratedContent("{}"))
         
         // Test Response.Partial creation
-        let incompletePartial = Response<Message>.Partial(
+        let incompletePartial = Response<TestMessage>.Partial(
             content: message,
             isComplete: false
         )
         
-        let completePartial = Response<Message>.Partial(
+        let completePartial = Response<TestMessage>.Partial(
             content: message,
             isComplete: true
         )
@@ -108,19 +139,7 @@ struct PartiallyGeneratedTests {
     
     @Test("PartiallyGenerated with multiple properties")
     func partiallyGeneratedWithMultipleProperties() throws {
-        @Generable
-        struct Product {
-            @Guide(description: "Product name")
-            let name: String
-            
-            @Guide(description: "Price in USD")
-            let price: Double
-            
-            @Guide(description: "In stock")
-            let inStock: Bool
-        }
-        
-        let product = try Product(GeneratedContent("{}"))
+        let product = try TestProduct(GeneratedContent("{}"))
         let partial = product.asPartiallyGenerated()
         
         // Verify all properties are accessible in partial
@@ -131,13 +150,7 @@ struct PartiallyGeneratedTests {
     
     @Test("PartiallyGenerated Sendable conformance")
     func partiallyGeneratedSendableConformance() async throws {
-        @Generable
-        struct SafeData {
-            let message: String
-            let value: Int
-        }
-        
-        let data = try SafeData(GeneratedContent("{}"))
+        let data = try TestSafeData(GeneratedContent("{}"))
         let partial = data.asPartiallyGenerated()
         
         // Test that partial works in async context (Sendable conformance)
@@ -227,19 +240,9 @@ struct PartiallyGeneratedTests {
     
     @Test("Multiple PartiallyGenerated types in same stream")
     func multiplePartiallyGeneratedTypesInSameStream() throws {
-        @Generable
-        struct TypeA {
-            let valueA: String
-        }
-        
-        @Generable
-        struct TypeB {
-            let valueB: Int
-        }
-        
         // Test that different Generable types can have their own partial representations
-        let typeA = try TypeA(GeneratedContent("{}"))
-        let typeB = try TypeB(GeneratedContent("{}"))
+        let typeA = try TestTypeA(GeneratedContent("{}"))
+        let typeB = try TestTypeB(GeneratedContent("{}"))
         
         let partialA = typeA.asPartiallyGenerated()
         let partialB = typeB.asPartiallyGenerated()
@@ -248,8 +251,8 @@ struct PartiallyGeneratedTests {
         #expect(partialB.valueB == 0)
         
         // Test that they can be used in separate Response.Partial instances
-        let responsePartialA = Response<TypeA>.Partial(content: typeA, isComplete: false)
-        let responsePartialB = Response<TypeB>.Partial(content: typeB, isComplete: true)
+        let responsePartialA = Response<TestTypeA>.Partial(content: typeA, isComplete: false)
+        let responsePartialB = Response<TestTypeB>.Partial(content: typeB, isComplete: true)
         
         #expect(responsePartialA.isComplete == false)
         #expect(responsePartialB.isComplete == true)

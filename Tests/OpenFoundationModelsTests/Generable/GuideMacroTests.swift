@@ -11,36 +11,48 @@ import Testing
 /// constraints for properties to guide model generation.
 ///
 /// **Reference:** https://developer.apple.com/documentation/foundationmodels/generating-swift-data-structures-with-guided-generation
+
+// MARK: - Test Types (moved from local scope to top level)
+
+@Generable
+struct TestGuidePerson {
+    @Guide(description: "The person's full name")
+    let name: String
+    
+    @Guide(description: "Age in years")  
+    let age: Int
+}
+
+@Generable
+struct TestGuideUser {
+    @Guide(description: "Username with letters and numbers only", .pattern("[a-zA-Z0-9]+"))
+    let username: String
+}
+
 @Suite("Guide Macro Tests", .tags(.guide, .macros))
 struct GuideMacroTests {
     
     @Test("@Guide macro compiles without errors")
-    func guideMacroCompilation() {
-        // Test that the @Guide macro can be applied and compiles
-        @Generable
-        struct Person {
-            @Guide(description: "The person's full name")
-            let name: String
-            
-            @Guide(description: "Age in years")  
-            let age: Int
-        }
+    func guideMacroCompilation() throws {
+        // Test that the @Guide macro works with @Generable
+        // Create instance to verify the type works properly
+        let content = GeneratedContent("{\"name\": \"John\", \"age\": 30}")
+        let person = try TestGuidePerson(content)
         
-        // Basic verification that the type exists and compiles
-        #expect(Person.self is Person.Type)
+        // Verify the instance can be converted back to GeneratedContent
+        let generated = person.generatedContent
+        #expect(generated.text != "")
+        
+        // Verify generationSchema exists
+        let schema = TestGuidePerson.generationSchema
+        #expect(schema.type == "object")
     }
     
     @Test("@Guide macro with pattern constraint compiles")
     func guideMacroWithPattern() {
         // Test @Guide with pattern constraint
-        @Generable
-        struct User {
-            @Guide(description: "Username with letters and numbers only", .pattern("[a-zA-Z0-9]+"))
-            let username: String
-        }
-        
         // Verify the type compiles and has schema
-        let schema = User.generationSchema
+        let schema = TestGuideUser.generationSchema
         #expect(schema.type == "object")
     }
 }

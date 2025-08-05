@@ -12,6 +12,15 @@ import Foundation
 /// containing the generated content and associated transcript entries.
 ///
 /// **Reference:** https://developer.apple.com/documentation/foundationmodels/response
+
+// MARK: - Test Types (moved from local scope to top level)
+
+@Generable
+struct TestResponseData {
+    let message: String
+    let count: Int
+}
+
 @Suite("Response Tests", .tags(.core, .unit))
 struct ResponseTests {
     
@@ -41,14 +50,8 @@ struct ResponseTests {
     
     @Test("Response creation with Generable content")
     func responseGenerableCreation() throws {
-        @Generable
-        struct TestData {
-            let message: String
-            let count: Int
-        }
-        
         // Test with valid JSON
-        let content = try TestData(GeneratedContent(#"{"message": "test", "count": 42}"#))
+        let content = try TestResponseData(GeneratedContent(#"{"message": "test", "count": 42}"#))
         let transcriptEntries = ArraySlice<Transcript.Entry>()
         
         let response = Response(
@@ -63,14 +66,8 @@ struct ResponseTests {
     
     @Test("Response with Generable fallback to defaults")
     func responseGenerableFallback() throws {
-        @Generable
-        struct TestData {
-            let message: String
-            let count: Int
-        }
-        
         // Test with invalid JSON - should fallback to defaults
-        let content = try TestData(GeneratedContent("{}"))
+        let content = try TestResponseData(GeneratedContent("{}"))
         let transcriptEntries = ArraySlice<Transcript.Entry>()
         
         let response = Response(

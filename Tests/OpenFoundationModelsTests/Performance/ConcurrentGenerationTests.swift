@@ -14,6 +14,59 @@ import Foundation
 /// and acceptable performance under load.
 ///
 /// **Reference:** https://developer.apple.com/documentation/foundationmodels/languagemodelsession
+
+// MARK: - Test Types (moved from local scope to top level)
+
+@Generable
+struct TestSchemaType1 {
+    @Guide(description: "Field A") let fieldA: String
+    @Guide(description: "Field B") let fieldB: Int
+}
+
+@Generable
+struct TestSchemaType2 {
+    @Guide(description: "Field X") let fieldX: String
+    @Guide(description: "Field Y") let fieldY: Double
+}
+
+@Generable
+struct TestSchemaType3 {
+    @Guide(description: "Field P") let fieldP: String
+    @Guide(description: "Field Q") let fieldQ: Bool
+}
+
+@Generable
+struct TestConcurrentTypeA {
+    @Guide(description: "Name") let name: String
+    @Guide(description: "Count") let count: Int
+}
+
+@Generable
+struct TestConcurrentTypeB {
+    @Guide(description: "Value") let value: String
+    @Guide(description: "Score") let score: Double
+}
+
+@Generable
+struct TestConcurrentTypeC {
+    @Guide(description: "ID") let id: String
+    @Guide(description: "Active") let active: Bool
+}
+
+@Generable
+struct TestLoadTestType {
+    @Guide(description: "ID") let id: String
+    @Guide(description: "Data") let data: String
+    @Guide(description: "Index") let index: Int
+}
+
+@Generable
+struct TestSharedResourceType {
+    @Guide(description: "Resource ID") let resourceId: String
+    @Guide(description: "Access count") let accessCount: Int
+    @Guide(description: "Timestamp") let timestamp: String
+}
+
 @Suite("Concurrent Generation Tests", .tags(.performance, .core, .integration))
 struct ConcurrentGenerationTests {
     
@@ -75,25 +128,6 @@ struct ConcurrentGenerationTests {
     
     @Test("Concurrent schema generation", .timeLimit(.minutes(1)))
     func concurrentSchemaGeneration() async throws {
-        // Define multiple schema types
-        @Generable
-        struct SchemaType1 {
-            @Guide(description: "Field A") let fieldA: String
-            @Guide(description: "Field B") let fieldB: Int
-        }
-        
-        @Generable
-        struct SchemaType2 {
-            @Guide(description: "Field X") let fieldX: String
-            @Guide(description: "Field Y") let fieldY: Double
-        }
-        
-        @Generable
-        struct SchemaType3 {
-            @Guide(description: "Field P") let fieldP: String
-            @Guide(description: "Field Q") let fieldQ: Bool
-        }
-        
         let concurrencyLevel = 20
         let startTime = Date()
         
@@ -101,9 +135,9 @@ struct ConcurrentGenerationTests {
         let results = try await withThrowingTaskGroup(of: (String, String).self) { group in
             for i in 0..<concurrencyLevel {
                 group.addTask {
-                    let schema1 = SchemaType1.generationSchema
-                    let schema2 = SchemaType2.generationSchema
-                    let schema3 = SchemaType3.generationSchema
+                    let schema1 = TestSchemaType1.generationSchema
+                    let schema2 = TestSchemaType2.generationSchema
+                    let schema3 = TestSchemaType3.generationSchema
                     
                     return ("task-\(i)", "\(schema1.type)-\(schema2.type)-\(schema3.type)")
                 }
@@ -133,49 +167,31 @@ struct ConcurrentGenerationTests {
     
     @Test("Concurrent instance creation with different types", .timeLimit(.minutes(1)))
     func concurrentInstanceCreationWithDifferentTypes() async throws {
-        @Generable
-        struct TypeA {
-            @Guide(description: "Name") let name: String
-            @Guide(description: "Count") let count: Int
-        }
-        
-        @Generable
-        struct TypeB {
-            @Guide(description: "Value") let value: String
-            @Guide(description: "Score") let score: Double
-        }
-        
-        @Generable
-        struct TypeC {
-            @Guide(description: "ID") let id: String
-            @Guide(description: "Active") let active: Bool
-        }
-        
         let instancesPerType = 50
         let startTime = Date()
         
         // Create instances concurrently
         let results = try await withThrowingTaskGroup(of: String.self) { group in
             // Type A instances
-            for i in 0..<instancesPerType {
+            for _ in 0..<instancesPerType {
                 group.addTask {
-                    let instance = try TypeA(GeneratedContent("{}"))
+                    let instance = try TestConcurrentTypeA(GeneratedContent("{}"))
                     return "A:\(instance.name):\(instance.count)"
                 }
             }
             
             // Type B instances
-            for i in 0..<instancesPerType {
+            for _ in 0..<instancesPerType {
                 group.addTask {
-                    let instance = try TypeB(GeneratedContent("{}"))
+                    let instance = try TestConcurrentTypeB(GeneratedContent("{}"))
                     return "B:\(instance.value):\(instance.score)"
                 }
             }
             
             // Type C instances
-            for i in 0..<instancesPerType {
+            for _ in 0..<instancesPerType {
                 group.addTask {
-                    let instance = try TypeC(GeneratedContent("{}"))
+                    let instance = try TestConcurrentTypeC(GeneratedContent("{}"))
                     return "C:\(instance.id):\(instance.active)"
                 }
             }
@@ -295,13 +311,6 @@ struct ConcurrentGenerationTests {
     
     @Test("High-load concurrent operations", .timeLimit(.minutes(2)))
     func highLoadConcurrentOperations() async throws {
-        @Generable
-        struct LoadTestType {
-            @Guide(description: "ID") let id: String
-            @Guide(description: "Data") let data: String
-            @Guide(description: "Index") let index: Int
-        }
-        
         let totalOperations = 200
         let batchSize = 20
         let startTime = Date()
@@ -316,8 +325,8 @@ struct ConcurrentGenerationTests {
                 for i in batchStart..<batchEnd {
                     group.addTask {
                         // Mix of operations: schema access and instance creation
-                        let schema = LoadTestType.generationSchema
-                        let instance = try LoadTestType(GeneratedContent("{}"))
+                        let schema = TestLoadTestType.generationSchema
+                        let instance = try TestLoadTestType(GeneratedContent("{}"))
                         
                         return "op-\(i):\(schema.type):\(instance.id):\(instance.index)"
                     }
@@ -353,13 +362,6 @@ struct ConcurrentGenerationTests {
     
     @Test("Resource contention test", .timeLimit(.minutes(1)))
     func resourceContentionTest() async throws {
-        @Generable
-        struct SharedResourceType {
-            @Guide(description: "Resource ID") let resourceId: String
-            @Guide(description: "Access count") let accessCount: Int
-            @Guide(description: "Timestamp") let timestamp: String
-        }
-        
         let concurrentAccesses = 100
         let startTime = Date()
         
@@ -368,11 +370,11 @@ struct ConcurrentGenerationTests {
             for i in 0..<concurrentAccesses {
                 group.addTask {
                     // Multiple operations on the same type to test resource contention
-                    let schema1 = SharedResourceType.generationSchema
-                    let instance1 = try SharedResourceType(GeneratedContent("{}"))
+                    let schema1 = TestSharedResourceType.generationSchema
+                    let instance1 = try TestSharedResourceType(GeneratedContent("{}"))
                     
-                    let schema2 = SharedResourceType.generationSchema
-                    let _ = try SharedResourceType(GeneratedContent("{}"))
+                    let schema2 = TestSharedResourceType.generationSchema
+                    let _ = try TestSharedResourceType(GeneratedContent("{}"))
                     
                     // Verify schemas are consistent
                     let schemasMatch = (schema1.type == schema2.type)

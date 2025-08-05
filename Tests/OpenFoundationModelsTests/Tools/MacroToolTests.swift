@@ -7,6 +7,22 @@ import Foundation
 import Testing
 @testable import OpenFoundationModels
 
+// MARK: - Test Types (defined at top level to avoid local type macro restrictions)
+
+@Generable
+struct TestWeatherToolArguments {
+    @Guide(description: "City name")
+    let city: String
+    
+    @Guide(description: "Temperature unit", .enumeration(["celsius", "fahrenheit"]))
+    let unit: String
+}
+
+@Generable
+struct MacroTestSimpleType {
+    let value: String
+}
+
 /// Tests for Tool protocol with @Generable macro integration
 /// 
 /// **Focus:** Validates that @Generable macro provides correct protocol conformance
@@ -16,19 +32,11 @@ struct MacroToolTests {
     
     // MARK: - Test Tools with @Generable
     
-    /// Tool with @Generable arguments and explicit conformance declaration
+    /// Tool with @Generable arguments
     struct TestWeatherTool: Tool {
         let description = "Get weather information for a city"
         
-        @Generable
-        struct Arguments: Generable {
-            @Guide(description: "City name")
-            let city: String
-            
-            @Guide(description: "Temperature unit", .enumeration(["celsius", "fahrenheit"]))
-            let unit: String
-        }
-        
+        typealias Arguments = TestWeatherToolArguments
         typealias Output = String
         
         func call(arguments: Arguments) async throws -> String {
@@ -67,7 +75,7 @@ struct MacroToolTests {
         
         // This should work if the macro properly generates the conformance
         do {
-            let args = try TestWeatherTool.Arguments(content)
+            let args = try TestWeatherToolArguments(content)
             let result = try await tool.call(arguments: args)
             
             let data = result.data(using: .utf8)!
@@ -103,18 +111,13 @@ struct MacroToolTests {
     
     @Test("Basic @Generable macro compilation")
     func basicGenerableMacroCompilation() {
-        @Generable
-        struct SimpleTest: Generable {
-            let value: String
-        }
-        
-        // Should compile without errors
-        let _ = SimpleTest.self
+        // Should compile without errors (using top-level MacroTestSimpleType)
+        let _ = MacroTestSimpleType.self
         
         // Test if the macro generated the required methods
         do {
             let content = GeneratedContent("{}")
-            let _ = try SimpleTest(content)
+            let _ = try MacroTestSimpleType(content)
         } catch {
             Issue.record("@Generable macro not generating init(_:) method: \(error)")
         }

@@ -14,19 +14,105 @@ import Foundation
 /// control over generated values.
 ///
 /// **Reference:** https://developer.apple.com/documentation/foundationmodels/generable
+
+// MARK: - Test Types (moved from local scope to top level)
+
+@Generable
+struct TestUserProfile {
+    let name: String
+    let age: Int
+}
+
+@Generable
+struct TestPerson {
+    @Guide(description: "Full name of the person")
+    let name: String
+    
+    @Guide(description: "Age in years")
+    let age: Int
+    
+    @Guide(description: "Email address")
+    let email: String
+}
+
+@Generable
+struct TestValidatedUser {
+    @Guide(description: "Username", .pattern("[a-zA-Z0-9_]+"))
+    let username: String
+    
+    @Guide(description: "Age", .range(13...120))
+    let age: Int
+    
+    @Guide(description: "Role", .enumeration(["admin", "user", "guest"]))
+    let role: String
+}
+
+@Generable
+struct TestAddress {
+    @Guide(description: "Street address")
+    let street: String
+    
+    @Guide(description: "City name")
+    let city: String
+    
+    @Guide(description: "ZIP code", .pattern("\\d{5}"))
+    let zipCode: String
+}
+
+@Generable
+struct TestGuidedProduct {
+    @Guide(description: "Product name")
+    let name: String
+    
+    @Guide(description: "Price in USD", .range(0.01...9999.99))
+    let price: Double
+}
+
+@Generable
+struct TestItem {
+    let value: String
+}
+
+@Generable
+struct TestSimpleList {
+    @Guide(description: "Total cost")
+    let totalCost: Double
+    
+    @Guide(description: "Item count")
+    let itemCount: Int
+}
+
+@Generable
+struct TestBook {
+    @Guide(description: "Book title")
+    let title: String
+    
+    @Guide(description: "Author name")
+    let author: String
+}
+
+@Generable
+struct TestAuthor {
+    @Guide(description: "Author name")
+    let name: String
+    
+    @Guide(description: "Birth year")
+    let birthYear: Int
+}
+
+@Generable
+struct TestGuidedSafeData {
+    let message: String
+    let timestamp: Int
+}
+
 @Suite("Guided Generation Tests", .tags(.generable, .integration, .guide))
 struct GuidedGenerationTests {
     
     @Test("Simple Generable type creation and basic properties")
     func simpleGenerableCreation() throws {
-        @Generable
-        struct UserProfile {
-            let name: String
-            let age: Int
-        }
-        
         // Test that the @Generable macro generates the required initializer
-        let content = try UserProfile(GeneratedContent("{}"))
+        let content = try TestUserProfile(GeneratedContent("{}"))
         
         // Verify default values are set (JSON parsing not yet implemented)
         #expect(content.name == "")
@@ -35,20 +121,8 @@ struct GuidedGenerationTests {
     
     @Test("Generable with Guide annotations")
     func generableWithGuideAnnotations() throws {
-        @Generable
-        struct Person {
-            @Guide(description: "Full name of the person")
-            let name: String
-            
-            @Guide(description: "Age in years")
-            let age: Int
-            
-            @Guide(description: "Email address")
-            let email: String
-        }
-        
         // Test creation with GeneratedContent
-        let person = try Person(GeneratedContent("{}"))
+        let person = try TestPerson(GeneratedContent("{}"))
         
         // Verify default values (proper JSON parsing to be implemented)
         #expect(person.name == "")
@@ -58,20 +132,8 @@ struct GuidedGenerationTests {
     
     @Test("Generable with constraint guides")
     func generableWithConstraintGuides() throws {
-        @Generable
-        struct ValidatedUser {
-            @Guide(description: "Username", .pattern("[a-zA-Z0-9_]+"))
-            let username: String
-            
-            @Guide(description: "Age", .range(13...120))
-            let age: Int
-            
-            @Guide(description: "Role", .enumeration(["admin", "user", "guest"]))
-            let role: String
-        }
-        
         // Test creation and verify structure compiles
-        let user = try ValidatedUser(GeneratedContent("{}"))
+        let user = try TestValidatedUser(GeneratedContent("{}"))
         
         // Verify default initialization
         #expect(user.username == "")
@@ -81,20 +143,8 @@ struct GuidedGenerationTests {
     
     @Test("Simple nested structures")
     func simpleNestedStructures() throws {
-        @Generable
-        struct Address {
-            @Guide(description: "Street address")
-            let street: String
-            
-            @Guide(description: "City name")
-            let city: String
-            
-            @Guide(description: "ZIP code", .pattern("\\d{5}"))
-            let zipCode: String
-        }
-        
         // Test only the Address structure for now (Customer with nested Address needs complex macro support)
-        let address = try Address(GeneratedContent("{}"))
+        let address = try TestAddress(GeneratedContent("{}"))
         
         // Verify basic structure
         #expect(address.street == "")
@@ -104,17 +154,8 @@ struct GuidedGenerationTests {
     
     @Test("Generable generationSchema property exists")
     func generableGenerationSchemaExists() {
-        @Generable
-        struct Product {
-            @Guide(description: "Product name")
-            let name: String
-            
-            @Guide(description: "Price in USD", .range(0.01...9999.99))
-            let price: Double
-        }
-        
         // Test that the macro generates the generationSchema static property
-        let schema = Product.generationSchema
+        let schema = TestGuidedProduct.generationSchema
         
         // Verify schema is generated (basic check)
         #expect(schema.type == "object")
@@ -129,11 +170,6 @@ struct GuidedGenerationTests {
     
     @Test("Generable protocol methods exist")
     func generableProtocolMethodsExist() throws {
-        @Generable
-        struct TestItem {
-            let value: String
-        }
-        
         let item = try TestItem(GeneratedContent("{}"))
         
         // Test that protocol methods are generated
@@ -151,17 +187,8 @@ struct GuidedGenerationTests {
     
     @Test("Generable with simple array properties")
     func generableWithSimpleArrayProperties() throws {
-        @Generable
-        struct SimpleList {
-            @Guide(description: "Total cost")
-            let totalCost: Double
-            
-            @Guide(description: "Item count")
-            let itemCount: Int
-        }
-        
         // Test creation - focusing on basic types first, arrays to be implemented later
-        let list = try SimpleList(GeneratedContent("{}"))
+        let list = try TestSimpleList(GeneratedContent("{}"))
         
         // Verify basic types work
         #expect(list.totalCost == 0.0)
@@ -170,27 +197,9 @@ struct GuidedGenerationTests {
     
     @Test("Multiple Generable types in same scope")
     func multipleGenerableTypesInSameScope() throws {
-        @Generable
-        struct Book {
-            @Guide(description: "Book title")
-            let title: String
-            
-            @Guide(description: "Author name")
-            let author: String
-        }
-        
-        @Generable
-        struct Author {
-            @Guide(description: "Author name")
-            let name: String
-            
-            @Guide(description: "Birth year")
-            let birthYear: Int
-        }
-        
         // Test that multiple @Generable types can coexist
-        let book = try Book(GeneratedContent("{}"))
-        let author = try Author(GeneratedContent("{}"))
+        let book = try TestBook(GeneratedContent("{}"))
+        let author = try TestAuthor(GeneratedContent("{}"))
         
         #expect(book.title == "")
         #expect(book.author == "")
@@ -200,13 +209,7 @@ struct GuidedGenerationTests {
     
     @Test("Generable Sendable conformance")
     func generableSendableConformance() throws {
-        @Generable
-        struct SafeData {
-            let message: String
-            let timestamp: Int
-        }
-        
-        let data = try SafeData(GeneratedContent("{}"))
+        let data = try TestGuidedSafeData(GeneratedContent("{}"))
         
         // Test Sendable conformance - should compile without warnings
         let _: any Sendable = data
