@@ -42,22 +42,7 @@ extension Transcript: Codable {
 
 // MARK: - Transcript.Entry Extensions
 
-extension Transcript.Entry: CustomStringConvertible {
-    public var description: String {
-        switch self {
-        case .instructions(let instructions):
-            return "Instructions: \(instructions.segments.map { $0.description }.joined(separator: " "))"
-        case .prompt(let prompt):
-            return "Prompt: \(prompt.segments.map { $0.description }.joined(separator: " "))"
-        case .response(let response):
-            return "Response: \(response.segments.map { $0.description }.joined(separator: " "))"
-        case .toolCalls(let toolCalls):
-            return "Tool Calls: \(toolCalls.toolCalls.map { $0.description }.joined(separator: ", "))"
-        case .toolOutput(let toolOutput):
-            return "Tool Output: \(toolOutput.toolName), segments: \(toolOutput.segments.count)"
-        }
-    }
-}
+// CustomStringConvertible is now implemented directly in Transcript.swift
 
 // MARK: - Transcript.Segment Extensions
 

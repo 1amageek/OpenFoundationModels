@@ -94,6 +94,51 @@ public struct ResponseStreamIterator<Content: Sendable>: AsyncIteratorProtocol {
     }
 }
 
+// MARK: - ResponseStream.Snapshot
+
+extension ResponseStream {
+    /// A snapshot of partially generated content.
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// A snapshot of partially generated content during streaming.
+    /// 
+    /// **Source:** https://developer.apple.com/documentation/foundationmodels/languagemodelsession/responsestream/snapshot
+    /// 
+    /// **Apple Official API:** `struct Snapshot`
+    /// - iOS 26.0+, iPadOS 26.0+, macOS 26.0+, visionOS 26.0+
+    /// - Beta Software: Contains preliminary API information
+    public struct Snapshot: Sendable {
+        /// The content of the response.
+        /// 
+        /// **Apple Foundation Models Documentation:**
+        /// The partially generated content at this point in the stream.
+        /// 
+        /// **Source:** https://developer.apple.com/documentation/foundationmodels/languagemodelsession/responsestream/snapshot/content
+        public let content: Content.PartiallyGenerated
+        
+        /// The raw content of the response.
+        /// 
+        /// **Apple Foundation Models Documentation:**
+        /// The raw generated content at this point in the stream.
+        /// 
+        /// **Source:** https://developer.apple.com/documentation/foundationmodels/languagemodelsession/responsestream/snapshot/rawcontent
+        public let rawContent: GeneratedContent
+        
+        /// Initialize a snapshot
+        /// 
+        /// - Parameters:
+        ///   - content: The partially generated content
+        ///   - rawContent: The raw generated content
+        public init(
+            content: Content.PartiallyGenerated,
+            rawContent: GeneratedContent
+        ) {
+            self.content = content
+            self.rawContent = rawContent
+        }
+    }
+}
+
 // MARK: - Helper Extensions
 
 extension ResponseStream {
@@ -133,8 +178,20 @@ extension ResponseStream {
         // In a real implementation, this would come from the session's transcript
         let transcriptSlice = ArraySlice(allEntries)
         
+        // Create raw content - for Generable types, convert back to GeneratedContent
+        let rawContent: GeneratedContent
+        if Content.self == GeneratedContent.self {
+            rawContent = content as! GeneratedContent
+        } else if Content.self == String.self {
+            rawContent = GeneratedContent(content as! String)
+        } else {
+            // For other Generable types, create GeneratedContent from string representation
+            rawContent = GeneratedContent("\(content)")
+        }
+        
         return Response(
             content: content,
+            rawContent: rawContent,
             transcriptEntries: transcriptSlice
         )
     }

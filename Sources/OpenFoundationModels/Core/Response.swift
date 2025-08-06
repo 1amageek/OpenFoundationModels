@@ -32,6 +32,15 @@ public struct Response<Content: Sendable>: Sendable {
     /// **Source:** https://developer.apple.com/documentation/foundationmodels/languagemodelsession/response/content
     public let content: Content
     
+    /// The raw response content.
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// The raw response content. When `Content` is `GeneratedContent`, 
+    /// this is the same as `content`.
+    /// 
+    /// **Source:** https://developer.apple.com/documentation/foundationmodels/languagemodelsession/response/rawcontent
+    public let rawContent: GeneratedContent
+    
     /// The list of transcript entries.
     /// 
     /// **Apple Foundation Models Documentation:**
@@ -48,12 +57,31 @@ public struct Response<Content: Sendable>: Sendable {
     /// 
     /// - Parameters:
     ///   - content: The generated content
+    ///   - rawContent: The raw generated content
+    ///   - transcriptEntries: The associated transcript entries
+    public init(
+        content: Content,
+        rawContent: GeneratedContent,
+        transcriptEntries: ArraySlice<Transcript.Entry>
+    ) {
+        self.content = content
+        self.rawContent = rawContent
+        self.transcriptEntries = transcriptEntries
+    }
+    
+    /// Convenience initializer when Content is GeneratedContent
+    /// 
+    /// When Content is GeneratedContent, rawContent is the same as content.
+    /// 
+    /// - Parameters:
+    ///   - content: The generated content (also used as rawContent)
     ///   - transcriptEntries: The associated transcript entries
     public init(
         content: Content,
         transcriptEntries: ArraySlice<Transcript.Entry>
-    ) {
+    ) where Content == GeneratedContent {
         self.content = content
+        self.rawContent = content
         self.transcriptEntries = transcriptEntries
     }
     

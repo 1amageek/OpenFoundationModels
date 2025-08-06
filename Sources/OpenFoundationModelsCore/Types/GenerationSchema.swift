@@ -21,6 +21,7 @@ import Foundation
 /// - Sendable
 /// - Codable
 /// - CustomDebugStringConvertible
+/// - Equatable (via extension)
 /// - SendableMetatype (via extension)
 public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible {
     
@@ -310,8 +311,17 @@ public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible 
     }
 }
 
-// MARK: - SendableMetatype Conformance
+// MARK: - Protocol Conformances
+
 extension GenerationSchema: SendableMetatype { }
+
+extension GenerationSchema: Equatable {
+    public static func ==(lhs: GenerationSchema, rhs: GenerationSchema) -> Bool {
+        // Compare internal properties
+        // Note: This is a simplified comparison for now
+        return lhs._description == rhs._description
+    }
+}
 
 // MARK: - Codable Implementation
 

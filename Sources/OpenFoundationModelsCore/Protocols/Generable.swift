@@ -66,7 +66,7 @@ public protocol Generable: ConvertibleFromGeneratedContent, ConvertibleToGenerat
     /// **Apple Official API:** `associatedtype PartiallyGenerated : ConvertibleFromGeneratedContent = Self`
     /// 
     /// **Required** - Default implementation provided.
-    associatedtype PartiallyGenerated: ConvertibleFromGeneratedContent = Self
+    associatedtype PartiallyGenerated: ConvertibleFromGeneratedContent & Sendable = Self
     
     /// The partially generated type of this struct.
     /// 

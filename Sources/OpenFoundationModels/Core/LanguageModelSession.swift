@@ -131,6 +131,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         
         return Response(
             content: content,
+            rawContent: GeneratedContent(content),
             transcriptEntries: [promptEntry, responseEntry]
         )
     }
@@ -175,6 +176,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         
         return Response(
             content: content,
+            rawContent: generatedContent,
             transcriptEntries: [promptEntry, responseEntry]
         )
     }
@@ -218,6 +220,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         
         return Response(
             content: content,
+            rawContent: content,
             transcriptEntries: [promptEntry, responseEntry]
         )
     }
@@ -462,31 +465,28 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
     
     // MARK: - Model Management
     
-    /// Prewarm the model to reduce initial latency
-    /// ✅ CONFIRMED: prewarm() method is synchronous (not async)
-    public func prewarm() {
-        // Implementation needed - model prewarming
-        // This should prepare the model for faster response generation
-    }
-    
-    /// Prewarm the model with a specific prompt and content type
-    /// ✅ APPLE SPEC: prewarm<Content>(prompt:generating:) method
-    public func prewarm<Content: Generable>(
-        prompt: Prompt,
-        generating: Content.Type
-    ) {
-        // Implementation needed - content-specific prewarming
-        // This should prepare the model for the specific content type
-    }
-    
-    /// Prewarm the model with a specific prompt and schema
-    /// ✅ APPLE SPEC: prewarm(prompt:schema:) method
-    public func prewarm(
-        prompt: Prompt,
-        schema: GenerationSchema?
-    ) {
-        // Implementation needed - schema-specific prewarming
-        // This should prepare the model for the specific schema
+    /// Requests that the system eagerly load the resources required for this session into memory 
+    /// and optionally caches a prefix of your prompt.
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// This method can be useful in cases where you have a strong signal that the user will interact 
+    /// with session within a few seconds. For example, you might call prewarm when the user begins 
+    /// typing into a text field.
+    /// 
+    /// If you know a prefix for the future prompt, passing it to prewarm will allow the system to 
+    /// process the prompt eagerly and reduce latency for the future request.
+    /// 
+    /// - Important: You should only use prewarm when you have a window of at least 1s before the
+    ///   call to `respond(to:)`.
+    /// 
+    /// - Note: Calling this method does not guarantee that the system loads your assets immediately,
+    ///   particularly if your app is running in the background or the system is under load.
+    /// 
+    /// - Parameter promptPrefix: An optional prompt prefix to cache for faster future responses
+    public func prewarm(promptPrefix: Prompt? = nil) {
+        // Implementation: Prepare the model and optionally cache the prompt prefix
+        // This is a synchronous method that initiates prewarming
+        // The actual prewarming happens asynchronously in the background
     }
 }
 

@@ -349,6 +349,51 @@ do {
 - Command-line interface
 - Swift library integration
 
+## SendableMetatype Protocol
+
+### 概要
+SendableMetatypeは、Swift 標準ライブラリのプロトコルで、型のメタタイプが並行コンテキスト間で安全に共有できることを示します。ジェネリック型`T`が`SendableMetatype`に準拠すると、そのメタタイプ`T.Type`が`Sendable`に準拠します。
+
+### 重要な特徴
+- **目的**: メタタイプ（T.Type）をTask間で安全に共有
+- **自動準拠**: すべての具象型は暗黙的にSendableMetatypeに準拠
+- **主な用途**: ジェネリックコードでisolated conformancesの使用を防ぐ
+
+### プロトコル定義
+```swift
+protocol SendableMetatype : ~Copyable, ~Escapable
+```
+
+### 使用例
+```swift
+// 問題のあるコード（SendableMetatypeなし）
+func useFromAnotherTask<T: P>(_: T.Type) {
+    Task { @concurrent in
+        T.f() // エラー: non-Sendable type `T.Type` をキャプチャ
+    }
+}
+
+// 修正版（SendableMetatype追加）
+func useFromAnotherTask<T: P & SendableMetatype>(_: T.Type) {
+    Task { @concurrent in
+        T.f() // OK: T.Type は Sendable
+    }
+}
+```
+
+### プロトコル継承関係
+- `Sendable`プロトコルは`SendableMetatype`を継承
+- `T: Sendable`の要件がある場合、`T: SendableMetatype`も暗黙的に要求される
+
+### Foundation Models での使用
+Apple Foundation Modelsでは、以下の型がSendableMetatypeに準拠：
+- GenerationSchema
+- GenerationOptions  
+- Guardrails
+- Tool（プロトコル）
+- LanguageModelFeedback およびネスト型（Sentiment, Issue, Issue.Category）
+- Transcript およびすべてのネスト型
+
 ## API Implementation Status
 
 ### ✅ Verified Against Apple Documentation
@@ -360,6 +405,11 @@ do {
 - **GenerationID**: Implemented with full Apple compliance
 - **Transcript**: Complete with all nested types
 - **Response/ResponseStream**: Generic types with Apple specifications
+- **SendableMetatype準拠**: すべての必要な型で正しく実装
+  - GenerationSchema, GenerationOptions, Guardrails（Extension経由）
+  - LanguageModelFeedback.Sentiment/Issue/Category
+  - Transcript.Entry（Apple仕様通り）
+  - Tool プロトコル
 - **GenerationOptions**: Complete with SamplingMode (greedy, random top-k, random top-p)
 - **GenerationSchema**: Full implementation with Property, SchemaError, and dynamic support
 - **GenerationGuide**: All static methods for constraints (ranges, patterns, enums, arrays)
