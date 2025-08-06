@@ -84,13 +84,13 @@ struct PartiallyGeneratedTests {
     func partialResponseCreationAndCompleteness() throws {
         let message = try TestMessage(GeneratedContent("{}"))
         
-        // Test Response.Partial creation
-        let incompletePartial = Response<TestMessage>.Partial(
+        // Test LanguageModelSession.Partial creation
+        let incompletePartial = LanguageModelSession.Partial<TestMessage>(
             content: message,
             isComplete: false
         )
         
-        let completePartial = Response<TestMessage>.Partial(
+        let completePartial = LanguageModelSession.Partial<TestMessage>(
             content: message,
             isComplete: true
         )
@@ -120,7 +120,7 @@ struct PartiallyGeneratedTests {
             continuation.finish()
         }
         
-        let responseStream = ResponseStream<String>(stream: stream)
+        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         var partialCount = 0
         var lastComplete = false
         
@@ -176,15 +176,15 @@ struct PartiallyGeneratedTests {
         }
     }
     
-    @Test("Response.Partial with String content")
+    @Test("LanguageModelSession.Partial with String content")
     func responsePartialWithStringContent() {
         // Test with String content (already Sendable + Generable)
-        let partialString = Response<String>.Partial(
+        let partialString = LanguageModelSession.Partial<String>(
             content: "Partial content",
             isComplete: false
         )
         
-        let completeString = Response<String>.Partial(
+        let completeString = LanguageModelSession.Partial<String>(
             content: "Complete content",
             isComplete: true
         )
@@ -207,7 +207,7 @@ struct PartiallyGeneratedTests {
             continuation.finish()
         }
         
-        let responseStream = ResponseStream<String>(stream: stream)
+        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
         // Test collect() waits for complete response
         let finalResponse = try await responseStream.collect()
@@ -230,7 +230,7 @@ struct PartiallyGeneratedTests {
             continuation.finish(throwing: error)
         }
         
-        let responseStream = ResponseStream<String>(stream: stream)
+        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
         // Test error propagation through PartiallyGenerated stream
         await #expect(throws: GenerationError.self) {
@@ -252,9 +252,9 @@ struct PartiallyGeneratedTests {
         #expect(partialA.valueA == nil)
         #expect(partialB.valueB == nil)
         
-        // Test that they can be used in separate Response.Partial instances
-        let responsePartialA = Response<TestTypeA>.Partial(content: typeA, isComplete: false)
-        let responsePartialB = Response<TestTypeB>.Partial(content: typeB, isComplete: true)
+        // Test that they can be used in separate LanguageModelSession.Partial instances
+        let responsePartialA = LanguageModelSession.Partial<TestTypeA>(content: typeA, isComplete: false)
+        let responsePartialB = LanguageModelSession.Partial<TestTypeB>(content: typeB, isComplete: true)
         
         #expect(responsePartialA.isComplete == false)
         #expect(responsePartialB.isComplete == true)

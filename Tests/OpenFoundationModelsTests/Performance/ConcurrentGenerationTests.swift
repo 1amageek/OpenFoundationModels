@@ -88,7 +88,7 @@ struct ConcurrentGenerationTests {
             }
         }
         
-        let responseStreams = streams.map { ResponseStream<String>(stream: $0) }
+        let responseStreams = streams.map { LanguageModelSession.ResponseStream<String>(stream: $0) }
         
         let startTime = Date()
         
@@ -258,7 +258,7 @@ struct ConcurrentGenerationTests {
         }
         
         let allStreams = successStreams + errorStreams
-        let responseStreams = allStreams.map { ResponseStream<String>(stream: $0) }
+        let responseStreams = allStreams.map { LanguageModelSession.ResponseStream<String>(stream: $0) }
         
         let startTime = Date()
         

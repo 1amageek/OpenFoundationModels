@@ -61,6 +61,6 @@ struct LanguageModelSessionTests {
         
         // This test verifies the method exists and returns correct type
         let stream = session.streamResponse { Prompt("Hello") }
-        #expect(type(of: stream) == ResponseStream<String>.self)
+        #expect(type(of: stream) == LanguageModelSession.ResponseStream<String>.self)
     }
 }

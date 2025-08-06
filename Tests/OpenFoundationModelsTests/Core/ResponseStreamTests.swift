@@ -24,7 +24,7 @@ struct ResponseStreamTests {
             continuation.finish()
         }
         
-        let responseStream = ResponseStream<String>(stream: stream)
+        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
         // Verify the stream is created successfully
         #expect(responseStream.last == nil) // Initially no last value
@@ -39,7 +39,7 @@ struct ResponseStreamTests {
             continuation.finish()
         }
         
-        let responseStream = ResponseStream<String>(stream: stream)
+        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         var collectedPartials: [String.PartiallyGenerated] = []
         
         // Test AsyncSequence iteration
@@ -63,7 +63,7 @@ struct ResponseStreamTests {
             continuation.finish()
         }
         
-        let responseStream = ResponseStream<String>(stream: stream)
+        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         var partialCount = 0
         var lastContent = ""
         
@@ -92,7 +92,7 @@ struct ResponseStreamTests {
             continuation.finish()
         }
         
-        let responseStream = ResponseStream<String>(stream: stream)
+        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
         // Test the collect() method
         let finalResponse = try await responseStream.collect()
@@ -109,7 +109,7 @@ struct ResponseStreamTests {
             continuation.finish()
         }
         
-        let responseStream = ResponseStream<String>(stream: stream)
+        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
         // For String type, collect() returns the last value since String has no concept of "complete"
         let response = try await responseStream.collect()
@@ -125,7 +125,7 @@ struct ResponseStreamTests {
             continuation.finish()
         }
         
-        let responseStream = ResponseStream<String>(stream: stream)
+        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
         // Test the collectPartials() helper method
         let allPartials = try await responseStream.collectPartials()
@@ -148,7 +148,7 @@ struct ResponseStreamTests {
             continuation.finish(throwing: expectedError)
         }
         
-        let responseStream = ResponseStream<String>(stream: stream)
+        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
         // Test error propagation through AsyncSequence
         await #expect(throws: GenerationError.self) {
@@ -168,7 +168,7 @@ struct ResponseStreamTests {
             continuation.finish()
         }
         
-        let responseStream = ResponseStream<String>(stream: stream)
+        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
         // Create an iterator and verify it works
         var iterator = responseStream.makeAsyncIterator()
@@ -191,7 +191,7 @@ struct ResponseStreamTests {
             continuation.finish()
         }
         
-        let responseStream = ResponseStream<String>(stream: stream)
+        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
         // This test verifies Sendable conformance compiles
         let _: any Sendable = responseStream

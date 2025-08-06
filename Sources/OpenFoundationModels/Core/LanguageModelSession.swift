@@ -107,7 +107,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         options: GenerationOptions = .default,
         isolation: isolated (any Actor)? = nil,
         prompt: () throws -> Prompt
-    ) async throws -> Response<String> {
+    ) async throws -> LanguageModelSession.Response<String> {
         let promptValue = try prompt()
         let promptText = promptValue.description
         let content = try await model.generate(prompt: promptText, options: options)
@@ -129,7 +129,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
             )
         )
         
-        return Response(
+        return LanguageModelSession.Response(
             content: content,
             rawContent: GeneratedContent(content),
             transcriptEntries: [promptEntry, responseEntry]
@@ -144,7 +144,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         includeSchemaInPrompt: Bool = true,
         isolation: isolated (any Actor)? = nil,
         prompt: () throws -> Prompt
-    ) async throws -> Response<Content> {
+    ) async throws -> LanguageModelSession.Response<Content> {
         let promptValue = try prompt()
         let promptText = promptValue.description
         
@@ -174,7 +174,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
             )
         )
         
-        return Response(
+        return LanguageModelSession.Response(
             content: content,
             rawContent: generatedContent,
             transcriptEntries: [promptEntry, responseEntry]
@@ -189,7 +189,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         includeSchemaInPrompt: Bool = true,
         isolation: isolated (any Actor)? = nil,
         prompt: () throws -> Prompt
-    ) async throws -> Response<GeneratedContent> {
+    ) async throws -> LanguageModelSession.Response<GeneratedContent> {
         let promptValue = try prompt()
         let promptText = promptValue.description
         
@@ -218,7 +218,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
             )
         )
         
-        return Response(
+        return LanguageModelSession.Response(
             content: content,
             rawContent: content,
             transcriptEntries: [promptEntry, responseEntry]
@@ -233,7 +233,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         to prompt: String,
         options: GenerationOptions = .default,
         isolation: isolated (any Actor)? = nil
-    ) async throws -> Response<String> {
+    ) async throws -> LanguageModelSession.Response<String> {
         return try await respond(options: options, isolation: isolation) {
             Prompt(prompt)
         }
@@ -247,7 +247,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         includeSchemaInPrompt: Bool = true,
         options: GenerationOptions = .default,
         isolation: isolated (any Actor)? = nil
-    ) async throws -> Response<Content> {
+    ) async throws -> LanguageModelSession.Response<Content> {
         return try await respond(
             generating: generating,
             options: options,
@@ -266,7 +266,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         includeSchemaInPrompt: Bool = true,
         options: GenerationOptions = .default,
         isolation: isolated (any Actor)? = nil
-    ) async throws -> Response<GeneratedContent> {
+    ) async throws -> LanguageModelSession.Response<GeneratedContent> {
         return try await respond(
             options: options,
             schema: schema,
@@ -287,7 +287,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
     public func streamResponse(
         options: GenerationOptions = .default,
         prompt: () throws -> Prompt
-    ) rethrows -> ResponseStream<String> {
+    ) rethrows -> LanguageModelSession.ResponseStream<String> {
         let promptValue = try prompt()
         let promptText = promptValue.description
         
@@ -307,7 +307,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
             }
         }
         
-        return ResponseStream(stream: stream)
+        return LanguageModelSession.ResponseStream(stream: stream)
     }
     
     /// Apple's official stream response method with generic content generation
@@ -317,7 +317,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         options: GenerationOptions = .default,
         includeSchemaInPrompt: Bool = true,
         prompt: () throws -> Prompt
-    ) rethrows -> ResponseStream<Content> {
+    ) rethrows -> LanguageModelSession.ResponseStream<Content> {
         let promptValue = try prompt()
         let promptText = promptValue.description
         
@@ -353,7 +353,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
             }
         }
         
-        return ResponseStream(stream: stream)
+        return LanguageModelSession.ResponseStream(stream: stream)
     }
     
     /// Apple's official stream response method with schema-based generation
@@ -363,7 +363,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         schema: GenerationSchema,
         includeSchemaInPrompt: Bool = true,
         prompt: () throws -> Prompt
-    ) rethrows -> ResponseStream<GeneratedContent> {
+    ) rethrows -> LanguageModelSession.ResponseStream<GeneratedContent> {
         let promptValue = try prompt()
         let promptText = promptValue.description
         
@@ -390,7 +390,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
             }
         }
         
-        return ResponseStream(stream: stream)
+        return LanguageModelSession.ResponseStream(stream: stream)
     }
     
     // MARK: - Convenience Streaming Methods (String-based)
@@ -400,7 +400,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
     public func streamResponse(
         to prompt: String,
         options: GenerationOptions = .default
-    ) -> ResponseStream<String> {
+    ) -> LanguageModelSession.ResponseStream<String> {
         return streamResponse(options: options) {
             Prompt(prompt)
         }
@@ -413,7 +413,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         generating: Content.Type,
         includeSchemaInPrompt: Bool = true,
         options: GenerationOptions = .default
-    ) -> ResponseStream<Content> {
+    ) -> LanguageModelSession.ResponseStream<Content> {
         return streamResponse(
             generating: generating,
             options: options,
@@ -430,7 +430,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         schema: GenerationSchema,
         includeSchemaInPrompt: Bool = true,
         options: GenerationOptions = .default
-    ) -> ResponseStream<GeneratedContent> {
+    ) -> LanguageModelSession.ResponseStream<GeneratedContent> {
         return streamResponse(
             options: options,
             schema: schema,
@@ -471,6 +471,268 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
 // MARK: - Nested Types
 
 extension LanguageModelSession {
+    
+    // MARK: - Response
+    
+    /// A structure that stores the output of a response call.
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// A response from a language model that contains the generated content
+    /// and associated transcript entries from the interaction.
+    /// 
+    /// **Source:** https://developer.apple.com/documentation/foundationmodels/languagemodelsession/response
+    /// 
+    /// **Apple Official API:** `struct Response<Content>`
+    /// - iOS 26.0+, iPadOS 26.0+, macOS 26.0+, visionOS 26.0+
+    /// - Beta Software: Contains preliminary API information
+    /// 
+    /// **Properties:**
+    /// - `content: Content` - The response content
+    /// - `transcriptEntries: ArraySlice<Transcript.Entry>` - The list of transcript entries
+    /// 
+    /// **Usage:**
+    /// ```swift
+    /// let response = try await session.respond { Prompt("Hello") }
+    /// print(response.content) // Generated content
+    /// print(response.transcriptEntries) // Transcript entries
+    /// ```
+    public struct Response<Content: Sendable>: Sendable {
+        /// The response content.
+        /// 
+        /// **Apple Foundation Models Documentation:**
+        /// The generated content from the language model response.
+        /// The type depends on the generation method used.
+        /// 
+        /// **Source:** https://developer.apple.com/documentation/foundationmodels/languagemodelsession/response/content
+        public let content: Content
+        
+        /// The raw response content.
+        /// 
+        /// **Apple Foundation Models Documentation:**
+        /// The raw response content. When `Content` is `GeneratedContent`, 
+        /// this is the same as `content`.
+        /// 
+        /// **Source:** https://developer.apple.com/documentation/foundationmodels/languagemodelsession/response/rawcontent
+        public let rawContent: GeneratedContent
+        
+        /// The list of transcript entries.
+        /// 
+        /// **Apple Foundation Models Documentation:**
+        /// The transcript entries associated with this response,
+        /// documenting the interaction history.
+        /// 
+        /// **Source:** https://developer.apple.com/documentation/foundationmodels/languagemodelsession/response/transcriptentries
+        public let transcriptEntries: ArraySlice<Transcript.Entry>
+        
+        /// Initialize a response with Apple-compliant structure
+        /// 
+        /// **Apple Foundation Models Documentation:**
+        /// Creates a response with generated content and transcript entries.
+        /// 
+        /// - Parameters:
+        ///   - content: The generated content
+        ///   - rawContent: The raw generated content
+        ///   - transcriptEntries: The associated transcript entries
+        public init(
+            content: Content,
+            rawContent: GeneratedContent,
+            transcriptEntries: ArraySlice<Transcript.Entry>
+        ) {
+            self.content = content
+            self.rawContent = rawContent
+            self.transcriptEntries = transcriptEntries
+        }
+        
+        /// Convenience initializer when Content is GeneratedContent
+        /// 
+        /// When Content is GeneratedContent, rawContent is the same as content.
+        /// 
+        /// - Parameters:
+        ///   - content: The generated content (also used as rawContent)
+        ///   - transcriptEntries: The associated transcript entries
+        public init(
+            content: Content,
+            transcriptEntries: ArraySlice<Transcript.Entry>
+        ) where Content == GeneratedContent {
+            self.content = content
+            self.rawContent = content
+            self.transcriptEntries = transcriptEntries
+        }
+        
+    }
+    
+    // MARK: - Response.Partial
+    
+    /// Partial response during streaming
+    /// ✅ APPLE SPEC: Response<Content>.Partial nested type
+    public struct Partial<Content: Sendable>: Sendable {
+        /// The partial content being generated
+        /// ✅ APPLE SPEC: content property (generic for different content types)
+        public let content: Content
+        
+        /// Whether the generation is complete
+        /// ✅ APPLE SPEC: isComplete property
+        public let isComplete: Bool
+        
+        /// Initialize a partial response
+        /// ✅ APPLE SPEC: Standard initializer
+        public init(
+            content: Content,
+            isComplete: Bool
+        ) {
+            self.content = content
+            self.isComplete = isComplete
+        }
+    }
+    
+    // MARK: - ResponseStream
+    
+    /// A structure that stores the output of a response stream.
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// A response stream that provides streaming access to generated content
+    /// as it becomes available from the language model.
+    /// 
+    /// **Source:** https://developer.apple.com/documentation/foundationmodels/languagemodelsession/responsestream
+    /// 
+    /// **Apple Official API:** `struct ResponseStream<Content> where Content : Generable`
+    /// - iOS 26.0+, iPadOS 26.0+, macOS 26.0+, visionOS 26.0+
+    /// - Beta Software: Contains preliminary API information
+    /// 
+    /// **Conformances:**
+    /// - AsyncSequence
+    /// - Copyable
+    /// 
+    /// **Key Method:**
+    /// - `collect(isolation:) async throws -> sending Response<Content>`
+    /// 
+    /// **Usage:**
+    /// ```swift
+    /// let stream = session.streamResponse { Prompt("Hello") }
+    /// for try await partial in stream {
+    ///     print(partial.content)
+    /// }
+    /// ```
+    public struct ResponseStream<Content>: AsyncSequence, Sendable where Content: Generable & Sendable {
+        
+        /// The element type yielded by the stream
+        /// ✅ APPLE SPEC: Element = Content.PartiallyGenerated
+        public typealias Element = Content.PartiallyGenerated
+        
+        /// The async iterator for the stream
+        /// ✅ APPLE SPEC: AsyncIterator implementation
+        public typealias AsyncIterator = ResponseStreamIterator<Content>
+        
+        /// The underlying async stream
+        /// ✅ APPLE SPEC: Internal stream implementation
+        private let stream: AsyncThrowingStream<Content.PartiallyGenerated, Error>
+        
+        /// The last partial response received
+        /// ✅ APPLE SPEC: Convenience property for UI updates
+        public private(set) var last: Content.PartiallyGenerated?
+        
+        /// Initialize with an async throwing stream
+        /// ✅ APPLE SPEC: Standard initializer
+        public init(
+            stream: AsyncThrowingStream<Content.PartiallyGenerated, Error>
+        ) {
+            self.stream = stream
+            self.last = nil
+        }
+        
+        /// Create an async iterator
+        /// ✅ APPLE SPEC: AsyncSequence conformance
+        public func makeAsyncIterator() -> AsyncIterator {
+            return LanguageModelSession.ResponseStreamIterator(stream: stream)
+        }
+    }
+    
+    // MARK: - ResponseStreamIterator
+    
+    /// The async iterator for ResponseStream
+    /// ✅ APPLE SPEC: AsyncIteratorProtocol implementation
+    public struct ResponseStreamIterator<Content: Generable & Sendable>: AsyncIteratorProtocol {
+        
+        /// The element type
+        /// ✅ APPLE SPEC: Element type matching parent stream
+        public typealias Element = Content.PartiallyGenerated
+        
+        /// The underlying stream iterator
+        /// ✅ APPLE SPEC: Internal iterator implementation
+        private var iterator: AsyncThrowingStream<Content.PartiallyGenerated, Error>.AsyncIterator
+        
+        /// Initialize with a stream
+        /// ✅ APPLE SPEC: Standard initializer
+        public init(
+            stream: AsyncThrowingStream<Content.PartiallyGenerated, Error>
+        ) {
+            self.iterator = stream.makeAsyncIterator()
+        }
+        
+        /// Get the next element
+        /// ✅ APPLE SPEC: AsyncIteratorProtocol conformance
+        public mutating func next() async throws -> Element? {
+            return try await iterator.next()
+        }
+    }
+    
+    // MARK: - GenerationError
+    
+    /// An error that occurs while generating a response.
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// An error that occurs while generating a response.
+    /// 
+    /// **Source:** https://developer.apple.com/documentation/foundationmodels/languagemodelsession/generationerror
+    /// 
+    /// **Apple Official API:** `enum GenerationError`
+    /// - iOS 26.0+, iPadOS 26.0+, macOS 26.0+, visionOS 26.0+
+    /// - Beta Software: Contains preliminary API information
+    /// 
+    /// **Conformances:**
+    /// - Error
+    /// - LocalizedError
+    /// - Sendable
+    /// - SendableMetatype
+    public enum GenerationError: Error, LocalizedError, Sendable, SendableMetatype {
+        
+        /// An error that indicates the assets required for the session are unavailable.
+        case assetsUnavailable(Context)
+        
+        /// An error that happens if you attempt to make a session respond to a second prompt while it's still responding to the first one.
+        case concurrentRequests(Context)
+        
+        /// An error that indicates the session failed to deserialize a valid generable type from model output.
+        case decodingFailure(Context)
+        
+        /// An error that signals the session reached its context window size limit.
+        case exceededContextWindowSize(Context)
+        
+        /// An error that indicates the system's safety guardrails are triggered by content in a prompt or the response generated by the model.
+        case guardrailViolation(Context)
+        
+        /// An error that indicates your session has been rate limited.
+        case rateLimited(Context)
+        
+        /// An error that indicates a generation guide with an unsupported pattern was used.
+        case unsupportedGuide(Context)
+        
+        /// An error that indicates an error that occurs if the model is prompted to respond in a language that it does not support.
+        case unsupportedLanguageOrLocale(Context)
+        
+        /// The context in which the error occurred.
+        public struct Context: Sendable, SendableMetatype {
+            /// A debug description to help developers diagnose issues during development.
+            public let debugDescription: String
+            
+            /// Creates a context.
+            public init(debugDescription: String) {
+                self.debugDescription = debugDescription
+            }
+        }
+    }
+    
+    // MARK: - ToolCallError
     
     /// An error that occurs while a system language model is calling a tool
     /// ✅ APPLE SPEC: LanguageModelSession.ToolCallError structure
@@ -672,5 +934,239 @@ extension LanguageModelSession.ToolCallError {
             ),
             context: ["error_type": ErrorType.unavailable.rawValue, "reason": reason]
         )
+    }
+}
+
+// MARK: - GenerationError Extensions
+
+extension LanguageModelSession.GenerationError {
+    
+    /// A string representation of the error description.
+    public var errorDescription: String? {
+        switch self {
+        case .assetsUnavailable(let context):
+            return "Assets unavailable: \(context.debugDescription)"
+            
+        case .concurrentRequests(let context):
+            return "Concurrent requests: \(context.debugDescription)"
+            
+        case .decodingFailure(let context):
+            return "Decoding failure: \(context.debugDescription)"
+            
+        case .exceededContextWindowSize(let context):
+            return "Context window size exceeded: \(context.debugDescription)"
+            
+        case .guardrailViolation(let context):
+            return "Guardrail violation: \(context.debugDescription)"
+            
+        case .rateLimited(let context):
+            return "Rate limited: \(context.debugDescription)"
+            
+        case .unsupportedGuide(let context):
+            return "Unsupported guide: \(context.debugDescription)"
+            
+        case .unsupportedLanguageOrLocale(let context):
+            return "Unsupported language or locale: \(context.debugDescription)"
+        }
+    }
+    
+    /// A string representation of the failure reason.
+    public var failureReason: String? {
+        switch self {
+        case .assetsUnavailable:
+            return "The assets required for the session are unavailable."
+            
+        case .concurrentRequests:
+            return "You attempted to make a session respond to a second prompt while it's still responding to the first one."
+            
+        case .decodingFailure:
+            return "The session failed to deserialize a valid generable type from model output."
+            
+        case .exceededContextWindowSize:
+            return "The session reached its context window size limit."
+            
+        case .guardrailViolation:
+            return "The system's safety guardrails were triggered by content in a prompt or the response generated by the model."
+            
+        case .rateLimited:
+            return "Your session has been rate limited."
+            
+        case .unsupportedGuide:
+            return "A generation guide with an unsupported pattern was used."
+            
+        case .unsupportedLanguageOrLocale:
+            return "The model was prompted to respond in a language that it does not support."
+        }
+    }
+    
+    /// A string representation of the recovery suggestion.
+    public var recoverySuggestion: String? {
+        switch self {
+        case .assetsUnavailable:
+            return "Check that the required model assets are available and try again."
+            
+        case .concurrentRequests:
+            return "Wait for the current response to complete before making another request."
+            
+        case .decodingFailure:
+            return "Check your generable type definition and try again."
+            
+        case .exceededContextWindowSize:
+            return "Try reducing the length of your prompt or conversation history."
+            
+        case .guardrailViolation:
+            return "Please modify your prompt to avoid sensitive or inappropriate content."
+            
+        case .rateLimited:
+            return "Wait a moment and try again, or reduce the frequency of your requests."
+            
+        case .unsupportedGuide:
+            return "Use a supported generation guide pattern and try again."
+            
+        case .unsupportedLanguageOrLocale:
+            return "Try using a supported language or check model capabilities."
+        }
+    }
+}
+
+// MARK: - ResponseStream Extensions
+
+extension LanguageModelSession.ResponseStream {
+    /// A snapshot of partially generated content.
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// A snapshot of partially generated content during streaming.
+    /// 
+    /// **Source:** https://developer.apple.com/documentation/foundationmodels/languagemodelsession/responsestream/snapshot
+    /// 
+    /// **Apple Official API:** `struct Snapshot`
+    /// - iOS 26.0+, iPadOS 26.0+, macOS 26.0+, visionOS 26.0+
+    /// - Beta Software: Contains preliminary API information
+    public struct Snapshot: Sendable {
+        /// The content of the response.
+        /// 
+        /// **Apple Foundation Models Documentation:**
+        /// The partially generated content at this point in the stream.
+        /// 
+        /// **Source:** https://developer.apple.com/documentation/foundationmodels/languagemodelsession/responsestream/snapshot/content
+        public let content: Content.PartiallyGenerated
+        
+        /// The raw content of the response.
+        /// 
+        /// **Apple Foundation Models Documentation:**
+        /// The raw generated content at this point in the stream.
+        /// 
+        /// **Source:** https://developer.apple.com/documentation/foundationmodels/languagemodelsession/responsestream/snapshot/rawcontent
+        public let rawContent: GeneratedContent
+        
+        /// Initialize a snapshot
+        /// 
+        /// - Parameters:
+        ///   - content: The partially generated content
+        ///   - rawContent: The raw generated content
+        public init(
+            content: Content.PartiallyGenerated,
+            rawContent: GeneratedContent
+        ) {
+            self.content = content
+            self.rawContent = rawContent
+        }
+    }
+}
+
+// MARK: - ResponseStream Helper Methods
+
+extension LanguageModelSession.ResponseStream {
+    /// The result from a streaming response, after it completes.
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// Collects all streaming content into a final Response object.
+    /// This method waits for the stream to complete and returns the final result.
+    /// 
+    /// **Source:** https://developer.apple.com/documentation/foundationmodels/languagemodelsession/responsestream/collect(isolation:)
+    /// 
+    /// **Apple Official API:**
+    /// `func collect(isolation: isolated (any Actor)?) async throws -> sending Response<Content>`
+    /// 
+    /// - Parameter isolation: Optional actor isolation context
+    /// - Returns: The complete response after streaming finishes
+    /// - Throws: Any error encountered during streaming
+    public func collect(
+        isolation: isolated (any Actor)? = nil
+    ) async throws -> LanguageModelSession.Response<Content> {
+        var finalPartial: Content.PartiallyGenerated?
+        let allEntries: [Transcript.Entry] = []
+        
+        for try await partial in self {
+            finalPartial = partial
+            // For types where PartiallyGenerated == Self, check if it has isComplete
+            if let partialWithComplete = partial as? PartiallyGeneratedProtocol,
+               partialWithComplete.isComplete {
+                break
+            }
+        }
+        
+        guard let partial = finalPartial else {
+            let context = GenerationError.Context(debugDescription: "Stream completed without any content")
+            throw GenerationError.decodingFailure(context)
+        }
+        
+        // Convert PartiallyGenerated back to Content
+        // For types where PartiallyGenerated == Self, this is straightforward
+        let content: Content
+        if Content.PartiallyGenerated.self == Content.self {
+            content = partial as! Content
+        } else {
+            // For types with custom PartiallyGenerated, we need to convert
+            // This requires the PartiallyGenerated to have the complete data
+            // PartiallyGenerated conforms to ConvertibleToGeneratedContent
+            if let convertible = partial as? ConvertibleToGeneratedContent {
+                guard let convertedContent = try? Content(convertible.generatedContent) else {
+                    let context = GenerationError.Context(debugDescription: "Failed to convert partial content to complete content")
+                    throw GenerationError.decodingFailure(context)
+                }
+                content = convertedContent
+            } else {
+                // Fallback: assume PartiallyGenerated can be cast to Content
+                guard let directContent = partial as? Content else {
+                    let context = GenerationError.Context(debugDescription: "Cannot convert PartiallyGenerated to Content")
+                    throw GenerationError.decodingFailure(context)
+                }
+                content = directContent
+            }
+        }
+        
+        // Create transcript entries from the streaming session
+        // In a real implementation, this would come from the session's transcript
+        let transcriptSlice = ArraySlice(allEntries)
+        
+        // Create raw content - for Generable types, convert back to GeneratedContent
+        let rawContent: GeneratedContent
+        if Content.self == GeneratedContent.self {
+            rawContent = content as! GeneratedContent
+        } else if Content.self == String.self {
+            rawContent = GeneratedContent(content as! String)
+        } else {
+            // For other Generable types, create GeneratedContent from string representation
+            rawContent = GeneratedContent("\(content)")
+        }
+        
+        return LanguageModelSession.Response(
+            content: content,
+            rawContent: rawContent,
+            transcriptEntries: transcriptSlice
+        )
+    }
+    
+    /// Collect all partial responses into an array (for testing)
+    /// 
+    /// **Implementation Note:** This is a convenience method for testing purposes.
+    /// Production code should use `collect(isolation:)` instead.
+    public func collectPartials() async throws -> [Element] {
+        var results: [Element] = []
+        for try await partial in self {
+            results.append(partial)
+        }
+        return results
     }
 }

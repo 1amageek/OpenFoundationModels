@@ -31,7 +31,7 @@ struct StreamingIntegrationTests {
             continuation.finish()
         }
         
-        let responseStream = ResponseStream<String>(stream: stream)
+        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
         // Test iteration through complete lifecycle
         for try await partial in responseStream {
@@ -55,7 +55,7 @@ struct StreamingIntegrationTests {
             continuation.finish()
         }
         
-        let responseStream = ResponseStream<String>(stream: stream)
+        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         var receivedValues: [String] = []
         
         // Test early termination when isComplete is reached
@@ -75,14 +75,14 @@ struct StreamingIntegrationTests {
     @Test("Concurrent streaming operations")
     func concurrentStreamingOperations() async throws {
         // Test multiple concurrent streaming operations
-        func createStringStream(identifier: String, count: Int) -> ResponseStream<String> {
+        func createStringStream(identifier: String, count: Int) -> LanguageModelSession.ResponseStream<String> {
             let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
                 for i in 0..<count {
                     continuation.yield("\(identifier)-\(i)")
                 }
                 continuation.finish()
             }
-            return ResponseStream(stream: stream)
+            return LanguageModelSession.ResponseStream(stream: stream)
         }
         
         let stream1 = createStringStream(identifier: "A", count: 3)
@@ -110,7 +110,7 @@ struct StreamingIntegrationTests {
             continuation.finish(throwing: testError)
         }
         
-        let responseStream = ResponseStream<String>(stream: stream)
+        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         var successfulPartials: [String] = []
         
         // Test error propagation preserves successful partials
@@ -148,7 +148,7 @@ struct StreamingIntegrationTests {
             }
         }
         
-        let responseStream = ResponseStream<String>(stream: stream)
+        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         var timestamps: [Date] = []
         var contents: [String] = []
         
@@ -188,7 +188,7 @@ struct StreamingIntegrationTests {
             continuation.finish()
         }
         
-        let responseStream = ResponseStream<String>(stream: stream)
+        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
         // Test collectPartials() captures all intermediate states
         let allPartials = try await responseStream.collectPartials()
@@ -211,7 +211,7 @@ struct StreamingIntegrationTests {
             continuation.finish()
         }
         
-        let responseStream = ResponseStream<String>(stream: stream)
+        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
         // Test that empty content is handled correctly
         let finalResponse = try await responseStream.collect()
@@ -227,7 +227,7 @@ struct StreamingIntegrationTests {
             continuation.finish()
         }
         
-        let responseStream = ResponseStream<String>(stream: stream)
+        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
         // Test multiple iterators (though they'll share the same underlying stream)
         var iterator1 = responseStream.makeAsyncIterator()
@@ -248,7 +248,7 @@ struct StreamingIntegrationTests {
             continuation.finish()
         }
         
-        let responseStream = ResponseStream<String>(stream: stream)
+        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
         // Test Sendable conformance in Task context
         let result = await withTaskGroup(of: String.self) { group in
@@ -280,7 +280,7 @@ struct StreamingIntegrationTests {
             continuation.finish()
         }
         
-        let responseStream = ResponseStream<String>(stream: stream)
+        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         let startTime = Date()
         
         var processedCount = 0
