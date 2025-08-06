@@ -18,13 +18,13 @@ struct ResponseStreamTests {
     @Test("ResponseStream creation and basic properties")
     func responseStreamCreation() {
         // Create a simple stream with string content
-        let stream = AsyncThrowingStream<Response<String>.Partial, Error> { continuation in
-            continuation.yield(Response<String>.Partial(content: "Hello", isComplete: false))
-            continuation.yield(Response<String>.Partial(content: "Hello, world!", isComplete: true))
+        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
+            continuation.yield("Hello")
+            continuation.yield("Hello, world!")
             continuation.finish()
         }
         
-        let responseStream = ResponseStream(stream: stream)
+        let responseStream = ResponseStream<String>(stream: stream)
         
         // Verify the stream is created successfully
         #expect(responseStream.last == nil) // Initially no last value
@@ -33,14 +33,14 @@ struct ResponseStreamTests {
     @Test("ResponseStream AsyncSequence iteration with String content")
     func responseStreamStringIteration() async throws {
         // Create a stream that yields partial string responses
-        let stream = AsyncThrowingStream<Response<String>.Partial, Error> { continuation in
-            continuation.yield(Response<String>.Partial(content: "Hello", isComplete: false))
-            continuation.yield(Response<String>.Partial(content: "Hello, world!", isComplete: true))
+        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
+            continuation.yield("Hello")
+            continuation.yield("Hello, world!")
             continuation.finish()
         }
         
-        let responseStream = ResponseStream(stream: stream)
-        var collectedPartials: [Response<String>.Partial] = []
+        let responseStream = ResponseStream<String>(stream: stream)
+        var collectedPartials: [String.PartiallyGenerated] = []
         
         // Test AsyncSequence iteration
         for try await partial in responseStream {
@@ -49,31 +49,32 @@ struct ResponseStreamTests {
         
         // Verify we collected the expected partial responses
         #expect(collectedPartials.count == 2)
-        #expect(collectedPartials[0].content == "Hello")
-        #expect(collectedPartials[0].isComplete == false)
-        #expect(collectedPartials[1].content == "Hello, world!")
-        #expect(collectedPartials[1].isComplete == true)
+        // Partials are now String
+        #expect(collectedPartials[0] == "Hello")
+        #expect(collectedPartials[1] == "Hello, world!")
     }
     
     @Test("ResponseStream with String Generable content")
     func responseStreamStringGenerableIteration() async throws {
         // String already conforms to Generable, so we can test with it
-        let stream = AsyncThrowingStream<Response<String>.Partial, Error> { continuation in
-            continuation.yield(Response<String>.Partial(content: "partial content", isComplete: false))
-            continuation.yield(Response<String>.Partial(content: "complete content", isComplete: true))
+        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
+            continuation.yield("partial content")
+            continuation.yield("complete content")
             continuation.finish()
         }
         
-        let responseStream = ResponseStream(stream: stream)
+        let responseStream = ResponseStream<String>(stream: stream)
         var partialCount = 0
         var lastContent = ""
         
         // Test iteration with String Generable content
         for try await partial in responseStream {
             partialCount += 1
-            lastContent = partial.content
+            // partial is now String (String.PartiallyGenerated = String)
+            lastContent = partial
             
-            if partial.isComplete {
+            // For String, check if we've reached the expected final content
+            if partial == "complete content" {
                 break
             }
         }
@@ -85,13 +86,13 @@ struct ResponseStreamTests {
     @Test("ResponseStream collect() method")
     func responseStreamCollect() async throws {
         // Use String content for collect() testing
-        let stream = AsyncThrowingStream<Response<String>.Partial, Error> { continuation in
-            continuation.yield(Response<String>.Partial(content: "partial", isComplete: false))
-            continuation.yield(Response<String>.Partial(content: "final content", isComplete: true))
+        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
+            continuation.yield("partial")
+            continuation.yield("final content")
             continuation.finish()
         }
         
-        let responseStream = ResponseStream(stream: stream)
+        let responseStream = ResponseStream<String>(stream: stream)
         
         // Test the collect() method
         let finalResponse = try await responseStream.collect()
@@ -103,12 +104,12 @@ struct ResponseStreamTests {
     
     @Test("ResponseStream collect() with no complete response throws error")
     func responseStreamCollectIncomplete() async throws {
-        let stream = AsyncThrowingStream<Response<String>.Partial, Error> { continuation in
-            continuation.yield(Response<String>.Partial(content: "partial", isComplete: false))
+        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
+            continuation.yield("partial")
             continuation.finish() // No complete response
         }
         
-        let responseStream = ResponseStream(stream: stream)
+        let responseStream = ResponseStream<String>(stream: stream)
         
         // Should throw when no complete response is found
         await #expect(throws: GenerationError.self) {
@@ -118,23 +119,23 @@ struct ResponseStreamTests {
     
     @Test("ResponseStream collectPartials() helper method")
     func responseStreamCollectPartials() async throws {
-        let stream = AsyncThrowingStream<Response<String>.Partial, Error> { continuation in
-            continuation.yield(Response<String>.Partial(content: "first", isComplete: false))
-            continuation.yield(Response<String>.Partial(content: "second", isComplete: false))
-            continuation.yield(Response<String>.Partial(content: "final", isComplete: true))
+        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
+            continuation.yield("first")
+            continuation.yield("second")
+            continuation.yield("final")
             continuation.finish()
         }
         
-        let responseStream = ResponseStream(stream: stream)
+        let responseStream = ResponseStream<String>(stream: stream)
         
         // Test the collectPartials() helper method
         let allPartials = try await responseStream.collectPartials()
         
         #expect(allPartials.count == 3)
-        #expect(allPartials[0].content == "first")
-        #expect(allPartials[1].content == "second")
-        #expect(allPartials[2].content == "final")
-        #expect(allPartials[2].isComplete == true)
+        // Partials are now String
+        #expect(allPartials[0] == "first")
+        #expect(allPartials[1] == "second")
+        #expect(allPartials[2] == "final")
     }
     
     @Test("ResponseStream error handling")
@@ -143,12 +144,12 @@ struct ResponseStreamTests {
             GenerationError.Context(debugDescription: "Test rate limit")
         )
         
-        let stream = AsyncThrowingStream<Response<String>.Partial, Error> { continuation in
-            continuation.yield(Response<String>.Partial(content: "partial", isComplete: false))
+        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
+            continuation.yield("partial")
             continuation.finish(throwing: expectedError)
         }
         
-        let responseStream = ResponseStream(stream: stream)
+        let responseStream = ResponseStream<String>(stream: stream)
         
         // Test error propagation through AsyncSequence
         await #expect(throws: GenerationError.self) {
@@ -160,14 +161,15 @@ struct ResponseStreamTests {
     
     @Test("ResponseStream AsyncIterator works correctly")
     func responseStreamIteratorCorrectness() async throws {
-        let stream = AsyncThrowingStream<Response<String>.Partial, Error> { continuation in
-            continuation.yield(Response<String>.Partial(content: "one", isComplete: false))
-            continuation.yield(Response<String>.Partial(content: "two", isComplete: false))
-            continuation.yield(Response<String>.Partial(content: "three", isComplete: true))
+        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
+            // String.PartiallyGenerated = String (default)
+            continuation.yield("one")
+            continuation.yield("two")
+            continuation.yield("three")
             continuation.finish()
         }
         
-        let responseStream = ResponseStream(stream: stream)
+        let responseStream = ResponseStream<String>(stream: stream)
         
         // Create an iterator and verify it works
         var iterator = responseStream.makeAsyncIterator()
@@ -177,22 +179,20 @@ struct ResponseStreamTests {
         let third = try await iterator.next()
         let fourth = try await iterator.next()
         
-        #expect(first?.content == "one")
-        #expect(first?.isComplete == false)
-        #expect(second?.content == "two")
-        #expect(second?.isComplete == false)
-        #expect(third?.content == "three")
-        #expect(third?.isComplete == true)
+        // Partials are now String
+        #expect(first == "one")
+        #expect(second == "two")
+        #expect(third == "three")
         #expect(fourth == nil) // Stream should be finished
     }
     
     @Test("ResponseStream Sendable conformance")
     func responseStreamSendableConformance() {
-        let stream = AsyncThrowingStream<Response<String>.Partial, Error> { continuation in
+        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
             continuation.finish()
         }
         
-        let responseStream = ResponseStream(stream: stream)
+        let responseStream = ResponseStream<String>(stream: stream)
         
         // This test verifies Sendable conformance compiles
         let _: any Sendable = responseStream

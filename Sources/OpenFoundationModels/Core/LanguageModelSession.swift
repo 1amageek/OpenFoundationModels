@@ -291,26 +291,18 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         let promptValue = try prompt()
         let promptText = promptValue.description
         
-        let stream = AsyncThrowingStream<Response<String>.Partial, Error> { continuation in
-            Task {
+        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
+            Task<Void, Never> {
                 let stringStream = model.stream(prompt: promptText, options: options)
                 var accumulatedContent = ""
                 
                 for await chunk in stringStream {
                     accumulatedContent += chunk
-                    let partial = Response<String>.Partial(
-                        content: accumulatedContent,
-                        isComplete: false
-                    )
-                    continuation.yield(partial)
+                    // String.PartiallyGenerated = String (default)
+                    continuation.yield(accumulatedContent)
                 }
                 
-                // Final complete partial
-                let finalPartial = Response<String>.Partial(
-                    content: accumulatedContent,
-                    isComplete: true
-                )
-                continuation.yield(finalPartial)
+                // Final complete content is already the accumulated string
                 continuation.finish()
             }
         }
@@ -329,8 +321,11 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         let promptValue = try prompt()
         let promptText = promptValue.description
         
-        let stream = AsyncThrowingStream<Response<Content>.Partial, Error> { continuation in
-            Task {
+        // Type alias for clarity
+        typealias PartialContent = Content.PartiallyGenerated
+        
+        let stream = AsyncThrowingStream<PartialContent, Error> { continuation in
+            Task<Void, Never> {
                 let schemaPrompt = includeSchemaInPrompt ? 
                     "\(promptText)\n\nGenerate response following this schema: \(Content.generationSchema)" : 
                     promptText
@@ -342,25 +337,16 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                     accumulatedText += chunk
                     let partialContent = GeneratedContent(accumulatedText)
                     
-                    // For now, create partial responses with string content
-                    // TODO: Implement proper Generable partial parsing when needed
-                    if let partialData = try? Content(partialContent) {
-                        let partial = Response<Content>.Partial(
-                            content: partialData,
-                            isComplete: false
-                        )
-                        continuation.yield(partial)
+                    // Create PartiallyGenerated from accumulated content
+                    if let partialData = try? PartialContent(partialContent) {
+                        continuation.yield(partialData)
                     }
                 }
                 
-                // Final complete partial
+                // Final complete content
                 let finalContent = GeneratedContent(accumulatedText)
-                if let finalData = try? Content(finalContent) {
-                    let partial = Response<Content>.Partial(
-                        content: finalData,
-                        isComplete: true
-                    )
-                    continuation.yield(partial)
+                if let finalData = try? PartialContent(finalContent) {
+                    continuation.yield(finalData)
                 }
                 
                 continuation.finish()
@@ -381,8 +367,8 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         let promptValue = try prompt()
         let promptText = promptValue.description
         
-        let stream = AsyncThrowingStream<Response<GeneratedContent>.Partial, Error> { continuation in
-            Task {
+        let stream = AsyncThrowingStream<GeneratedContent.PartiallyGenerated, Error> { continuation in
+            Task<Void, Never> {
                 let schemaPrompt = includeSchemaInPrompt ? 
                     "\(promptText)\n\nGenerate response following this schema: \(schema)" : 
                     promptText
@@ -392,22 +378,14 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 
                 for await chunk in stringStream {
                     accumulatedText += chunk
+                    // GeneratedContent.PartiallyGenerated = GeneratedContent
                     let partialContent = GeneratedContent(accumulatedText)
-                    
-                    let partial = Response<GeneratedContent>.Partial(
-                        content: partialContent,
-                        isComplete: false
-                    )
-                    continuation.yield(partial)
+                    continuation.yield(partialContent)
                 }
                 
-                // Final complete partial
+                // Final complete content
                 let finalContent = GeneratedContent(accumulatedText)
-                let finalPartial = Response<GeneratedContent>.Partial(
-                    content: finalContent,
-                    isComplete: true
-                )
-                continuation.yield(finalPartial)
+                continuation.yield(finalContent)
                 continuation.finish()
             }
         }

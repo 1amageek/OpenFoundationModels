@@ -26,6 +26,377 @@ OSS implementation of Apple's Foundation Models framework (iOS 26/macOS 15 Xcode
 - Release build: `swift build -c release`
 - Lint/Format: `swift-format --in-place --recursive Sources/ Tests/`
 
+## Apple Foundation Models 完全仕様
+
+### Generable プロトコルとJSON Schema の関係
+
+Apple の Generable は TypeScript の JSON Schema に相当する機能で、LLM の出力を構造化するための仕組みです。
+
+#### JSON Schema との対応表
+
+| JSON Schema | Apple Generable | 説明 |
+|------------|----------------|------|
+| `type: "object"` | `@Generable struct` | オブジェクト型 |
+| `type: "string"` | `String` | 文字列型 |
+| `type: "integer"` | `Int` | 整数型 |
+| `type: "number"` | `Double/Float` | 数値型 |
+| `type: "boolean"` | `Bool` | 真偽値型 |
+| `type: "array"` | `[T]` | 配列型 |
+| `enum: [...]` | `enum` または `.anyOf()` | 列挙型 |
+| `pattern: "regex"` | `.pattern(/regex/)` | 正規表現制約 |
+| `minimum/maximum` | `.range(min...max)` | 範囲制約 |
+| `minItems/maxItems` | `.minimumCount()/.maximumCount()` | 配列要素数制約 |
+| `required: [...]` | 非Optional プロパティ | 必須フィールド |
+| `properties: {...}` | `GenerationSchema.Property` | プロパティ定義 |
+
+### PartiallyGenerated の設計思想
+
+PartiallyGenerated は Apple Foundation Models の素晴らしい機能で、ストリーミングレスポンス中の部分的なデータを UI で利用可能にするための仕組みです。
+
+#### 動作原理
+
+```swift
+// ストリーミング中の状態遷移例
+@Generable
+struct UserProfile {
+    let name: String
+    let age: Int
+    let bio: String
+}
+
+// 1. 初期状態: {}
+// isComplete: false
+let partial1 = UserProfile.PartiallyGenerated(GeneratedContent(json: "{}"))
+
+// 2. name が到着: {"name": "John"}
+// isComplete: false
+let partial2 = UserProfile.PartiallyGenerated(GeneratedContent(json: #"{"name": "John"}"#))
+
+// 3. 完全なJSON: {"name": "John", "age": 25, "bio": "Developer"}
+// isComplete: true
+let complete = UserProfile(GeneratedContent(json: #"{"name": "John", "age": 25, "bio": "Developer"}"#))
+```
+
+### GeneratedContent の詳細設計
+
+#### Kind enum
+
+GeneratedContent は JSON 互換のデータ構造を表現します：
+
+```swift
+public enum Kind: Sendable, Equatable {
+    case null                                                           // JSON null
+    case bool(Bool)                                                     // JSON boolean
+    case number(Double)                                                 // JSON number
+    case string(String)                                                 // JSON string
+    case array([GeneratedContent])                                      // JSON array
+    case structure(properties: [String: GeneratedContent], orderedKeys: [String])  // JSON object
+    case partial(json: String)                                          // 不完全なJSON（ストリーミング中）
+}
+```
+
+#### isComplete の判定ロジック
+
+```swift
+public var isComplete: Bool {
+    switch kind {
+    case .structure(_, _):
+        // JSON として完全にパース可能か
+        return isValidCompleteJSON()
+    case .array(let elements):
+        // すべての要素が complete か
+        return elements.allSatisfy { $0.isComplete }
+    case .partial:
+        // 部分的なJSONは常に incomplete
+        return false
+    case .string, .number, .bool, .null:
+        // プリミティブ型は常に complete
+        return true
+    }
+}
+```
+
+### @Generable マクロの生成コード仕様
+
+#### 構造体の場合
+
+```swift
+@Generable(description: "User profile data")
+struct UserProfile {
+    @Guide(description: "User's full name", .pattern(/^[A-Za-z ]+$/))
+    let name: String
+    
+    @Guide(description: "Age in years", .range(0...150))
+    let age: Int
+}
+
+// マクロが生成するコード:
+extension UserProfile: Generable {
+    // ConvertibleFromGeneratedContent 要件
+    public init(_ content: GeneratedContent) throws {
+        let props = try content.properties()
+        
+        // 各プロパティの取得（部分的なパースも許容）
+        self.name = try props["name"]?.value(String.self) ?? ""
+        self.age = try props["age"]?.value(Int.self) ?? 0
+    }
+    
+    // ConvertibleToGeneratedContent 要件
+    public var generatedContent: GeneratedContent {
+        GeneratedContent(
+            kind: .structure(
+                properties: [
+                    "name": GeneratedContent(kind: .string(self.name)),
+                    "age": GeneratedContent(kind: .number(Double(self.age)))
+                ],
+                orderedKeys: ["name", "age"]  // スキーマ順序を保持
+            )
+        )
+    }
+    
+    // Generable 要件
+    public static var generationSchema: GenerationSchema {
+        GenerationSchema(
+            type: UserProfile.self,
+            description: "User profile data",
+            properties: [
+                GenerationSchema.Property(
+                    name: "name",
+                    description: "User's full name",
+                    type: String.self,
+                    guides: [/^[A-Za-z ]+$/]
+                ),
+                GenerationSchema.Property(
+                    name: "age",
+                    description: "Age in years",
+                    type: Int.self,
+                    guides: [GenerationGuide.range(0...150)]
+                )
+            ]
+        )
+    }
+    
+    // PartiallyGenerated 型（必要な場合のみ生成）
+    public struct PartiallyGenerated: ConvertibleFromGeneratedContent {
+        public let name: String?
+        public let age: Int?
+        private let content: GeneratedContent
+        
+        public init(_ content: GeneratedContent) throws {
+            self.content = content
+            
+            // 部分的なパースを許容
+            if let props = try? content.properties() {
+                self.name = try? props["name"]?.value(String.self)
+                self.age = try? props["age"]?.value(Int.self)
+            } else {
+                self.name = nil
+                self.age = nil
+            }
+        }
+        
+        public var isComplete: Bool {
+            content.isComplete
+        }
+    }
+    
+    // デフォルト実装
+    public func asPartiallyGenerated() -> PartiallyGenerated {
+        try! PartiallyGenerated(self.generatedContent)
+    }
+}
+```
+
+#### 列挙型の場合
+
+```swift
+@Generable
+enum Status {
+    case active
+    case inactive
+    case pending(reason: String)
+}
+
+// マクロが生成するコード:
+extension Status: Generable {
+    public init(_ content: GeneratedContent) throws {
+        // 単純な列挙型として試行
+        if let stringValue = try? content.value(String.self) {
+            switch stringValue {
+            case "active": self = .active
+            case "inactive": self = .inactive
+            default: break
+            }
+        }
+        
+        // Discriminated Union として試行
+        let props = try content.properties()
+        guard let caseContent = props["case"],
+              let caseName = try? caseContent.value(String.self) else {
+            throw GenerationError.invalidValue
+        }
+        
+        switch caseName {
+        case "active": self = .active
+        case "inactive": self = .inactive
+        case "pending":
+            let valueContent = props["value"] ?? GeneratedContent("")
+            let reason = try valueContent.value(String.self)
+            self = .pending(reason: reason)
+        default:
+            throw GenerationError.invalidValue
+        }
+    }
+    
+    public var generatedContent: GeneratedContent {
+        switch self {
+        case .active:
+            return GeneratedContent(kind: .string("active"))
+        case .inactive:
+            return GeneratedContent(kind: .string("inactive"))
+        case .pending(let reason):
+            return GeneratedContent(
+                kind: .structure(
+                    properties: [
+                        "case": GeneratedContent(kind: .string("pending")),
+                        "value": GeneratedContent(kind: .string(reason))
+                    ],
+                    orderedKeys: ["case", "value"]
+                )
+            )
+        }
+    }
+    
+    public static var generationSchema: GenerationSchema {
+        // 関連値がない場合は単純な anyOf
+        // 関連値がある場合は discriminated union
+        GenerationSchema(
+            type: Status.self,
+            description: "Status enumeration",
+            properties: [
+                GenerationSchema.Property(
+                    name: "case",
+                    description: "Enum case identifier",
+                    type: String.self
+                ),
+                GenerationSchema.Property(
+                    name: "value",
+                    description: "Associated value",
+                    type: String.self
+                )
+            ]
+        )
+    }
+}
+```
+
+### @Guide マクロの詳細
+
+@Guide マクロは peer macro として、プロパティに JSON Schema 相当の制約を付与：
+
+```swift
+// 文字列パターン
+@Guide(description: "Email address", .pattern(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/))
+var email: String
+
+// 数値範囲
+@Guide(description: "Score percentage", .range(0...100))
+var score: Int
+
+// 配列要素数
+@Guide(description: "Tag list", .minimumCount(1), .maximumCount(10))
+var tags: [String]
+
+// 列挙値
+@Guide(description: "Status", .anyOf(["draft", "published", "archived"]))
+var status: String
+```
+
+### GenerationSchema.Property の設計
+
+```swift
+public struct Property {
+    // 内部ストレージ
+    internal let name: String
+    internal let description: String?
+    internal let type: any Sendable.Type
+    internal let guides: [Any]  // GenerationGuide または Regex
+    
+    // Generable 型用
+    public init<Value: Generable>(
+        name: String,
+        description: String? = nil,
+        type: Value.Type,
+        guides: [GenerationGuide<Value>] = []
+    )
+    
+    // String 型用（正規表現付き）
+    public init<RegexOutput>(
+        name: String,
+        description: String? = nil,
+        type: String.Type,
+        guides: [Regex<RegexOutput>] = []
+    )
+    
+    // Optional 型用
+    public init<Value: Generable>(
+        name: String,
+        description: String? = nil,
+        type: Value?.Type,
+        guides: [GenerationGuide<Value>] = []
+    )
+}
+```
+
+### 型変換とデフォルト値
+
+#### 型マッピング
+
+| Swift 型 | GeneratedContent.Kind | デフォルト値 |
+|---------|---------------------|------------|
+| String | .string(_) | "" |
+| Int | .number(_) | 0 |
+| Double | .number(_) | 0.0 |
+| Float | .number(_) | 0.0 |
+| Bool | .bool(_) | false |
+| [T] | .array(_) | [] |
+| T? | .null または 該当Kind | nil |
+
+### ストリーミング対応
+
+```swift
+// ResponseStream での使用例
+let stream = session.streamResponse(
+    to: "Generate user profile",
+    generating: UserProfile.self
+)
+
+for try await partial in stream {
+    // partial.content は UserProfile.PartiallyGenerated 型
+    if let name = partial.content.name {
+        updateNameLabel(name)  // 部分的なデータでUIを更新
+    }
+    
+    if partial.isComplete {
+        let complete = try UserProfile(partial.content.generatedContent)
+        saveToDatabase(complete)
+    }
+}
+```
+
+### エラーハンドリング
+
+```swift
+public enum GenerationError: Error {
+    case invalidValue                           // 無効な値
+    case missingRequiredProperty(String)        // 必須プロパティの欠如
+    case typeMismatch(expected: String, actual: String)  // 型の不一致
+    case invalidJSON(String)                     // 無効なJSON
+    case schemaViolation(String)                 // スキーマ違反
+    case partialContent                          // 部分的なコンテンツ（完全でない）
+}
+```
+
 ## Architecture
 
 ### Core Components

@@ -41,6 +41,7 @@ struct ResponseTests {
         
         let response = Response(
             content: content,
+            rawContent: GeneratedContent(content),
             transcriptEntries: transcriptEntries
         )
         
@@ -56,6 +57,7 @@ struct ResponseTests {
         
         let response = Response(
             content: content,
+            rawContent: content.generatedContent,
             transcriptEntries: transcriptEntries
         )
         
@@ -72,6 +74,7 @@ struct ResponseTests {
         
         let response = Response(
             content: content,
+            rawContent: content.generatedContent,
             transcriptEntries: transcriptEntries
         )
         
@@ -117,6 +120,7 @@ struct ResponseTests {
         
         let response = Response(
             content: content,
+            rawContent: content.generatedContent,
             transcriptEntries: transcriptEntries
         )
         
@@ -141,6 +145,7 @@ struct ResponseTests {
         // Test that Response conforms to Sendable
         let response = Response(
             content: "test",
+            rawContent: GeneratedContent("test"),
             transcriptEntries: ArraySlice<Transcript.Entry>()
         )
         

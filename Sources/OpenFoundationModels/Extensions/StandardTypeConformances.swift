@@ -41,10 +41,8 @@ extension Bool: Generable {
         return GeneratedContent(self ? "true" : "false")
     }
     
-    /// Convert to partially generated representation
-    public func asPartiallyGenerated() -> Bool {
-        return self
-    }
+    // asPartiallyGenerated() uses default implementation from protocol extension
+    // Returns self since PartiallyGenerated = Bool (default)
 }
 
 // MARK: - Int Generable Conformance
@@ -78,10 +76,8 @@ extension Int: Generable {
         return GeneratedContent(String(self))
     }
     
-    /// Convert to partially generated representation
-    public func asPartiallyGenerated() -> Int {
-        return self
-    }
+    // asPartiallyGenerated() uses default implementation from protocol extension
+    // Returns self since PartiallyGenerated = Int (default)
 }
 
 // MARK: - Float Generable Conformance
@@ -115,10 +111,8 @@ extension Float: Generable {
         return GeneratedContent(String(self))
     }
     
-    /// Convert to partially generated representation
-    public func asPartiallyGenerated() -> Float {
-        return self
-    }
+    // asPartiallyGenerated() uses default implementation from protocol extension
+    // Returns self since PartiallyGenerated = Float (default)
 }
 
 // MARK: - Double Generable Conformance
@@ -152,10 +146,8 @@ extension Double: Generable {
         return GeneratedContent(String(self))
     }
     
-    /// Convert to partially generated representation
-    public func asPartiallyGenerated() -> Double {
-        return self
-    }
+    // asPartiallyGenerated() uses default implementation from protocol extension
+    // Returns self since PartiallyGenerated = Double (default)
 }
 
 // MARK: - Decimal Generable Conformance
@@ -189,10 +181,8 @@ extension Decimal: Generable {
         return GeneratedContent(String(describing: self))
     }
     
-    /// Convert to partially generated representation
-    public func asPartiallyGenerated() -> Decimal {
-        return self
-    }
+    // asPartiallyGenerated() uses default implementation from protocol extension
+    // Returns self since PartiallyGenerated = Decimal (default)
 }
 
 // MARK: - Never Generable Conformance
@@ -223,9 +213,6 @@ extension Never: Generable {
         fatalError("Never has no instances")
     }
     
-    /// Convert to partially generated representation
-    public func asPartiallyGenerated() -> Never {
-        // This will never be called since Never has no instances
-        fatalError("Never has no instances")
-    }
+    // asPartiallyGenerated() uses default implementation from protocol extension
+    // But will never be called since Never has no instances
 }

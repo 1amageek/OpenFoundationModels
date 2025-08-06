@@ -56,18 +56,28 @@ struct TestTypeB {
     let valueB: Int
 }
 
+@Generable
+struct TestStreamingProfile {
+    let id: String
+    let username: String
+    let email: String
+    let score: Int
+}
+
 @Suite("PartiallyGenerated Tests", .tags(.generable, .streaming, .integration))
 struct PartiallyGeneratedTests {
     
     @Test("Basic PartiallyGenerated with simple types")
     func basicPartiallyGeneratedSimpleTypes() throws {
         // Test asPartiallyGenerated method exists and works
-        let userInfo = try TestUserInfo(GeneratedContent("{}"))
+        let json = #"{"name": "Alice", "age": 25}"#
+        let userInfo = try TestUserInfo(GeneratedContent(json))
         let partial = userInfo.asPartiallyGenerated()
         
-        // Verify partial has same values as original (basic implementation)
-        #expect(partial.name == userInfo.name)
-        #expect(partial.age == userInfo.age)
+        // Verify partial has same values as original
+        #expect(partial.name == "Alice")
+        #expect(partial.age == 25)
+        #expect(partial.isComplete == true)
     }
     
     @Test("Partial Response creation and isComplete flag")
@@ -97,37 +107,29 @@ struct PartiallyGeneratedTests {
     @Test("Streaming progression with partial updates")
     func streamingProgressionWithPartialUpdates() async throws {
         // Use String content (already Generable) for streaming tests
-        let initialPartial = Response<String>.Partial(
-            content: "Initial content",
-            isComplete: false
-        )
-        
-        let midPartial = Response<String>.Partial(
-            content: "Middle content",
-            isComplete: false
-        )
-        
-        let finalPartial = Response<String>.Partial(
-            content: "Final content",
-            isComplete: true
-        )
+        // For String, PartiallyGenerated = String (default)
+        let initialPartial = "Initial content"
+        let midPartial = "Middle content"
+        let finalPartial = "Final content"
         
         // Create a stream that simulates progressive generation
-        let stream = AsyncThrowingStream<Response<String>.Partial, Error> { continuation in
+        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
             continuation.yield(initialPartial)
             continuation.yield(midPartial)
             continuation.yield(finalPartial)
             continuation.finish()
         }
         
-        let responseStream = ResponseStream(stream: stream)
+        let responseStream = ResponseStream<String>(stream: stream)
         var partialCount = 0
         var lastComplete = false
         
         // Test progressive updates
         for try await partial in responseStream {
             partialCount += 1
-            if partial.isComplete {
+            // For String, we don't have isComplete tracking
+            // Check for specific final content instead
+            if partial == "Final content" {
                 lastComplete = true
                 break
             }
@@ -139,13 +141,24 @@ struct PartiallyGeneratedTests {
     
     @Test("PartiallyGenerated with multiple properties")
     func partiallyGeneratedWithMultipleProperties() throws {
-        let product = try TestProduct(GeneratedContent("{}"))
-        let partial = product.asPartiallyGenerated()
+        // Test with partial JSON data
+        let partialJSON = #"{"name": "Widget", "price": 19.99}"#
+        let partial = try TestProduct.PartiallyGenerated(GeneratedContent(partialJSON))
         
-        // Verify all properties are accessible in partial
-        #expect(partial.name == "")
-        #expect(partial.price == 0.0)
-        #expect(partial.inStock == false)
+        // Verify partial properties
+        #expect(partial.name == "Widget")
+        #expect(partial.price == 19.99)
+        #expect(partial.inStock == nil)  // Missing property should be nil
+        #expect(partial.isComplete == false)  // Not all properties present
+        
+        // Test with complete JSON
+        let completeJSON = #"{"name": "Widget", "price": 19.99, "inStock": true}"#
+        let complete = try TestProduct.PartiallyGenerated(GeneratedContent(completeJSON))
+        
+        #expect(complete.name == "Widget")
+        #expect(complete.price == 19.99)
+        #expect(complete.inStock == true)
+        #expect(complete.isComplete == true)  // All properties present
     }
     
     @Test("PartiallyGenerated Sendable conformance")
@@ -185,25 +198,16 @@ struct PartiallyGeneratedTests {
     @Test("Streaming collect() with PartiallyGenerated")
     func streamingCollectWithPartiallyGenerated() async throws {
         // Use String content for collect() testing
-        let stream = AsyncThrowingStream<Response<String>.Partial, Error> { continuation in
-            // Partial updates
-            continuation.yield(Response<String>.Partial(
-                content: "partial1",
-                isComplete: false
-            ))
-            continuation.yield(Response<String>.Partial(
-                content: "partial2",
-                isComplete: false
-            ))
+        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
+            // Partial updates (String.PartiallyGenerated = String)
+            continuation.yield("partial1")
+            continuation.yield("partial2")
             // Final complete
-            continuation.yield(Response<String>.Partial(
-                content: "complete content",
-                isComplete: true
-            ))
+            continuation.yield("complete content")
             continuation.finish()
         }
         
-        let responseStream = ResponseStream(stream: stream)
+        let responseStream = ResponseStream<String>(stream: stream)
         
         // Test collect() waits for complete response
         let finalResponse = try await responseStream.collect()
@@ -220,15 +224,13 @@ struct PartiallyGeneratedTests {
         )
         
         // Create stream that fails during partial generation using String content
-        let stream = AsyncThrowingStream<Response<String>.Partial, Error> { continuation in
-            continuation.yield(Response<String>.Partial(
-                content: "partial content",
-                isComplete: false
-            ))
+        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
+            // String.PartiallyGenerated = String (default)
+            continuation.yield("partial content")
             continuation.finish(throwing: error)
         }
         
-        let responseStream = ResponseStream(stream: stream)
+        let responseStream = ResponseStream<String>(stream: stream)
         
         // Test error propagation through PartiallyGenerated stream
         await #expect(throws: GenerationError.self) {
@@ -256,5 +258,46 @@ struct PartiallyGeneratedTests {
         
         #expect(responsePartialA.isComplete == false)
         #expect(responsePartialB.isComplete == true)
+    }
+    
+    @Test("Progressive streaming JSON simulation")
+    func progressiveStreamingJSONSimulation() throws {
+        // Simulate progressive JSON streaming like from an LLM
+        
+        // Stage 1: Empty JSON
+        let stage1 = GeneratedContent("{}")
+        let partial1 = try TestStreamingProfile.PartiallyGenerated(stage1)
+        #expect(partial1.id == nil)
+        #expect(partial1.username == nil)
+        #expect(partial1.email == nil)
+        #expect(partial1.score == nil)
+        #expect(partial1.isComplete == false)
+        
+        // Stage 2: ID arrives
+        let stage2 = GeneratedContent(#"{"id": "user123"}"#)
+        let partial2 = try TestStreamingProfile.PartiallyGenerated(stage2)
+        #expect(partial2.id == "user123")
+        #expect(partial2.username == nil)
+        #expect(partial2.email == nil)
+        #expect(partial2.score == nil)
+        #expect(partial2.isComplete == false)
+        
+        // Stage 3: Username and email arrive
+        let stage3 = GeneratedContent(#"{"id": "user123", "username": "alice", "email": "alice@example.com"}"#)
+        let partial3 = try TestStreamingProfile.PartiallyGenerated(stage3)
+        #expect(partial3.id == "user123")
+        #expect(partial3.username == "alice")
+        #expect(partial3.email == "alice@example.com")
+        #expect(partial3.score == nil)
+        #expect(partial3.isComplete == false)
+        
+        // Stage 4: Complete JSON
+        let stage4 = GeneratedContent(#"{"id": "user123", "username": "alice", "email": "alice@example.com", "score": 95}"#)
+        let partial4 = try TestStreamingProfile.PartiallyGenerated(stage4)
+        #expect(partial4.id == "user123")
+        #expect(partial4.username == "alice")
+        #expect(partial4.email == "alice@example.com")
+        #expect(partial4.score == 95)
+        #expect(partial4.isComplete == true)
     }
 }

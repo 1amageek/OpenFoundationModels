@@ -29,8 +29,8 @@ import Foundation
 public struct ResponseStream<Content>: AsyncSequence, Sendable where Content: Generable & Sendable {
     
     /// The element type yielded by the stream
-    /// ✅ APPLE SPEC: Element = Response<Content>.Partial
-    public typealias Element = Response<Content>.Partial
+    /// ✅ APPLE SPEC: Element = Content.PartiallyGenerated
+    public typealias Element = Content.PartiallyGenerated
     
     /// The async iterator for the stream
     /// ✅ APPLE SPEC: AsyncIterator implementation
@@ -38,16 +38,16 @@ public struct ResponseStream<Content>: AsyncSequence, Sendable where Content: Ge
     
     /// The underlying async stream
     /// ✅ APPLE SPEC: Internal stream implementation
-    private let stream: AsyncThrowingStream<Response<Content>.Partial, Error>
+    private let stream: AsyncThrowingStream<Content.PartiallyGenerated, Error>
     
     /// The last partial response received
     /// ✅ APPLE SPEC: Convenience property for UI updates
-    public private(set) var last: Response<Content>.Partial?
+    public private(set) var last: Content.PartiallyGenerated?
     
     /// Initialize with an async throwing stream
     /// ✅ APPLE SPEC: Standard initializer
     public init(
-        stream: AsyncThrowingStream<Response<Content>.Partial, Error>
+        stream: AsyncThrowingStream<Content.PartiallyGenerated, Error>
     ) {
         self.stream = stream
         self.last = nil
@@ -69,20 +69,20 @@ public struct ResponseStream<Content>: AsyncSequence, Sendable where Content: Ge
 
 /// The async iterator for ResponseStream
 /// ✅ APPLE SPEC: AsyncIteratorProtocol implementation
-public struct ResponseStreamIterator<Content: Sendable>: AsyncIteratorProtocol {
+public struct ResponseStreamIterator<Content: Generable & Sendable>: AsyncIteratorProtocol {
     
     /// The element type
     /// ✅ APPLE SPEC: Element type matching parent stream
-    public typealias Element = Response<Content>.Partial
+    public typealias Element = Content.PartiallyGenerated
     
     /// The underlying stream iterator
     /// ✅ APPLE SPEC: Internal iterator implementation
-    private var iterator: AsyncThrowingStream<Response<Content>.Partial, Error>.AsyncIterator
+    private var iterator: AsyncThrowingStream<Content.PartiallyGenerated, Error>.AsyncIterator
     
     /// Initialize with a stream
     /// ✅ APPLE SPEC: Standard initializer
     public init(
-        stream: AsyncThrowingStream<Response<Content>.Partial, Error>
+        stream: AsyncThrowingStream<Content.PartiallyGenerated, Error>
     ) {
         self.iterator = stream.makeAsyncIterator()
     }
@@ -159,19 +159,46 @@ extension ResponseStream {
     public func collect(
         isolation: isolated (any Actor)? = nil
     ) async throws -> Response<Content> {
-        var finalContent: Content?
+        var finalPartial: Content.PartiallyGenerated?
         let allEntries: [Transcript.Entry] = []
         
         for try await partial in self {
-            if partial.isComplete {
-                finalContent = partial.content
+            finalPartial = partial
+            // For types where PartiallyGenerated == Self, check if it has isComplete
+            if let partialWithComplete = partial as? PartiallyGeneratedProtocol,
+               partialWithComplete.isComplete {
                 break
             }
         }
         
-        guard let content = finalContent else {
-            let context = GenerationError.Context(debugDescription: "Stream completed without complete content")
+        guard let partial = finalPartial else {
+            let context = GenerationError.Context(debugDescription: "Stream completed without any content")
             throw GenerationError.decodingFailure(context)
+        }
+        
+        // Convert PartiallyGenerated back to Content
+        // For types where PartiallyGenerated == Self, this is straightforward
+        let content: Content
+        if Content.PartiallyGenerated.self == Content.self {
+            content = partial as! Content
+        } else {
+            // For types with custom PartiallyGenerated, we need to convert
+            // This requires the PartiallyGenerated to have the complete data
+            // PartiallyGenerated conforms to ConvertibleToGeneratedContent
+            if let convertible = partial as? ConvertibleToGeneratedContent {
+                guard let convertedContent = try? Content(convertible.generatedContent) else {
+                    let context = GenerationError.Context(debugDescription: "Failed to convert partial content to complete content")
+                    throw GenerationError.decodingFailure(context)
+                }
+                content = convertedContent
+            } else {
+                // Fallback: assume PartiallyGenerated can be cast to Content
+                guard let directContent = partial as? Content else {
+                    let context = GenerationError.Context(debugDescription: "Cannot convert PartiallyGenerated to Content")
+                    throw GenerationError.decodingFailure(context)
+                }
+                content = directContent
+            }
         }
         
         // Create transcript entries from the streaming session

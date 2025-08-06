@@ -39,6 +39,7 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                 // Removed generateFromGeneratedContentMethod and generateToGeneratedContentMethod
                 // as they are not needed with the new protocol design
                 generateGenerationSchemaProperty(structName: structName, description: description, properties: properties),
+                generatePartiallyGeneratedStruct(structName: structName, properties: properties),
                 generateAsPartiallyGeneratedMethod(structName: structName),
                 // Need to generate these properties as they don't have default implementations
                 generateInstructionsRepresentationProperty(),
@@ -233,42 +234,53 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         """)
     }
     
+    /// Generate property extraction from GeneratedContent properties for partial types
+    private static func generatePartialPropertyExtraction(propertyName: String, propertyType: String) -> String {
+        switch propertyType {
+        case "String", "String?":
+            return "self.\(propertyName) = try? properties[\"\(propertyName)\"]?.value(String.self)"
+        case "Int", "Int?":
+            return "self.\(propertyName) = try? properties[\"\(propertyName)\"]?.value(Int.self)"
+        case "Double", "Double?":
+            return "self.\(propertyName) = try? properties[\"\(propertyName)\"]?.value(Double.self)"
+        case "Float", "Float?":
+            return "self.\(propertyName) = try? properties[\"\(propertyName)\"]?.value(Float.self)"
+        case "Bool", "Bool?":
+            return "self.\(propertyName) = try? properties[\"\(propertyName)\"]?.value(Bool.self)"
+        default:
+            // For complex types, try to initialize if possible
+            return """
+            if let value = properties[\"\(propertyName)\"] {
+                self.\(propertyName) = try? \(propertyType)(value)
+            } else {
+                self.\(propertyName) = nil
+            }
+            """
+        }
+    }
+    
     /// Generate property extraction from GeneratedContent properties
     private static func generatePropertyExtraction(propertyName: String, propertyType: String) -> String {
         switch propertyType {
         case "String":
-            return "self.\(propertyName) = properties[\"\(propertyName)\"]?.stringValue ?? \"\""
+            return """
+            self.\(propertyName) = try properties["\(propertyName)"]?.value(String.self) ?? ""
+            """
         case "Int":
             return """
-            if let value = properties["\(propertyName)"]?.stringValue, let intValue = Int(value) {
-                self.\(propertyName) = intValue
-            } else {
-                self.\(propertyName) = 0
-            }
+            self.\(propertyName) = try properties["\(propertyName)"]?.value(Int.self) ?? 0
             """
         case "Double":
             return """
-            if let value = properties["\(propertyName)"]?.stringValue, let doubleValue = Double(value) {
-                self.\(propertyName) = doubleValue
-            } else {
-                self.\(propertyName) = 0.0
-            }
+            self.\(propertyName) = try properties["\(propertyName)"]?.value(Double.self) ?? 0.0
             """
         case "Float":
             return """
-            if let value = properties["\(propertyName)"]?.stringValue, let floatValue = Float(value) {
-                self.\(propertyName) = floatValue
-            } else {
-                self.\(propertyName) = 0.0
-            }
+            self.\(propertyName) = try properties["\(propertyName)"]?.value(Float.self) ?? 0.0
             """
         case "Bool":
             return """
-            if let value = properties["\(propertyName)"]?.stringValue {
-                self.\(propertyName) = value.lowercased() == "true" || value == "1"
-            } else {
-                self.\(propertyName) = false
-            }
+            self.\(propertyName) = try properties["\(propertyName)"]?.value(Bool.self) ?? false
             """
         default:
             // For complex types, try to use their init(_:) if they conform to ConvertibleFromGeneratedContent
@@ -285,11 +297,44 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
     
     /// Generate generatedContent property according to Apple specs
     private static func generateGeneratedContentProperty(structName: String, description: String?, properties: [PropertyInfo]) -> DeclSyntax {
+        // Generate property conversions
+        let propertyConversions = properties.map { prop in
+            let propName = prop.name
+            let propType = prop.type
+            
+            // Handle different types
+            switch propType {
+            case "String", "String?":
+                return "\"\(propName)\": GeneratedContent(kind: .string(self.\(propName)))"
+            case "Int", "Int?":
+                return "\"\(propName)\": GeneratedContent(kind: .number(Double(self.\(propName))))"
+            case "Double", "Double?":
+                return "\"\(propName)\": GeneratedContent(kind: .number(self.\(propName)))"
+            case "Float", "Float?":
+                return "\"\(propName)\": GeneratedContent(kind: .number(Double(self.\(propName))))"
+            case "Bool", "Bool?":
+                return "\"\(propName)\": GeneratedContent(kind: .bool(self.\(propName)))"
+            default:
+                // For other types, assume they have generatedContent property
+                return "\"\(propName)\": self.\(propName).generatedContent"
+            }
+        }.joined(separator: ",\n                ")
+        
+        // Get ordered keys
+        let orderedKeys = properties.map { "\"\($0.name)\"" }.joined(separator: ", ")
+        
         return DeclSyntax(stringLiteral: """
         public var generatedContent: GeneratedContent {
             // ✅ CONFIRMED: Apple generates generatedContent property
-            // Convert this instance to GeneratedContent format
-            return GeneratedContent("\\(self)")
+            // Convert this instance to GeneratedContent format using Kind.structure
+            return GeneratedContent(
+                kind: .structure(
+                    properties: [
+                        \(propertyConversions)
+                    ],
+                    orderedKeys: [\(orderedKeys)]
+                )
+            )
         }
         """)
     }
@@ -317,32 +362,55 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
     private static func generateGenerationSchemaProperty(structName: String, description: String?, properties: [PropertyInfo]) -> DeclSyntax {
         // Generate property definitions for the schema
         let propertyDefinitions = properties.map { prop in
-            let descriptionValue = prop.guideDescription.map { "\"\($0)\"" } ?? "\"\""
-            let patternValue = prop.pattern.map { "\"\($0)\"" } ?? "nil"
+            let descriptionParam = prop.guideDescription.map { "description: \"\($0)\"" } ?? "description: nil"
+            
+            // Map Swift types to correct type parameter
+            let typeParam: String
+            switch prop.type {
+            case "String", "String?":
+                typeParam = "String.self"
+            case "Int", "Int?":
+                typeParam = "Int.self"
+            case "Double", "Double?":
+                typeParam = "Double.self"
+            case "Float", "Float?":
+                typeParam = "Float.self"
+            case "Bool", "Bool?":
+                typeParam = "Bool.self"
+            default:
+                // For other types, assume they are Generable
+                typeParam = "\(prop.type.replacingOccurrences(of: "?", with: "")).self"
+            }
+            
+            // Build guides array
+            var guides: [String] = []
+            if let pattern = prop.pattern {
+                guides.append("try! Regex(\"\(pattern)\")")
+            }
+            let guidesParam = guides.isEmpty ? "[]" : "[\(guides.joined(separator: ", "))]"
+            
             return """
                 GenerationSchema.Property(
                     name: "\(prop.name)",
-                    type: "\(prop.type)",
-                    description: \(descriptionValue),
-                    guides: [],
-                    pattern: \(patternValue)
+                    \(descriptionParam),
+                    type: \(typeParam),
+                    guides: \(guidesParam)
                 )
             """
         }
         
-        let _ = propertyDefinitions.isEmpty ? "[]" : """
+        let propertiesArray = propertyDefinitions.isEmpty ? "[]" : """
 [
-            \(propertyDefinitions.joined(separator: ",\n            "))
-        ]
+                \(propertyDefinitions.joined(separator: ",\n                "))
+            ]
 """
         
         return DeclSyntax(stringLiteral: """
         public static var generationSchema: GenerationSchema {
             return GenerationSchema(
-                type: "object",
+                type: \(structName).self,
                 description: \(description.map { "\"\($0)\"" } ?? "\"Generated \(structName)\""),
-                properties: [:],  // Will be computed dynamically
-                anyOf: []
+                properties: \(propertiesArray)
             )
         }
         """)
@@ -351,8 +419,9 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
     /// Generate asPartiallyGenerated method
     private static func generateAsPartiallyGeneratedMethod(structName: String) -> DeclSyntax {
         return DeclSyntax(stringLiteral: """
-        public func asPartiallyGenerated() -> Self {
-            return self
+        public func asPartiallyGenerated() -> PartiallyGenerated {
+            // Convert this instance to its PartiallyGenerated representation
+            return try! PartiallyGenerated(self.generatedContent)
         }
         """)
     }
@@ -361,41 +430,44 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
     private static func generatePartiallyGeneratedStruct(structName: String, properties: [PropertyInfo]) -> DeclSyntax {
         // Generate optional properties for partial representation
         let optionalProperties = properties.map { prop in
-            "public var \(prop.name): \(prop.type)?"
+            "public let \(prop.name): \(prop.type)?"
         }.joined(separator: "\n        ")
         
-        // Generate initialization assignments for partial
-        let partialAssignments = properties.map { prop in
-            "self.\(prop.name) = partial?.\(prop.name)"
+        // Generate property extraction from GeneratedContent
+        let propertyExtractions = properties.map { prop in
+            generatePartialPropertyExtraction(propertyName: prop.name, propertyType: prop.type)
         }.joined(separator: "\n            ")
         
         return DeclSyntax(stringLiteral: """
         /// Partially generated representation for streaming
         /// ✅ APPLE SPEC: Nested type for streaming support
-        public struct PartiallyGenerated: Codable, Sendable, ConvertibleFromGeneratedContent {
+        public struct PartiallyGenerated: Sendable, ConvertibleFromGeneratedContent, PartiallyGeneratedProtocol {
             // Optional properties from original struct
             \(optionalProperties)
             
-            // Apple required fields for streaming state
-            public var isComplete: Bool
-            public var rawContent: GeneratedContent
+            // Track completion state
+            public let isComplete: Bool
             
-            /// Initialize with partial data
-            public init(partial: \(structName)? = nil, isComplete: Bool = false, rawContent: GeneratedContent) {
-                \(partialAssignments)
-                self.isComplete = isComplete
-                self.rawContent = rawContent
-            }
+            // Store the raw content
+            private let rawContent: GeneratedContent
             
             /// ConvertibleFromGeneratedContent conformance
-            public static func from(generatedContent: GeneratedContent) throws -> PartiallyGenerated {
-                // Basic implementation - decode from JSON if possible
-                let isComplete = !generatedContent.text.isEmpty
-                return PartiallyGenerated(
-                    partial: nil,
-                    isComplete: isComplete,
-                    rawContent: generatedContent
-                )
+            public init(_ generatedContent: GeneratedContent) throws {
+                self.rawContent = generatedContent
+                self.isComplete = generatedContent.isComplete
+                
+                // Try to extract properties, allowing partial parsing
+                if let properties = try? generatedContent.properties() {
+                    \(propertyExtractions)
+                } else {
+                    // If we can't parse as structure, initialize all as nil
+                    \(properties.map { "self.\($0.name) = nil" }.joined(separator: "\n                    "))
+                }
+            }
+            
+            /// ConvertibleToGeneratedContent conformance
+            public var generatedContent: GeneratedContent {
+                return rawContent
             }
         }
         """)
@@ -769,16 +841,44 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             // Use object type with discriminated union approach
             let caseNames = cases.map { "\"\($0.name)\"" }.joined(separator: ", ")
             
+            // Create properties for discriminated union
+            let caseProperty = """
+GenerationSchema.Property(
+                        name: "case",
+                        description: "Enum case identifier",
+                        type: String.self,
+                        guides: []
+                    )
+"""
+            let valueProperty = """
+GenerationSchema.Property(
+                        name: "value",
+                        description: "Associated value data",
+                        type: String.self,
+                        guides: []
+                    )
+"""
+            
             return DeclSyntax(stringLiteral: """
             public static var generationSchema: GenerationSchema {
                 // ✅ CONFIRMED: Apple generates discriminated union schema for enums with associated values
                 // Each case becomes an object with "case" and "value" properties
+                
+                // Create a dummy Generable type for the enum schema
+                struct \(enumName)Schema: Generable {
+                    public init(_ generatedContent: GeneratedContent) throws {}
+                    public var generatedContent: GeneratedContent { GeneratedContent("") }
+                    public static var generationSchema: GenerationSchema { 
+                        GenerationSchema(type: \(enumName)Schema.self, description: "Enum", properties: [])
+                    }
+                }
+                
                 return GenerationSchema(
-                    type: "object",
+                    type: \(enumName)Schema.self,
                     description: \(description.map { "\"\($0)\"" } ?? "\"Generated \(enumName)\""),
                     properties: [
-                        "case": GenerationSchema(type: String.self, description: "Enum case identifier", anyOf: [\(caseNames)]),
-                        "value": GenerationSchema(type: "object", description: "Associated value data", properties: [:])
+                        \(caseProperty),
+                        \(valueProperty)
                     ]
                 )
             }
@@ -791,8 +891,18 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             public static var generationSchema: GenerationSchema {
                 // ✅ CONFIRMED: Apple generates generationSchema for simple enums
                 // Create schema for simple enum using type initializer with anyOf
+                
+                // Create a dummy Generable type for the enum schema
+                struct \(enumName)Schema: Generable {
+                    public init(_ generatedContent: GeneratedContent) throws {}
+                    public var generatedContent: GeneratedContent { GeneratedContent("") }
+                    public static var generationSchema: GenerationSchema { 
+                        GenerationSchema(type: \(enumName)Schema.self, description: "Enum", anyOf: [])
+                    }
+                }
+                
                 return GenerationSchema(
-                    type: String.self,
+                    type: \(enumName)Schema.self,
                     description: \(description.map { "\"\($0)\"" } ?? "\"Generated \(enumName)\""),
                     anyOf: [\(caseNames)]
                 )

@@ -9,7 +9,8 @@ import OpenFoundationModelsCore
 // MARK: - Optional PartiallyGenerated
 
 extension Optional where Wrapped: Generable {
-    public typealias PartiallyGenerated = Wrapped.PartiallyGenerated?
+    // Apple spec: PartiallyGenerated = Wrapped.PartiallyGenerated (no Optional wrapper)
+    public typealias PartiallyGenerated = Wrapped.PartiallyGenerated
 }
 
 // MARK: - Optional Protocol Conformances
@@ -81,10 +82,12 @@ extension Optional: Generable where Wrapped: Generable {
     }
     
     /// Convert to partially generated representation
-    public func asPartiallyGenerated() -> Wrapped.PartiallyGenerated? {
+    public func asPartiallyGenerated() -> Wrapped.PartiallyGenerated {
         switch self {
         case .none:
-            return nil
+            // For nil Optional, we need to create an "empty" PartiallyGenerated
+            // This requires the PartiallyGenerated to be ConvertibleFromGeneratedContent
+            return try! Wrapped.PartiallyGenerated(GeneratedContent("null"))
         case .some(let value):
             return value.asPartiallyGenerated()
         }

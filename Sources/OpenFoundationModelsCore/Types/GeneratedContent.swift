@@ -29,9 +29,31 @@ import Foundation
 /// - SendableMetatype
 public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertible {
     
+    // MARK: - Public Types
+    
+    /// A representation of the different types of content that can be stored in GeneratedContent.
+    /// ✅ CONFIRMED: From Apple documentation
+    /// - Source: https://developer.apple.com/documentation/foundationmodels/generatedcontent/kind-swift.enum
+    public enum Kind: Sendable, Equatable {
+        /// Represents a null value
+        case null
+        /// Represents a boolean value
+        case bool(Bool)
+        /// Represents a numeric value
+        case number(Double)
+        /// Represents a string value
+        case string(String)
+        /// Represents an array of GeneratedContent elements
+        case array([GeneratedContent])
+        /// Represents a structured object with key-value pairs
+        case structure(properties: [String: GeneratedContent], orderedKeys: [String])
+        /// Represents partial/incomplete JSON (for streaming)
+        case partial(json: String)
+    }
+    
     // MARK: - Internal Data Structure
     
-    /// Internal content representation
+    /// Internal content representation (legacy, will be migrated to Kind)
     private enum Content: Sendable, Equatable {
         case string(String)
         case array([GeneratedContent])
@@ -67,24 +89,28 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
     }
     
     /// Creates an object with an array of elements you specify.
-    /// ✅ CONFIRMED: init(elements:) from Apple docs
-    /// - Parameter elements: A collection of elements conforming to ConvertibleToGeneratedContent
-    public init<C: Collection>(elements: C) where C.Element: ConvertibleToGeneratedContent {
+    /// ✅ CONFIRMED: init(elements:id:) from Apple docs
+    /// - Parameters:
+    ///   - elements: A collection of elements conforming to ConvertibleToGeneratedContent
+    ///   - id: Optional generation ID for tracking
+    public init<C: Collection>(elements: C, id: GenerationID? = nil) where C.Element: ConvertibleToGeneratedContent {
         let generatedElements = elements.map { $0.generatedContent }
         self.content = .array(generatedElements)
-        self.generationID = nil
+        self.generationID = id
     }
     
     /// Creates an object with the properties you specify.
-    /// ✅ CONFIRMED: init(properties:) from Apple docs
-    /// - Parameter properties: Key-value pairs of properties
-    public init(properties: KeyValuePairs<String, any ConvertibleToGeneratedContent>) {
+    /// ✅ CONFIRMED: init(properties:id:) from Apple docs
+    /// - Parameters:
+    ///   - properties: Key-value pairs of properties
+    ///   - id: Optional generation ID for tracking
+    public init(properties: KeyValuePairs<String, any ConvertibleToGeneratedContent>, id: GenerationID? = nil) {
         var dict: [String: GeneratedContent] = [:]
         for (key, value) in properties {
             dict[key] = value.generatedContent
         }
         self.content = .dictionary(dict)
-        self.generationID = nil
+        self.generationID = id
     }
     
     /// Creates generated content from another ConvertibleToGeneratedContent value.
@@ -94,11 +120,23 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
         self = content.generatedContent
     }
     
+    /// Creates content that contains a single value with a custom generation ID.
+    /// ✅ CONFIRMED: init(_:id:) from Apple docs
+    /// - Parameters:
+    ///   - content: A value that can be converted to GeneratedContent
+    ///   - id: Generation ID for tracking
+    public init(_ content: some ConvertibleToGeneratedContent, id: GenerationID) {
+        let generated = content.generatedContent
+        self.content = generated.content
+        self.generationID = id
+    }
+    
     /// Creates new generated content from the key-value pairs in the given sequence,
     /// using a combining closure to determine the value for any duplicate keys.
-    /// ✅ CONFIRMED: init(properties:uniquingKeysWith:) from Apple docs
+    /// ✅ CONFIRMED: init(properties:id:uniquingKeysWith:) from Apple docs
     public init<S: Sequence>(
         properties: S,
+        id: GenerationID? = nil,
         uniquingKeysWith combine: (any ConvertibleToGeneratedContent, any ConvertibleToGeneratedContent) throws -> any ConvertibleToGeneratedContent
     ) rethrows where S.Element == (String, any ConvertibleToGeneratedContent) {
         var dict: [String: GeneratedContent] = [:]
@@ -111,7 +149,7 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
             }
         }
         self.content = .dictionary(dict)
-        self.generationID = nil
+        self.generationID = id
     }
     
     /// Creates equivalent content from a JSON string.
@@ -132,6 +170,103 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
     private init(content: Content, id: GenerationID? = nil) {
         self.content = content
         self.generationID = id
+    }
+    
+    /// Creates a new GeneratedContent instance with the specified kind and generation ID.
+    /// ✅ CONFIRMED: init(kind:id:) from Apple docs
+    /// - Parameters:
+    ///   - kind: The kind of content
+    ///   - id: Optional generation ID for tracking
+    public init(kind: Kind, id: GenerationID? = nil) {
+        // Convert Kind to Content for backward compatibility
+        switch kind {
+        case .null:
+            self.content = .null
+        case .bool(let value):
+            self.content = .string(value ? "true" : "false")
+        case .number(let value):
+            self.content = .string(String(value))
+        case .string(let value):
+            self.content = .string(value)
+        case .array(let elements):
+            self.content = .array(elements)
+        case .structure(let properties, _):
+            self.content = .dictionary(properties)
+        case .partial(let json):
+            // Try to parse partial JSON, fallback to string if invalid
+            if let data = json.data(using: .utf8),
+               let jsonObject = try? JSONSerialization.jsonObject(with: data),
+               let parsedContent = try? Self.parseJSONObject(jsonObject) {
+                self.content = parsedContent
+            } else {
+                self.content = .string(json)
+            }
+        }
+        self.generationID = id
+    }
+    
+    // MARK: - Public Properties
+    
+    /// The kind representation of this generated content.
+    /// ✅ CONFIRMED: From Apple documentation
+    public var kind: Kind {
+        switch content {
+        case .null:
+            return .null
+        case .string(let str):
+            // Try to detect bool/number from string
+            if str == "true" {
+                return .bool(true)
+            } else if str == "false" {
+                return .bool(false)
+            } else if let number = Double(str) {
+                return .number(number)
+            } else {
+                return .string(str)
+            }
+        case .array(let elements):
+            return .array(elements)
+        case .dictionary(let dict):
+            let keys = dict.keys.sorted()
+            return .structure(properties: dict, orderedKeys: keys)
+        }
+    }
+    
+    /// A Boolean that indicates whether the generated content is completed.
+    /// ✅ CONFIRMED: From Apple documentation
+    public var isComplete: Bool {
+        switch kind {
+        case .partial:
+            return false
+        case .structure(let properties, _):
+            // Check if all nested content is complete
+            return properties.values.allSatisfy { $0.isComplete }
+        case .array(let elements):
+            // Check if all elements are complete
+            return elements.allSatisfy { $0.isComplete }
+        case .null, .bool, .number, .string:
+            // Primitive types are always complete
+            return true
+        }
+    }
+    
+    /// Returns a JSON string representation of the generated content.
+    /// ✅ CONFIRMED: From Apple documentation
+    public var jsonString: String {
+        do {
+            let jsonObject = try toJSONObject()
+            let data = try JSONSerialization.data(withJSONObject: jsonObject, options: .prettyPrinted)
+            return String(data: data, encoding: .utf8) ?? "{}"
+        } catch {
+            // Fallback for invalid JSON
+            return stringValue
+        }
+    }
+    
+    /// A unique id that is stable for the duration of a generated response.
+    /// ✅ CONFIRMED: From Apple documentation
+    public var id: GenerationID? {
+        return generationID
     }
     
     // MARK: - Data Access
@@ -252,12 +387,6 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
     
     // MARK: - Properties
     
-    /// A unique ID used for the duration of a generated response.
-    /// ✅ CONFIRMED: id property from Apple docs
-    public var id: GenerationID? {
-        return generationID
-    }
-    
     /// A representation of this instance.
     /// ✅ CONFIRMED: generatedContent property from Apple docs
     public var generatedContent: GeneratedContent {
@@ -336,6 +465,33 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
         case .array: return "Array"
         case .dictionary: return "Dictionary"
         case .null: return "Null"
+        }
+    }
+    
+    /// Convert content to JSON object for serialization
+    private func toJSONObject() throws -> Any {
+        switch content {
+        case .null:
+            return NSNull()
+        case .string(let str):
+            // Check if it's a boolean or number
+            if str == "true" {
+                return true
+            } else if str == "false" {
+                return false
+            } else if let number = Double(str) {
+                return number
+            } else {
+                return str
+            }
+        case .array(let elements):
+            return try elements.map { try $0.toJSONObject() }
+        case .dictionary(let dict):
+            var jsonDict: [String: Any] = [:]
+            for (key, value) in dict {
+                jsonDict[key] = try value.toJSONObject()
+            }
+            return jsonDict
         }
     }
 }

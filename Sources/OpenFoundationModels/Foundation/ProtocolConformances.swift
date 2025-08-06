@@ -18,11 +18,8 @@ import OpenFoundationModelsCore
 // String InstructionsRepresentable and PromptRepresentable conformances are in Core module
 
 extension String: Generable {
-    /// Partially generated string content
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Represents string content that is being generated incrementally.
-    public typealias PartiallyGenerated = GeneratedContent
+    // Note: PartiallyGenerated defaults to Self (String)
+    // No explicit typealias needed per Apple specification
     
     /// The generation schema for String content
     /// 
@@ -55,31 +52,15 @@ extension String: Generable {
         return GeneratedContent(self)
     }
     
-    /// Convert to partially generated representation
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Converts string to partially generated content for streaming.
-    public func toPartiallyGenerated() -> PartiallyGenerated {
-        return GeneratedContent(self)
-    }
-    
-    /// Convert to partially generated representation (instance method)
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Instance method for converting to partially generated content.
-    public func asPartiallyGenerated() -> PartiallyGenerated {
-        return GeneratedContent(self)
-    }
+    // asPartiallyGenerated() uses default implementation from protocol extension
+    // Returns self since PartiallyGenerated = String (default)
 }
 
 // GeneratedContent conformances are already defined in OpenFoundationModelsCore
 
 extension GeneratedContent: Generable {
-    /// Partially generated content representation
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// GeneratedContent can represent partially generated content.
-    public typealias PartiallyGenerated = GeneratedContent
+    // Note: PartiallyGenerated defaults to Self (GeneratedContent)
+    // No explicit typealias needed per Apple specification
     
     /// The generation schema for GeneratedContent
     /// 
@@ -95,22 +76,7 @@ extension GeneratedContent: Generable {
     
     // ConvertibleFromGeneratedContent conformance is already in GeneratedContent.swift
     // ConvertibleToGeneratedContent conformance: generatedContent property is already in GeneratedContent.swift
-    
-    /// Convert to partially generated representation (identity function)
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Identity transformation for GeneratedContent.
-    public func toPartiallyGenerated() -> PartiallyGenerated {
-        return self
-    }
-    
-    /// Convert to partially generated representation (instance method)
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Instance method for converting to partially generated content.
-    public func asPartiallyGenerated() -> PartiallyGenerated {
-        return self
-    }
+    // asPartiallyGenerated() uses default implementation from protocol extension
 }
 
 // MARK: - Array SendableMetatype Conformance
