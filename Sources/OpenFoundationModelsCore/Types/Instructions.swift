@@ -1,79 +1,27 @@
 // Instructions.swift
-// OpenFoundationModels
+// OpenFoundationModelsCore
 //
-// ✅ CONFIRMED: Based on Apple Foundation Models API specification
+// ✅ APPLE OFFICIAL: Placeholder for builder usage in Core module
 
 import Foundation
 
-/// Instructions define the model's intended behavior on prompts.
-/// 
-/// **Apple Foundation Models Documentation:**
-/// Instructions define the model's intended behavior on prompts.
-/// 
-/// Instructions are typically provided by you to define the role and behavior of the model.
-/// Apple trains the model to obey instructions over any commands it receives in prompts,
-/// so don't include untrusted content in instructions.
-/// 
-/// **Source:** https://developer.apple.com/documentation/foundationmodels/instructions
-/// 
-/// **Apple Official API:** `struct Instructions`
-/// - iOS 26.0+, iPadOS 26.0+, macOS 26.0+, visionOS 26.0+
-/// - Beta Software: Contains preliminary API information
-/// 
-/// **Conformances:**
-/// - Copyable
-/// - InstructionsRepresentable
-/// 
-/// **Example:**
-/// ```swift
-/// let instructions = """
-///  Suggest related topics. Keep them concise (three to seven words) and make sure they \
-///  build naturally from the person's topic.
-///  """
-/// 
-/// let session = LanguageModelSession(instructions: instructions)
-/// 
-/// let prompt = "Making homemade bread"
-/// let response = try await session.respond(to: prompt)
-/// ```
-public struct Instructions: Copyable, InstructionsRepresentable {
-    /// Text content of the instructions
-    /// ✅ CONFIRMED: Apple specification requires text property
-    public let text: String
+/// Placeholder Instructions type for Core module builders
+/// The actual Instructions implementation is in the main module
+public struct Instructions: Sendable {
+    internal let content: String
     
-    /// Creates instructions with text content.
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Creates instructions with text content.
-    /// 
-    /// **Source:** https://developer.apple.com/documentation/foundationmodels/instructions/init(_:)
-    /// 
-    /// **Apple Official API:** `init(_: String)`
-    /// 
-    /// - Parameter text: The instruction text that defines model behavior
-    public init(_ text: String) {
-        self.text = text
-    }
-    
-    /// Initialize instructions with result builder
-    /// - Parameter builder: Instructions builder closure
-    public init(@InstructionsBuilder _ builder: () -> Instructions) {
-        let instructions = builder()
-        self.text = instructions.text
+    public init(_ content: String) {
+        self.content = content
     }
 }
 
-// MARK: - Protocol Conformances
+extension Instructions: CustomStringConvertible {
+    public var description: String {
+        return content
+    }
+}
 
-extension Instructions {
-    /// An instance that represents the instructions.
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// An instance that represents the instructions.
-    /// 
-    /// **Source:** https://developer.apple.com/documentation/foundationmodels/instructionsrepresentable/instructionsrepresentation
-    /// 
-    /// **Apple Official API:** `var instructionsRepresentation: Instructions`
+extension Instructions: InstructionsRepresentable {
     public var instructionsRepresentation: Instructions {
         return self
     }

@@ -113,19 +113,7 @@ extension GenerationID: CustomStringConvertible {
 }
 
 // MARK: - Protocol Conformances
-extension GenerationID: InstructionsRepresentable, PromptRepresentable {
-    /// An instance that represents the instructions.
-    /// ✅ CONFIRMED: Required by InstructionsRepresentable
-    public var instructionsRepresentation: Instructions {
-        return Instructions("A unique identifier: \(value.uuidString)")
-    }
-    
-    /// An instance that represents a prompt.
-    /// ✅ CONFIRMED: Required by PromptRepresentable
-    public var promptRepresentation: Prompt {
-        return Prompt(value.uuidString)
-    }
-}
+// InstructionsRepresentable and PromptRepresentable implementations are provided in the main module
 
 // MARK: - Generable Conformance
 extension GenerationID: Generable {

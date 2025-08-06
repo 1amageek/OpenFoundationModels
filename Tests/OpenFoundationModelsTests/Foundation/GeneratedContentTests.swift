@@ -166,7 +166,7 @@ struct GeneratedContentTests {
         let content = GeneratedContent("Instruction content")
         let instructions = content.instructionsRepresentation
         
-        #expect(instructions.text == "Instruction content")
+        #expect(instructions.description == "Instruction content")
     }
     
     @Test("GeneratedContent PartiallyGenerated")

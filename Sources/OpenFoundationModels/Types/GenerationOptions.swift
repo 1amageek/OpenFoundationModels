@@ -1,62 +1,185 @@
+// GenerationOptions.swift
+// OpenFoundationModels
+//
+// ✅ APPLE OFFICIAL: Based on Apple Foundation Models API specification
+
 import Foundation
 
-/// Options that control how the model generates its response to a prompt
-/// ✅ APPLE SPEC: GenerationOptions structure
-/// Referenced in Apple Foundation Models documentation
-public struct GenerationOptions: Sendable, Codable {
-    /// Sampling strategy for generation
-    /// ✅ APPLE SPEC: sampling property
-    public let sampling: Sampling
+/// Options that control how the model generates its response to a prompt.
+///
+/// Create a `GenerationOptions` structure when you want to adjust
+/// the way the model generates its response. Use this structure to
+/// perform various adjustments on how the model chooses output tokens,
+/// to specify the penalties for repeating tokens or generating
+/// longer responses.
+public struct GenerationOptions: Sendable, Equatable, Codable {
     
-    /// Maximum number of tokens to generate
-    /// ✅ APPLE SPEC: maxTokens property
-    public let maxTokens: Int?
+    /// A type that defines how values are sampled from a probability distribution.
+    ///
+    /// A model builds its response to a prompt in a loop. At each iteration in the
+    /// loop the model produces a probability distribution for all the tokens in its
+    /// vocabulary. The sampling mode controls how a token is selected from that
+    /// distribution.
+    public struct SamplingMode: Sendable, Equatable, Codable {
+        
+        private enum Mode: Sendable, Equatable, Codable {
+            case greedy
+            case randomTopK(k: Int, seed: UInt64?)
+            case randomTopP(threshold: Double, seed: UInt64?)
+        }
+        
+        private let mode: Mode
+        
+        private init(mode: Mode) {
+            self.mode = mode
+        }
+        
+        /// A sampling mode that always chooses the most likely token.
+        ///
+        /// Using this mode will always result in the same output
+        /// for a given input. Responses produced with greedy sampling
+        /// are statistically likely, but may lack the human-like quality
+        /// and variety of other sampling strategies.
+        public static var greedy: GenerationOptions.SamplingMode {
+            return SamplingMode(mode: .greedy)
+        }
+        
+        /// A sampling mode that considers a fixed number of high-probability tokens.
+        ///
+        /// Also known as top-k.
+        ///
+        /// During the token-selection process, the vocabulary is sorted by probability a
+        /// token is selected from among the top K candidates. Smaller values of K will
+        /// ensure only the most probable tokens are candidates for selection, resulting
+        /// in more deterministic and confident answers. Larger values of K will allow less
+        /// probably tokens to be selected, raising non-determinism and creativity.
+        ///
+        /// - Note: Setting a random seed is not guaranteed to result in fully deterministic
+        ///   output. It is best effort.
+        ///
+        /// - Parameters:
+        ///   - top: The number of tokens to consider.
+        ///   - seed: An optional random seed used to make output more deterministic.
+        public static func random(top k: Int, seed: UInt64? = nil) -> GenerationOptions.SamplingMode {
+            return SamplingMode(mode: .randomTopK(k: k, seed: seed))
+        }
+        
+        /// A mode that considers a variable number of high-probability tokens
+        /// based on the specified threshold.
+        ///
+        /// Also known as top-p or nucleus sampling.
+        ///
+        /// With nucleus sampling, tokens are sorted by probability and added to a
+        /// pool of candidates until the cumulative probability of the pool exceeds
+        /// the specified threshold, and then a token is sampled from the pool.
+        ///
+        /// Because the number of tokens isn't predetermined, the selection pool size
+        /// will be larger when the distribution is flat and smaller when it is spikey.
+        /// This variability can lead to a wider variety of options to choose from, and
+        /// potentially more creative responses.
+        ///
+        /// - Note: Setting a random seed is not guaranteed to result in fully deterministic
+        ///   output. It is best effort.
+        ///
+        /// - Parameters:
+        ///     - probabilityThreshold: A number between `0.0` and `1.0` that
+        ///       increases sampling pool size.
+        ///     - seed: An optional random seed used to make output more deterministic.
+        public static func random(probabilityThreshold: Double, seed: UInt64? = nil) -> GenerationOptions.SamplingMode {
+            return SamplingMode(mode: .randomTopP(threshold: probabilityThreshold, seed: seed))
+        }
+        
+        /// Returns a Boolean value indicating whether two values are equal.
+        ///
+        /// Equality is the inverse of inequality. For any values `a` and `b`,
+        /// `a == b` implies that `a != b` is `false`.
+        ///
+        /// - Parameters:
+        ///   - lhs: A value to compare.
+        ///   - rhs: Another value to compare.
+        public static func == (a: GenerationOptions.SamplingMode, b: GenerationOptions.SamplingMode) -> Bool {
+            return a.mode == b.mode
+        }
+    }
     
-    /// Temperature for sampling (0.0 to 1.0)
-    /// ✅ APPLE SPEC: temperature property (legacy)
-    public let temperature: Double?
+    /// A sampling strategy for how the model picks tokens when generating a
+    /// response.
+    ///
+    /// When you execute a prompt on a model, the model produces a probability
+    /// for every token in its vocabulary. The sampling strategy controls how
+    /// the model narrows down the list of tokens to consider during that process.
+    /// A strategy that picks the single most likely token yields a predictable
+    /// response every time, but other strategies offer results that often
+    /// sound more natural to a person.
+    ///
+    /// - Note: Leaving the `sampling` nil lets the system choose a
+    ///   a reasonable default on your behalf.
+    public var sampling: GenerationOptions.SamplingMode?
     
-    /// Top-p sampling parameter
-    /// ✅ APPLE SPEC: topP property (legacy)
-    public let topP: Double?
+    /// Temperature influences the confidence of the models response.
+    ///
+    /// The value of this property must be a number between `0` and `2` inclusive.
+    ///
+    /// Temperature is an adjustment applied  to the probability distribution
+    /// prior to sampling. A value of `1` results in no adjustment. Values less
+    /// than `1` will make the probability distribution sharper, with already
+    /// likely tokens becoming even more likely. Values greather than `1` will
+    /// flatten the distribution, making less probable tokens more likely.
+    ///
+    /// The net effect is that low temperatures manifest as more stable and
+    /// predictable responses, while high temperatures give the model more
+    /// creative license.
+    ///
+    /// - Note: Leaving `temperature` nil lets the system choose a reasonable
+    ///   default on your behalf.
+    public var temperature: Double?
     
-    /// Initialize generation options
-    /// ✅ APPLE SPEC: Standard initializer
+    /// The maximum number of tokens the model is allowed to produce in its response.
+    ///
+    /// If the model produce `maximumResponseTokens` before it naturally completes its response,
+    /// the response will be terminated early. No error will be thrown. This property
+    /// can be used to protect against unexpectedly verbose responses and runaway generations.
+    ///
+    /// If no value is specified, then the model is allowed to produce the longest answer
+    /// its context size supports. If the response exceeds that limit without terminating,
+    /// an error will be thrown.
+    public var maximumResponseTokens: Int?
+    
+    /// Creates generation options that control token sampling behavior.
+    ///
+    /// - Parameters:
+    ///   - sampling: A strategy to use for sampling from a distribution.
+    ///   - temperature: Increasing temperature makes it possible for the model to produce less likely
+    ///     responses. Must be between 0 and 2, inclusive.
+    ///   - maximumResponseTokens: The maximum number of tokens the model is allowed
+    ///     to produce before being artificially halted. Must be positive.
     public init(
-        sampling: Sampling = .greedy,
-        maxTokens: Int? = nil,
+        sampling: GenerationOptions.SamplingMode? = nil,
         temperature: Double? = nil,
-        topP: Double? = nil
+        maximumResponseTokens: Int? = nil
     ) {
         self.sampling = sampling
-        self.maxTokens = maxTokens
         self.temperature = temperature
-        self.topP = topP
+        self.maximumResponseTokens = maximumResponseTokens
+    }
+    
+    /// Returns a Boolean value indicating whether two values are equal.
+    ///
+    /// Equality is the inverse of inequality. For any values `a` and `b`,
+    /// `a == b` implies that `a != b` is `false`.
+    ///
+    /// - Parameters:
+    ///   - lhs: A value to compare.
+    ///   - rhs: Another value to compare.
+    public static func == (a: GenerationOptions, b: GenerationOptions) -> Bool {
+        return a.sampling == b.sampling &&
+               a.temperature == b.temperature &&
+               a.maximumResponseTokens == b.maximumResponseTokens
     }
     
     /// Default generation options
-    /// ✅ APPLE SPEC: static let default property
-    public static let `default`: GenerationOptions = GenerationOptions(sampling: .greedy)
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// Default options with nil values, letting the system choose reasonable defaults.
+    public static let `default` = GenerationOptions()
 }
-
-// MARK: - Sampling
-
-extension GenerationOptions {
-    /// Sampling strategy for text generation
-    /// ✅ APPLE SPEC: Sampling enum
-    public enum Sampling: Sendable, Codable {
-        /// Greedy decoding - always pick the most likely token
-        /// ✅ APPLE SPEC: greedy case
-        case greedy
-        
-        /// Random sampling with optional top-p parameter
-        /// ✅ APPLE SPEC: random(topP:) case
-        case random(topP: Double? = nil)
-    }
-}
-
-// MARK: - Legacy Support
-
-
-// MARK: - Conversion Methods
-

@@ -109,7 +109,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         prompt: () throws -> Prompt
     ) async throws -> Response<String> {
         let promptValue = try prompt()
-        let promptText = promptValue.segments.map { $0.text }.joined(separator: " ")
+        let promptText = promptValue.description
         let content = try await model.generate(prompt: promptText, options: options)
         
         // Create transcript entries
@@ -145,7 +145,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         prompt: () throws -> Prompt
     ) async throws -> Response<Content> {
         let promptValue = try prompt()
-        let promptText = promptValue.segments.map { $0.text }.joined(separator: " ")
+        let promptText = promptValue.description
         
         // Generate schema-guided content
         let schemaPrompt = includeSchemaInPrompt ? 
@@ -189,7 +189,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         prompt: () throws -> Prompt
     ) async throws -> Response<GeneratedContent> {
         let promptValue = try prompt()
-        let promptText = promptValue.segments.map { $0.text }.joined(separator: " ")
+        let promptText = promptValue.description
         
         // Generate schema-guided content
         let schemaPrompt = includeSchemaInPrompt ? 
@@ -286,7 +286,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         prompt: () throws -> Prompt
     ) rethrows -> ResponseStream<String> {
         let promptValue = try prompt()
-        let promptText = promptValue.segments.map { $0.text }.joined(separator: " ")
+        let promptText = promptValue.description
         
         let stream = AsyncThrowingStream<Response<String>.Partial, Error> { continuation in
             Task {
@@ -324,7 +324,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         prompt: () throws -> Prompt
     ) rethrows -> ResponseStream<Content> {
         let promptValue = try prompt()
-        let promptText = promptValue.segments.map { $0.text }.joined(separator: " ")
+        let promptText = promptValue.description
         
         let stream = AsyncThrowingStream<Response<Content>.Partial, Error> { continuation in
             Task {
@@ -376,7 +376,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         prompt: () throws -> Prompt
     ) rethrows -> ResponseStream<GeneratedContent> {
         let promptValue = try prompt()
-        let promptText = promptValue.segments.map { $0.text }.joined(separator: " ")
+        let promptText = promptValue.description
         
         let stream = AsyncThrowingStream<Response<GeneratedContent>.Partial, Error> { continuation in
             Task {

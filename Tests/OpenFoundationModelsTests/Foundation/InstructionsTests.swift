@@ -26,16 +26,16 @@ struct InstructionsTests {
     func instructionsStringCreation() {
         let instructions = Instructions("Write a short story")
         
-        #expect(instructions.text == "Write a short story")
-        #expect(!instructions.text.isEmpty)
+        #expect(instructions.description == "Write a short story")
+        #expect(!instructions.description.isEmpty)
     }
     
     @Test("Instructions creation with empty string")
     func instructionsEmptyCreation() {
         let instructions = Instructions("")
         
-        #expect(instructions.text == "")
-        #expect(instructions.text.isEmpty)
+        #expect(instructions.description == "")
+        #expect(instructions.description.isEmpty)
     }
     
     @Test("Instructions text property access")
@@ -43,7 +43,7 @@ struct InstructionsTests {
         let text = "Generate a user profile with name and age"
         let instructions = Instructions(text)
         
-        #expect(instructions.text == text)
+        #expect(instructions.description == text)
     }
     
     // MARK: - InstructionsRepresentable Tests
@@ -53,7 +53,7 @@ struct InstructionsTests {
         let text = "Test instructions"
         let instructions = text.instructionsRepresentation
         
-        #expect(instructions.text == text)
+        #expect(instructions.description == text)
     }
     
     @Test("GeneratedContent conforms to InstructionsRepresentable")
@@ -61,7 +61,7 @@ struct InstructionsTests {
         let content = GeneratedContent("Generated instructions")
         let instructions = content.instructionsRepresentation
         
-        #expect(instructions.text == "Generated instructions")
+        #expect(instructions.description == "Generated instructions")
     }
     
     // MARK: - InstructionsBuilder Tests
@@ -74,7 +74,7 @@ struct InstructionsTests {
         }
         
         let instructions = buildInstructions()
-        #expect(instructions.text == "Write a detailed description")
+        #expect(instructions.description == "Write a detailed description")
     }
     
     @Test("InstructionsBuilder with multiple components")
@@ -88,7 +88,7 @@ struct InstructionsTests {
         
         let instructions = buildInstructions()
         let expected = "First instruction line\nSecond instruction line\nThird instruction line"
-        #expect(instructions.text == expected)
+        #expect(instructions.description == expected)
     }
     
     @Test("InstructionsBuilder with mixed types")
@@ -104,7 +104,7 @@ struct InstructionsTests {
         
         let instructions = buildInstructions()
         let expected = "Static instruction\nDynamic content\nAnother static instruction"
-        #expect(instructions.text == expected)
+        #expect(instructions.description == expected)
     }
     
     @Test("InstructionsBuilder buildArray method")
@@ -117,7 +117,7 @@ struct InstructionsTests {
         
         let instructions = InstructionsBuilder.buildArray(components)
         let expected = "First component\nSecond component\nThird component"
-        #expect(instructions.text == expected)
+        #expect(instructions.description == expected)
     }
     
     @Test("InstructionsBuilder buildBlock method")
@@ -128,7 +128,7 @@ struct InstructionsTests {
             "Component 3"
         )
         let expected = "Component 1\nComponent 2\nComponent 3"
-        #expect(instructions.text == expected)
+        #expect(instructions.description == expected)
     }
     
     @Test("InstructionsBuilder buildEither first")
@@ -145,7 +145,7 @@ struct InstructionsTests {
         }
         
         let instructions = buildConditional()
-        #expect(instructions.text == "First branch")
+        #expect(instructions.description == "First branch")
     }
     
     @Test("InstructionsBuilder buildEither second")
@@ -162,7 +162,7 @@ struct InstructionsTests {
         }
         
         let instructions = buildConditional()
-        #expect(instructions.text == "Second branch")
+        #expect(instructions.description == "Second branch")
     }
     
     @Test("InstructionsBuilder buildExpression")
@@ -170,7 +170,7 @@ struct InstructionsTests {
         let expression = "Test expression"
         let instructions = InstructionsBuilder.buildExpression(expression)
         
-        #expect(instructions.text == expression)
+        #expect(instructions.description == expression)
     }
     
     @Test("InstructionsBuilder buildOptional with value")
@@ -178,14 +178,14 @@ struct InstructionsTests {
         let optionalInstructions = Instructions("Optional content")
         let instructions = InstructionsBuilder.buildOptional(optionalInstructions)
         
-        #expect(instructions.text == "Optional content")
+        #expect(instructions.description == "Optional content")
     }
     
     @Test("InstructionsBuilder buildOptional with nil")
     func instructionsBuilderOptionalNil() {
         let instructions = InstructionsBuilder.buildOptional(nil)
         
-        #expect(instructions.text == "")
+        #expect(instructions.description == "")
     }
     
     @Test("InstructionsBuilder buildLimitedAvailability")
@@ -193,7 +193,7 @@ struct InstructionsTests {
         let component = "Limited availability content"
         let instructions = InstructionsBuilder.buildLimitedAvailability(component)
         
-        #expect(instructions.text == component)
+        #expect(instructions.description == component)
     }
     
     // MARK: - Complex InstructionsBuilder Scenarios
@@ -220,7 +220,7 @@ struct InstructionsTests {
         
         let instructions = buildComplexInstructions()
         let expected = "Base instruction\nExample: Generate a user profile\nAdditional context\nFinal instruction"
-        #expect(instructions.text == expected)
+        #expect(instructions.description == expected)
     }
     
     @Test("InstructionsBuilder with array of components")
@@ -243,7 +243,7 @@ struct InstructionsTests {
         let instructions = buildInstructionsWithArray()
         let expectedSteps = steps.joined(separator: "\n")
         let expected = "Process Overview:\n\(expectedSteps)\nComplete the process carefully."
-        #expect(instructions.text == expected)
+        #expect(instructions.description == expected)
     }
     
     // MARK: - Edge Cases and Error Handling
@@ -253,8 +253,8 @@ struct InstructionsTests {
         let longText = String(repeating: "A", count: 10000)
         let instructions = Instructions(longText)
         
-        #expect(instructions.text.count == 10000)
-        #expect(instructions.text.allSatisfy { $0 == "A" })
+        #expect(instructions.description.count == 10000)
+        #expect(instructions.description.allSatisfy { $0 == "A" })
     }
     
     @Test("Instructions with special characters")
@@ -262,10 +262,10 @@ struct InstructionsTests {
         let specialText = "Instructions with émojis 🚀, ñewlines\n, tabs\t, and \"quotes\""
         let instructions = Instructions(specialText)
         
-        #expect(instructions.text == specialText)
-        #expect(instructions.text.contains("🚀"))
-        #expect(instructions.text.contains("\n"))
-        #expect(instructions.text.contains("\t"))
+        #expect(instructions.description == specialText)
+        #expect(instructions.description.contains("🚀"))
+        #expect(instructions.description.contains("\n"))
+        #expect(instructions.description.contains("\t"))
     }
     
     @Test("Instructions with Unicode characters")
@@ -273,9 +273,9 @@ struct InstructionsTests {
         let unicodeText = "Unicode: 日本語, العربية, русский, 中文"
         let instructions = Instructions(unicodeText)
         
-        #expect(instructions.text == unicodeText)
-        #expect(instructions.text.contains("日本語"))
-        #expect(instructions.text.contains("العربية"))
+        #expect(instructions.description == unicodeText)
+        #expect(instructions.description.contains("日本語"))
+        #expect(instructions.description.contains("العربية"))
     }
     
     // MARK: - Performance Tests
@@ -286,7 +286,7 @@ struct InstructionsTests {
         
         for _ in 0..<1000 {
             let instructions = Instructions(text)
-            #expect(instructions.text == text)
+            #expect(instructions.description == text)
         }
     }
     
@@ -302,8 +302,8 @@ struct InstructionsTests {
         }
         
         let instructions = buildManyInstructions()
-        #expect(instructions.text.contains("Component 1"))
-        #expect(instructions.text.contains("Component 100"))
-        #expect(!instructions.text.isEmpty)
+        #expect(instructions.description.contains("Component 1"))
+        #expect(instructions.description.contains("Component 100"))
+        #expect(!instructions.description.isEmpty)
     }
 }

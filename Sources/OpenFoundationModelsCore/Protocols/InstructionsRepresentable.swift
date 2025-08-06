@@ -31,7 +31,6 @@ public protocol InstructionsRepresentable {
     /// 
     /// **Source:** https://developer.apple.com/documentation/foundationmodels/instructionsrepresentable/instructionsrepresentation
     /// 
-    /// **Apple Official API:** `var instructionsRepresentation: Instructions`
-    /// **Required** Default implementation provided.
-    var instructionsRepresentation: Instructions { get }
+    /// **Apple Official API:** `@InstructionsBuilder var instructionsRepresentation: Instructions { get }`
+    @InstructionsBuilder var instructionsRepresentation: Instructions { get }
 }

@@ -87,6 +87,13 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
         self.generationID = nil
     }
     
+    /// Creates generated content from another ConvertibleToGeneratedContent value.
+    /// ✅ CONFIRMED: init(_:) from Apple docs for ConvertibleToGeneratedContent types
+    /// - Parameter content: A value that can be converted to GeneratedContent
+    public init(_ content: some ConvertibleToGeneratedContent) {
+        self = content.generatedContent
+    }
+    
     /// Creates new generated content from the key-value pairs in the given sequence,
     /// using a combining closure to determine the value for any duplicate keys.
     /// ✅ CONFIRMED: init(properties:uniquingKeysWith:) from Apple docs
@@ -228,6 +235,21 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
         return try propertyContent.value(type)
     }
     
+    /// Reads an optional concrete generable type from named property.
+    /// ✅ CONFIRMED: value(_:forProperty:) from Apple docs - Optional version
+    /// - Parameters:
+    ///   - type: The optional type to decode the property value into
+    ///   - property: The property name to read
+    /// - Returns: The decoded value or nil if the property doesn't exist
+    /// - Throws: GeneratedContentError if the property exists but cannot be decoded
+    public func value<Value>(_ type: Value?.Type, forProperty property: String) throws -> Value? {
+        let properties = try self.properties()
+        guard let propertyContent = properties[property] else {
+            return nil
+        }
+        return try propertyContent.value(Value.self)
+    }
+    
     // MARK: - Properties
     
     /// A unique ID used for the duration of a generated response.
@@ -332,17 +354,7 @@ extension GeneratedContent: ConvertibleFromGeneratedContent {
 /// ✅ CONFIRMED: GeneratedContent conforms to ConvertibleToGeneratedContent
 extension GeneratedContent: ConvertibleToGeneratedContent {
     // generatedContent property already defined in main struct
-    
-    /// Convert to instructions representation
-    public var instructionsRepresentation: Instructions {
-        return Instructions(self.stringValue)
-    }
-    
-    /// An instance that represents a prompt.
-    /// ✅ CONFIRMED: Required by PromptRepresentable (inherited from ConvertibleToGeneratedContent)
-    public var promptRepresentation: Prompt {
-        return Prompt(stringValue)
-    }
+    // instructionsRepresentation and promptRepresentation are provided by extensions in main module
 }
 
 // Note: Generable conformance is implemented in ProtocolConformances.swift

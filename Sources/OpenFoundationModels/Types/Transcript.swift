@@ -4,6 +4,7 @@
 // ✅ APPLE OFFICIAL: Based on Apple Foundation Models API documentation
 
 import Foundation
+import OpenFoundationModelsCore
 
 /// A transcript that documents interactions with a language model.
 /// 
@@ -30,7 +31,7 @@ import Foundation
 /// 
 /// **Initialization:**
 /// `init(entries: some Sequence<Transcript.Entry>)`
-public struct Transcript: Codable, Sendable {
+public struct Transcript: Sendable {
     /// Internal storage for transcript entries
     public private(set) var entries: [Entry] = []
     
@@ -75,7 +76,7 @@ extension Transcript {
     /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/entry
     /// 
     /// **Apple Official API:** `enum Entry`
-    public enum Entry: Codable, Sendable, Identifiable, CustomStringConvertible {
+    public enum Entry: Codable, Sendable, Identifiable {
         /// System instructions for the model
         /// 
         /// **Apple Foundation Models Documentation:**
@@ -131,22 +132,6 @@ extension Transcript {
                 return toolOutput.id
             }
         }
-        
-        /// Description for CustomStringConvertible
-        public var description: String {
-            switch self {
-            case .instructions:
-                return "Entry.instructions"
-            case .prompt:
-                return "Entry.prompt"
-            case .response:
-                return "Entry.response"
-            case .toolCalls:
-                return "Entry.toolCalls"
-            case .toolOutput:
-                return "Entry.toolOutput"
-            }
-        }
     }
 }
 
@@ -160,7 +145,7 @@ extension Transcript {
     /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/segment
     /// 
     /// **Apple Official API:** `enum Segment`
-    public enum Segment: Codable, Sendable, Identifiable, CustomStringConvertible {
+    public enum Segment: Codable, Sendable, Identifiable {
         /// A text segment
         /// 
         /// **Apple Foundation Models Documentation:**
@@ -171,25 +156,15 @@ extension Transcript {
         /// 
         /// **Apple Foundation Models Documentation:**
         /// A segment containing structured content.
-        case structured(StructuredSegment)
+        case structure(StructuredSegment)
         
         /// Unique identifier for the segment
         public var id: String {
             switch self {
             case .text(let textSegment):
                 return textSegment.id
-            case .structured(let structuredSegment):
+            case .structure(let structuredSegment):
                 return structuredSegment.id
-            }
-        }
-        
-        /// Description for CustomStringConvertible
-        public var description: String {
-            switch self {
-            case .text:
-                return "Segment.text"
-            case .structured:
-                return "Segment.structured"
             }
         }
     }
@@ -202,9 +177,9 @@ extension Transcript {
     /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/textsegment
     /// 
     /// **Apple Official API:** `struct TextSegment`
-    public struct TextSegment: Codable, Sendable, Identifiable, Equatable, CustomStringConvertible {
+    public struct TextSegment: Codable, Sendable, Identifiable, Equatable {
         /// Unique identifier
-        public let id: String
+        public var id: String
         
         /// The text content of the segment
         /// 
@@ -212,7 +187,7 @@ extension Transcript {
         /// The text content of the segment.
         /// 
         /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/textsegment/content
-        public let content: String
+        public var content: String
         
         /// Initialize a text segment
         /// 
@@ -228,11 +203,6 @@ extension Transcript {
             self.id = id
             self.content = content
         }
-        
-        /// Description for CustomStringConvertible
-        public var description: String {
-            "TextSegment(id: \(id), content: \(content.prefix(50))...)"
-        }
     }
     
     /// A segment containing structured content.
@@ -243,9 +213,9 @@ extension Transcript {
     /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/structuredsegment
     /// 
     /// **Apple Official API:** `struct StructuredSegment`
-    public struct StructuredSegment: Codable, Sendable, Identifiable, Equatable, CustomStringConvertible {
+    public struct StructuredSegment: Codable, Sendable, Identifiable, Equatable {
         /// Unique identifier
-        public let id: String
+        public var id: String
         
         /// The source of the structured content
         /// 
@@ -253,7 +223,7 @@ extension Transcript {
         /// The source that generated this structured content.
         /// 
         /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/structuredsegment/source
-        public let source: String
+        public var source: String
         
         /// The structured content
         /// 
@@ -261,7 +231,7 @@ extension Transcript {
         /// The structured content as GeneratedContent.
         /// 
         /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/structuredsegment/content
-        public let content: GeneratedContent
+        public var content: GeneratedContent
         
         /// Initialize a structured segment
         /// 
@@ -278,11 +248,6 @@ extension Transcript {
             self.id = id
             self.source = source
             self.content = content
-        }
-        
-        /// Description for CustomStringConvertible
-        public var description: String {
-            "StructuredSegment(id: \(id), source: \(source))"
         }
     }
 }
@@ -304,7 +269,7 @@ extension Transcript {
         /// The unique identifier for this prompt.
         /// 
         /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/prompt/id
-        public let id: String
+        public var id: String
         
         /// The segments containing the prompt content
         /// 
@@ -312,7 +277,7 @@ extension Transcript {
         /// The segments that make up the prompt.
         /// 
         /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/prompt/segments
-        public let segments: [Transcript.Segment]
+        public var segments: [Transcript.Segment]
         
         /// Generation options for this prompt
         /// 
@@ -320,7 +285,7 @@ extension Transcript {
         /// Options that control how the model generates content.
         /// 
         /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/prompt/options
-        public let options: GenerationOptions
+        public var options: GenerationOptions
         
         /// Response format specification
         /// 
@@ -328,7 +293,7 @@ extension Transcript {
         /// Specifies a response format that the model must conform its output to.
         /// 
         /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/prompt/responseformat
-        public let responseFormat: Transcript.ResponseFormat?
+        public var responseFormat: Transcript.ResponseFormat?
         
         /// Initialize a prompt
         /// 
@@ -360,7 +325,7 @@ extension Transcript {
     /// **Apple Official API:** `struct Response`
     public struct Response: Codable, Sendable, Identifiable {
         /// Unique identifier
-        public let id: String
+        public var id: String
         
         /// Asset identifiers associated with this response
         /// 
@@ -368,7 +333,7 @@ extension Transcript {
         /// Identifiers for any assets referenced in the response.
         /// 
         /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/response/assetids
-        public let assetIDs: [String]
+        public var assetIDs: [String]
         
         /// The segments containing the response content
         /// 
@@ -376,7 +341,7 @@ extension Transcript {
         /// The segments that make up the response.
         /// 
         /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/response/segments
-        public let segments: [Transcript.Segment]
+        public var segments: [Transcript.Segment]
         
         /// Initialize a response
         /// 
@@ -406,7 +371,7 @@ extension Transcript {
     /// **Apple Official API:** `struct Instructions`
     public struct Instructions: Codable, Sendable, Identifiable {
         /// Unique identifier
-        public let id: String
+        public var id: String
         
         /// The segments containing the instructions content
         /// 
@@ -414,7 +379,7 @@ extension Transcript {
         /// The segments that make up the instructions.
         /// 
         /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/instructions/segments
-        public let segments: [Transcript.Segment]
+        public var segments: [Transcript.Segment]
         
         /// Tool definitions available for use
         /// 
@@ -422,7 +387,7 @@ extension Transcript {
         /// The tools that the model can call during the conversation.
         /// 
         /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/instructions/tooldefinitions
-        public let toolDefinitions: [Transcript.ToolDefinition]
+        public var toolDefinitions: [Transcript.ToolDefinition]
         
         /// Initialize instructions
         /// 
@@ -450,9 +415,9 @@ extension Transcript {
     /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/toolcall
     /// 
     /// **Apple Official API:** `struct ToolCall`
-    public struct ToolCall: Codable, Sendable, Identifiable, CustomStringConvertible {
+    public struct ToolCall: Codable, Sendable, Identifiable {
         /// A unique identifier for this tool call
-        public let id: String
+        public var id: String
         
         /// The name of the tool to call
         /// 
@@ -460,7 +425,7 @@ extension Transcript {
         /// The name of the tool to call.
         /// 
         /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/toolcall/toolname
-        public let toolName: String
+        public var toolName: String
         
         /// The arguments to pass to the tool
         /// 
@@ -468,7 +433,7 @@ extension Transcript {
         /// The arguments to pass to the tool as GeneratedContent.
         /// 
         /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/toolcall/arguments
-        public let arguments: GeneratedContent
+        public var arguments: GeneratedContent
         
         /// Initialize a tool call
         /// 
@@ -486,11 +451,6 @@ extension Transcript {
             self.toolName = toolName
             self.arguments = arguments
         }
-        
-        /// Description for CustomStringConvertible
-        public var description: String {
-            "ToolCall(id: \(id), toolName: \(toolName))"
-        }
     }
     
     /// A collection of tool calls generated by the model.
@@ -501,12 +461,12 @@ extension Transcript {
     /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/toolcalls
     /// 
     /// **Apple Official API:** `struct ToolCalls`
-    public struct ToolCalls: Codable, Sendable, Identifiable, CustomStringConvertible {
+    public struct ToolCalls: Codable, Sendable, Identifiable {
         /// Unique identifier
-        public let id: String
+        public var id: String
         
         /// The tool calls
-        private let calls: [ToolCall]
+        private var calls: [ToolCall]
         
         /// Initialize tool calls
         /// 
@@ -521,11 +481,6 @@ extension Transcript {
         public init<S>(id: String, _ calls: S) where S: Sequence, S.Element == ToolCall {
             self.id = id
             self.calls = Array(calls)
-        }
-        
-        /// Description for CustomStringConvertible
-        public var description: String {
-            "ToolCalls(id: \(id), count: \(calls.count))"
         }
         
         /// Access to the calls array for Collection conformance
@@ -549,7 +504,7 @@ extension Transcript {
         /// The name of the tool.
         /// 
         /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/tooldefinition/name
-        public let name: String
+        public var name: String
         
         /// The description of the tool
         /// 
@@ -557,13 +512,13 @@ extension Transcript {
         /// A description of what the tool does.
         /// 
         /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/tooldefinition/description
-        public let description: String
+        public var description: String
         
         /// The parameters schema for the tool
         /// 
         /// **Apple Foundation Models Documentation:**
         /// The schema describing the parameters the tool accepts.
-        public let parameters: GenerationSchema
+        public var parameters: GenerationSchema
         
         /// Initialize a tool definition
         /// 
@@ -605,14 +560,14 @@ extension Transcript {
     /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/tooloutput
     /// 
     /// **Apple Official API:** `struct ToolOutput`
-    public struct ToolOutput: Codable, Sendable, Identifiable, CustomStringConvertible {
+    public struct ToolOutput: Codable, Sendable, Identifiable {
         /// Unique identifier
         /// 
         /// **Apple Foundation Models Documentation:**
         /// The unique identifier for this tool output.
         /// 
         /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/tooloutput/id
-        public let id: String
+        public var id: String
         
         /// The name of the tool that generated this output
         /// 
@@ -620,7 +575,7 @@ extension Transcript {
         /// The name of the tool that generated this output.
         /// 
         /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/tooloutput/toolname
-        public let toolName: String
+        public var toolName: String
         
         /// The segments containing the output
         /// 
@@ -628,7 +583,7 @@ extension Transcript {
         /// The segments that make up the tool output.
         /// 
         /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/tooloutput/segments
-        public let segments: [Transcript.Segment]
+        public var segments: [Transcript.Segment]
         
         /// Initialize a tool output
         /// 
@@ -645,11 +600,6 @@ extension Transcript {
             self.id = id
             self.toolName = toolName
             self.segments = segments
-        }
-        
-        /// Description for CustomStringConvertible
-        public var description: String {
-            "ToolOutput(id: \(id), toolName: \(toolName), segments: \(segments.count))"
         }
     }
     
@@ -668,13 +618,13 @@ extension Transcript {
         /// The name of the response format.
         /// 
         /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/responseformat/name
-        public let name: String
+        public var name: String
         
         /// The format type
-        private let type: String?
+        private var type: String?
         
         /// The format schema
-        private let schema: GenerationSchema?
+        private var schema: GenerationSchema?
         
         /// Initialize a response format with schema
         /// 
@@ -693,15 +643,15 @@ extension Transcript {
         /// Initialize a response format with type
         /// 
         /// **Apple Foundation Models Documentation:**
-        /// Creates a response format with a type.
+        /// Creates a response format with type you specify.
         /// 
         /// **Source:** https://developer.apple.com/documentation/foundationmodels/transcript/responseformat/init(type:)
         /// 
-        /// - Parameter type: The type of the response format
-        public init(type: String) {
-            self.name = type
-            self.type = type
-            self.schema = nil
+        /// - Parameter type: The type to use for the response format
+        public init<Content>(type: Content.Type) where Content: Generable {
+            self.name = String(describing: type)
+            self.type = String(describing: type)
+            self.schema = Content.generationSchema
         }
     }
 }

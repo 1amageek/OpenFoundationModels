@@ -15,17 +15,7 @@ import OpenFoundationModelsCore
 /// This conformance allows String to be used directly in generation methods.
 /// 
 /// **Source:** https://developer.apple.com/documentation/foundationmodels/generable
-extension String: InstructionsRepresentable, PromptRepresentable {
-    /// Convert to instructions representation
-    public var instructionsRepresentation: Instructions {
-        return Instructions(self)
-    }
-    
-    /// Convert to prompt representation
-    public var promptRepresentation: Prompt {
-        return Prompt(self)
-    }
-}
+// String InstructionsRepresentable and PromptRepresentable conformances are in Core module
 
 extension String: Generable {
     /// Partially generated string content
@@ -118,5 +108,70 @@ extension GeneratedContent: Generable {
     /// Instance method for converting to partially generated content.
     public func asPartiallyGenerated() -> PartiallyGenerated {
         return self
+    }
+}
+
+// MARK: - Array SendableMetatype Conformance
+
+extension Array: SendableMetatype where Element: SendableMetatype {}
+
+// MARK: - Array Generable Conformance
+
+extension Array: Generable where Element: Generable {
+    /// A representation of partially generated content
+    public typealias PartiallyGenerated = [Element.PartiallyGenerated]
+    
+    /// An instance of the generation schema.
+    public static var generationSchema: GenerationSchema {
+        return GenerationSchema(
+            type: "array",
+            description: "Array of \(String(describing: Element.self))",
+            items: Element.generationSchema
+        )
+    }
+    
+    /// Convert to partially generated representation
+    public func asPartiallyGenerated() -> PartiallyGenerated {
+        return self.map { $0.asPartiallyGenerated() }
+    }
+}
+
+// MARK: - Array ConvertibleToGeneratedContent
+
+extension Array: ConvertibleToGeneratedContent where Element: ConvertibleToGeneratedContent {
+    /// An instance that represents the generated content.
+    public var generatedContent: GeneratedContent {
+        let elements = self.map { $0.generatedContent }
+        // Create a JSON array representation
+        let jsonArray = elements.map { $0.text }
+        let jsonString = "[\(jsonArray.map { "\"\($0)\"" }.joined(separator: ", "))]"
+        return GeneratedContent(jsonString)
+    }
+}
+
+// MARK: - Array ConvertibleFromGeneratedContent
+
+extension Array: ConvertibleFromGeneratedContent where Element: ConvertibleFromGeneratedContent {
+    /// Creates an instance with the content.
+    public init(_ content: GeneratedContent) throws {
+        // Try to parse as JSON array
+        if let elements = try? content.elements() {
+            self = try elements.map { try Element($0) }
+        } else {
+            // Fallback: try to split by common separators
+            let text = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if text.hasPrefix("[") && text.hasSuffix("]") {
+                // Remove brackets and split
+                let inner = String(text.dropFirst().dropLast())
+                let parts = inner.split(separator: ",").map { String($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+                self = try parts.map { try Element(GeneratedContent($0)) }
+            } else {
+                // Try splitting by newlines or commas
+                let parts = text.split(whereSeparator: { $0.isNewline || $0 == "," })
+                    .map { String($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+                    .filter { !$0.isEmpty }
+                self = try parts.map { try Element(GeneratedContent($0)) }
+            }
+        }
     }
 }

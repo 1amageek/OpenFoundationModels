@@ -43,7 +43,7 @@ import Foundation
 ///     }
 /// }
 /// ```
-public protocol Generable: ConvertibleFromGeneratedContent, ConvertibleToGeneratedContent, InstructionsRepresentable, PromptRepresentable, SendableMetatype, Sendable {
+public protocol Generable: ConvertibleFromGeneratedContent, ConvertibleToGeneratedContent {
     /// An instance of the generation schema.
     /// 
     /// **Apple Foundation Models Documentation:**
@@ -81,10 +81,36 @@ public protocol Generable: ConvertibleFromGeneratedContent, ConvertibleToGenerat
     func asPartiallyGenerated() -> Self.PartiallyGenerated
 }
 
-// MARK: - Protocol Implementation
-// All required methods are provided by the @Generable macro:
-// - init(_:) for ConvertibleFromGeneratedContent.from(generatedContent:)
-// - generatedContent for ConvertibleToGeneratedContent.toGeneratedContent()
+// MARK: - Default Implementations
+
+extension Generable {
+    /// The partially generated type of this struct.
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// The partially generated type of this struct.
+    /// 
+    /// **Source:** https://developer.apple.com/documentation/foundationmodels/generable/aspartiallygenerated
+    /// 
+    /// **Apple Official API:** `func asPartiallyGenerated() -> Self.PartiallyGenerated`
+    /// 
+    /// - Returns: The partially generated representation of this instance
+    public func asPartiallyGenerated() -> Self.PartiallyGenerated {
+        // Default implementation when PartiallyGenerated == Self
+        return self as! Self.PartiallyGenerated
+    }
+}
+
+extension Generable {
+    /// A representation of partially generated content
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// Default type alias when not overridden
+    public typealias PartiallyGenerated = Self
+}
+
+// MARK: - Protocol Implementation Notes
+// Most required methods are provided by the @Generable macro:
+// - init(_:) for ConvertibleFromGeneratedContent
+// - generatedContent for ConvertibleToGeneratedContent
 // - generationSchema static property
-// - asPartiallyGenerated() method
 

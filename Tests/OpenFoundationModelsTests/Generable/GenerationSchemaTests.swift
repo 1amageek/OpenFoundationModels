@@ -30,9 +30,9 @@ struct GenerationSchemaTests {
     
     @Test("GenerationSchema initializes with enumeration")
     func generationSchemaEnumerationInitialization() {
-        // Test enumeration schema initialization
+        // Test enumeration schema initialization using String type with anyOf
         let schema = GenerationSchema(
-            type: "string",
+            type: String.self,
             description: "Test enumeration",
             anyOf: ["option1", "option2", "option3"]
         )

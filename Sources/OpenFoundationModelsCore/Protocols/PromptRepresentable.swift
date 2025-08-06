@@ -10,7 +10,13 @@ import Foundation
 /// ✅ CONFIRMED: Referenced in Apple documentation for:
 /// - Generable protocol inheritance
 public protocol PromptRepresentable {
-    /// Required property with default implementation
-    /// ✅ CONFIRMED: promptRepresentation property from Apple docs
-    var promptRepresentation: Prompt { get }
+    /// An instance that represents a prompt.
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// An instance that represents a prompt.
+    /// 
+    /// **Source:** https://developer.apple.com/documentation/foundationmodels/promptrepresentable/promptrepresentation
+    /// 
+    /// **Apple Official API:** `@PromptBuilder var promptRepresentation: Prompt { get }`
+    @PromptBuilder var promptRepresentation: Prompt { get }
 }

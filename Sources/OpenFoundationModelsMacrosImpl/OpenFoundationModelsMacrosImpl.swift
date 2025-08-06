@@ -767,6 +767,8 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         if hasAnyAssociatedValues {
             // Mixed enum with both simple and associated value cases
             // Use object type with discriminated union approach
+            let caseNames = cases.map { "\"\($0.name)\"" }.joined(separator: ", ")
+            
             return DeclSyntax(stringLiteral: """
             public static var generationSchema: GenerationSchema {
                 // ✅ CONFIRMED: Apple generates discriminated union schema for enums with associated values
@@ -775,22 +777,22 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                     type: "object",
                     description: \(description.map { "\"\($0)\"" } ?? "\"Generated \(enumName)\""),
                     properties: [
-                        "case": GenerationSchema(type: "string", description: "Enum case identifier", anyOf: [\(cases.map { "\"\($0.name)\"" }.joined(separator: ", "))]),
+                        "case": GenerationSchema(type: String.self, description: "Enum case identifier", anyOf: [\(caseNames)]),
                         "value": GenerationSchema(type: "object", description: "Associated value data", properties: [:])
                     ]
                 )
             }
             """)
         } else {
-            // Simple enum cases only (existing logic)
+            // Simple enum cases only - use type initializer with anyOf
             let caseNames = cases.map { "\"\($0.name)\"" }.joined(separator: ", ")
             
             return DeclSyntax(stringLiteral: """
             public static var generationSchema: GenerationSchema {
                 // ✅ CONFIRMED: Apple generates generationSchema for simple enums
-                // Create schema for simple enum with anyOf containing possible case names
+                // Create schema for simple enum using type initializer with anyOf
                 return GenerationSchema(
-                    type: "string",
+                    type: String.self,
                     description: \(description.map { "\"\($0)\"" } ?? "\"Generated \(enumName)\""),
                     anyOf: [\(caseNames)]
                 )

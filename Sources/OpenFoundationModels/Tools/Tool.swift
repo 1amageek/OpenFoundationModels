@@ -56,7 +56,22 @@ import Foundation
 ///     }
 /// }
 /// ```
-public protocol Tool: Sendable, SendableMetatype {
+public protocol Tool<Arguments, Output>: Sendable, SendableMetatype {
+    /// The output that this tool produces for the language model to reason about in subsequent
+    /// interactions.
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// The output that this tool produces for the language model to reason about in subsequent interactions.
+    /// 
+    /// **Source:** https://developer.apple.com/documentation/foundationmodels/tool/output
+    /// 
+    /// **Apple Official API:** `associatedtype Output : PromptRepresentable`
+    /// 
+    /// **Required**
+    /// 
+    /// **Note:** Typically output is either a String or a Generable type.
+    associatedtype Output: PromptRepresentable
+    
     /// The arguments that this tool should accept.
     /// 
     /// **Apple Foundation Models Documentation:**
@@ -68,22 +83,8 @@ public protocol Tool: Sendable, SendableMetatype {
     /// 
     /// **Required**
     /// 
-    /// **Note:** Arguments typically are Generable types for schema generation
+    /// **Note:** Typically arguments are either a Generable type or GeneratedContent.
     associatedtype Arguments: ConvertibleFromGeneratedContent
-    
-    /// The output that this tool generates.
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// The output that this tool generates.
-    /// 
-    /// **Source:** https://developer.apple.com/documentation/foundationmodels/tool/output
-    /// 
-    /// **Apple Official API:** `associatedtype Output : PromptRepresentable`
-    /// 
-    /// **Required**
-    /// 
-    /// **Note:** Output must be representable as a prompt for the model
-    associatedtype Output: PromptRepresentable
     
     /// A unique name for the tool, such as "get_weather", "toggleDarkMode", or "search contacts".
     /// 
@@ -156,43 +157,7 @@ public protocol Tool: Sendable, SendableMetatype {
 /// **Apple Foundation Models Documentation:**
 /// Default implementations for Tool protocol properties
 extension Tool {
-    /// Default implementation: include schema in instructions
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// By default, includes the tool's schema in session instructions.
-    /// 
-    /// **Source:** https://developer.apple.com/documentation/foundationmodels/tool/includesschemaininstructions
-    /// 
-    /// **Apple Official API:** Default implementation provided.
-    public var includesSchemaInInstructions: Bool {
-        return true
-    }
-    
-    /// Default implementation: generate schema from Arguments type
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Automatically generates a schema based on the tool's Arguments type.
-    /// 
-    /// **Source:** https://developer.apple.com/documentation/foundationmodels/tool/parameters
-    /// 
-    /// **Apple Official API:** Default implementation provided.
-    public var parameters: GenerationSchema {
-        // If Arguments conforms to Generable, use its generationSchema
-        if let generableType = Arguments.self as? any Generable.Type {
-            return generableType.generationSchema
-        }
-        // Otherwise, create a basic schema for ConvertibleFromGeneratedContent types
-        // Note: Even though String conforms to Generable, when used as typealias Arguments = String,
-        // the cast above may fail due to Swift type system limitations
-        // For now, return object type as default
-        return GenerationSchema(
-            type: "object", 
-            description: "Tool arguments for \(name)",
-            properties: [:] // Empty properties for object type
-        )
-    }
-    
-    /// Default implementation: use type name as tool name
+    /// A unique name for the tool, such as "get_weather", "toggleDarkMode", or "search contacts".
     /// 
     /// **Apple Foundation Models Documentation:**
     /// By default, uses the type name as the tool name.
@@ -202,6 +167,65 @@ extension Tool {
     /// **Apple Official API:** Default implementation provided.
     public var name: String {
         return String(describing: type(of: self))
+    }
+    
+    /// If true, the model's name, description, and parameters schema will be injected
+    /// into the instructions of sessions that leverage this tool.
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// The default implementation is `true`
+    /// 
+    /// **Source:** https://developer.apple.com/documentation/foundationmodels/tool/includesschemaininstructions
+    /// 
+    /// **Apple Official API:** Default implementation provided.
+    /// 
+    /// **Note:** This should only be `false` if the model has been trained to have
+    /// innate knowledge of this tool. For zero-shot prompting, it should always be `true`.
+    public var includesSchemaInInstructions: Bool {
+        return true
+    }
+}
+
+// MARK: - Parameters Default Implementation for Generable Arguments
+/// **Apple Foundation Models Documentation:**
+/// Default implementation for parameters when Arguments conforms to Generable
+extension Tool where Self.Arguments: Generable {
+    /// A schema for the parameters this tool accepts.
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// Automatically generates a schema based on the tool's Arguments type when it conforms to Generable.
+    /// 
+    /// **Source:** https://developer.apple.com/documentation/foundationmodels/tool/parameters
+    /// 
+    /// **Apple Official API:** Default implementation provided for Generable Arguments.
+    public var parameters: GenerationSchema {
+        return Arguments.generationSchema
+    }
+}
+
+// MARK: - Parameters Default Implementation for Non-Generable Arguments
+/// **Apple Foundation Models Documentation:**
+/// Default implementation for parameters when Arguments doesn't conform to Generable
+extension Tool {
+    /// A schema for the parameters this tool accepts.
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// Provides a basic object schema when Arguments doesn't conform to Generable.
+    /// 
+    /// **Source:** https://developer.apple.com/documentation/foundationmodels/tool/parameters
+    /// 
+    /// **Apple Official API:** Default implementation provided.
+    public var parameters: GenerationSchema {
+        // Check if Arguments conforms to Generable at runtime
+        if let generableType = Arguments.self as? any Generable.Type {
+            return generableType.generationSchema
+        }
+        // Otherwise, return a basic object schema
+        return GenerationSchema(
+            type: "object",
+            description: "Tool arguments for \(name)",
+            properties: [:]
+        )
     }
 }
 

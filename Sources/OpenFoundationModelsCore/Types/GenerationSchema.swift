@@ -23,29 +23,42 @@ import Foundation
 /// - Encodable
 /// - Sendable
 /// - SendableMetatype
-public struct GenerationSchema: CustomDebugStringConvertible, Decodable, Encodable, Sendable, SendableMetatype {
+public struct GenerationSchema: CustomDebugStringConvertible, Decodable, Encodable, Equatable, Sendable, SendableMetatype {
     
     /// Internal schema representation
     private let schemaType: SchemaType
     private let _description: String?
     
     /// Schema type enumeration
-    private indirect enum SchemaType: Sendable {
+    internal indirect enum SchemaType: Sendable, Equatable {
         case object(properties: [GenerationSchema.Property])
         case enumeration(values: [String])
         case dynamic(root: DynamicGenerationSchema, dependencies: [DynamicGenerationSchema])
+        case array(items: GenerationSchema?)
+        case primitive(type: String)
     }
     
     /// Additional initializer for compatibility with Apple's API
-    public init(type: String, description: String? = nil, properties: [String: GenerationSchema]? = nil, required: [String]? = nil, items: GenerationSchema? = nil, anyOf: [String] = []) {
+    public init(type: String, description: String? = nil, properties: [String: GenerationSchema]? = nil, required: [String]? = nil, items: GenerationSchema? = nil, anyOf: [GenerationSchema] = []) {
         if !anyOf.isEmpty {
-            self.schemaType = .enumeration(values: anyOf)
-        } else {
+            // For anyOf, we'll use the first schema type and merge information
+            // This is a simplified implementation - in practice, anyOf would need more complex handling
+            if let first = anyOf.first {
+                self.schemaType = .primitive(type: first.type)
+            } else {
+                self.schemaType = .primitive(type: type)
+            }
+        } else if type == "array" {
+            self.schemaType = .array(items: items)
+        } else if let properties = properties {
             // Convert dictionary properties to Property array
-            let propertyArray = properties?.map { key, value in
+            let propertyArray = properties.map { key, value in
                 GenerationSchema.Property(name: key, description: value.description, type: String.self, guides: [])
-            } ?? []
+            }
             self.schemaType = .object(properties: propertyArray)
+        } else {
+            // Primitive type
+            self.schemaType = .primitive(type: type)
         }
         self._description = description
     }
@@ -59,6 +72,20 @@ public struct GenerationSchema: CustomDebugStringConvertible, Decodable, Encodab
             return "string"
         case .dynamic:
             return "object"
+        case .array:
+            return "array"
+        case .primitive(type: let type):
+            return type
+        }
+    }
+    
+    /// The items schema for array types
+    public var items: GenerationSchema? {
+        switch schemaType {
+        case .array(let items):
+            return items
+        default:
+            return nil
         }
     }
     
@@ -71,7 +98,7 @@ public struct GenerationSchema: CustomDebugStringConvertible, Decodable, Encodab
                 dict[prop.name] = GenerationSchema(type: prop.typeDescription, description: prop.propertyDescription)
             }
             return dict.isEmpty ? nil : dict
-        case .enumeration, .dynamic:
+        case .enumeration, .dynamic, .array, .primitive:
             return nil
         }
     }
@@ -81,17 +108,10 @@ public struct GenerationSchema: CustomDebugStringConvertible, Decodable, Encodab
         switch schemaType {
         case .object(let props):
             return props.map { $0.name }
-        case .enumeration, .dynamic:
+        case .enumeration, .dynamic, .array, .primitive:
             return nil
         }
     }
-    
-    /// The schema for array items (for array types)
-    public var items: GenerationSchema? {
-        // Not used in current implementation
-        return nil
-    }
-    
     /// The description of this schema
     public var description: String? {
         return _description
@@ -132,6 +152,12 @@ public struct GenerationSchema: CustomDebugStringConvertible, Decodable, Encodab
         self._description = description
     }
     
+    /// Internal initializer for direct schema type creation
+    internal init(schemaType: SchemaType, description: String? = nil) {
+        self.schemaType = schemaType
+        self._description = description
+    }
+    
     // MARK: - Apple Confirmed Properties
     
     /// Debug description
@@ -145,6 +171,14 @@ public struct GenerationSchema: CustomDebugStringConvertible, Decodable, Encodab
             return "GenerationSchema(enum: \(values))"
         case .dynamic(_, let dependencies):
             return "GenerationSchema(dynamic: root + \(dependencies.count) dependencies)"
+        case .array(let items):
+            if let items = items {
+                return "GenerationSchema(array of: \(items.debugDescription))"
+            } else {
+                return "GenerationSchema(array)"
+            }
+        case .primitive(type: let type):
+            return "GenerationSchema(\(type))"
         }
     }
     
@@ -205,7 +239,7 @@ public struct GenerationSchema: CustomDebugStringConvertible, Decodable, Encodab
             
             return schema
             
-        case .dynamic(let root, let dependencies):
+        case .dynamic(_, _):
             // For dynamic schemas, convert to object schema
             var schema: [String: Any] = [
                 "type": "object"
@@ -215,37 +249,29 @@ public struct GenerationSchema: CustomDebugStringConvertible, Decodable, Encodab
                 schema["description"] = description
             }
             
-            // Build properties from root and dependencies
-            var propertiesDict: [String: Any] = [:]
-            var requiredFields: [String] = []
-            
-            // Note: DynamicGenerationSchema properties are [String: GenerationSchema]
+            // Dynamic schemas are complex and would need full conversion
             // This is a simplified implementation
-            if let rootProperties = root.properties {
-                for (name, schema) in rootProperties {
-                    propertiesDict[name] = [
-                        "type": schema.type,
-                        "description": schema.description ?? ""
-                    ]
-                    requiredFields.append(name)
-                }
+            return schema
+            
+        case .array(let items):
+            var schema: [String: Any] = [
+                "type": "array"
+            ]
+            if let description = _description {
+                schema["description"] = description
             }
-            
-            for dependency in dependencies {
-                if let depProperties = dependency.properties {
-                    for (name, schema) in depProperties {
-                        propertiesDict[name] = [
-                            "type": schema.type,
-                            "description": schema.description ?? ""
-                        ]
-                        requiredFields.append(name)
-                    }
-                }
+            if let items = items {
+                schema["items"] = items.toSchemaDictionary()
             }
+            return schema
             
-            schema["properties"] = propertiesDict
-            schema["required"] = requiredFields
-            
+        case .primitive(type: let type):
+            var schema: [String: Any] = [
+                "type": type
+            ]
+            if let description = _description {
+                schema["description"] = description
+            }
             return schema
         }
     }
@@ -379,6 +405,16 @@ extension GenerationSchema {
         case .dynamic:
             // Dynamic schemas are complex - simplified for now
             try container.encode("object", forKey: .type)
+            
+        case .array(let items):
+            try container.encode("array", forKey: .type)
+            // Encode items if present
+            if let items = items {
+                try container.encode(items, forKey: .items)
+            }
+            
+        case .primitive(type: let type):
+            try container.encode(type, forKey: .type)
         }
     }
 }
@@ -715,6 +751,48 @@ extension GenerationGuide {
     public static func maximumCount<Element: Sendable>(_ count: Int) -> GenerationGuide<[Element]> where Value == [Element] {
         return GenerationGuide<[Element]>(type: .maximumCount, value: [])
     }
+    
+    /// Enforces that the number of elements in the array fall within a closed range.
+    /// 
+    /// **Apple Foundation Models Documentation:**
+    /// Enforces that the number of elements in the array fall within a closed range.
+    /// 
+    /// **Apple Official API:** `static func count<Element>(_ range: ClosedRange<Int>) -> GenerationGuide<[Element]>`
+    /// where Value == [Element]
+    /// 
+    /// - Parameter range: The range of allowed element counts
+    /// - Returns: A generation guide that enforces the count range
+    public static func count<Element: Sendable>(_ range: ClosedRange<Int>) -> GenerationGuide<[Element]> where Value == [Element] {
+        return GenerationGuide<[Element]>(type: .count, value: [])
+    }
+    
+}
+
+// MARK: - Never Array Guides (for macro expansion)
+extension GenerationGuide where Value == [Never] {
+    /// Enforces a minimum number of elements in the array.
+    /// - Warning: This overload is only used for macro expansion. Don't call `GenerationGuide<[Never]>.minimumCount(_:)` on your own.
+    public static func minimumCount(_ count: Int) -> GenerationGuide<Value> {
+        return GenerationGuide<Value>(type: .minimumCount, value: [])
+    }
+    
+    /// Enforces a maximum number of elements in the array.
+    /// - Warning: This overload is only used for macro expansion. Don't call `GenerationGuide<[Never]>.maximumCount(_:)` on your own.
+    public static func maximumCount(_ count: Int) -> GenerationGuide<Value> {
+        return GenerationGuide<Value>(type: .maximumCount, value: [])
+    }
+    
+    /// Enforces that the number of elements in the array fall within a closed range.
+    /// - Warning: This overload is only used for macro expansion. Don't call `GenerationGuide<[Never]>.count(_:)` on your own.
+    public static func count(_ range: ClosedRange<Int>) -> GenerationGuide<Value> {
+        return GenerationGuide<Value>(type: .count, value: [])
+    }
+    
+    /// Enforces that the array has exactly a certain number elements.
+    /// - Warning: This overload is only used for macro expansion. Don't call `GenerationGuide<[Never]>.count(_:)` on your own.
+    public static func count(_ count: Int) -> GenerationGuide<Value> {
+        return GenerationGuide<Value>(type: .count, value: [])
+    }
 }
 
 extension GenerationGuide where Value == Decimal {
@@ -773,6 +851,32 @@ extension GenerationGuide where Value == Decimal {
 // Additional overloads for Int and Double types
 extension GenerationGuide where Value == ClosedRange<Int> {
     /// Enforces values fall within a range.
+    public static func range(_ range: ClosedRange<Int>) -> GenerationGuide<Int> {
+        return GenerationGuide<Int>(type: .range, value: range.lowerBound)
+    }
+}
+
+// MARK: - Float Guides
+extension GenerationGuide where Value == Float {
+    /// Enforces a minimum value.
+    public static func minimum(_ value: Float) -> GenerationGuide<Float> {
+        return GenerationGuide<Float>(type: .minimum, value: value)
+    }
+    
+    /// Enforces a maximum value.
+    public static func maximum(_ value: Float) -> GenerationGuide<Float> {
+        return GenerationGuide<Float>(type: .maximum, value: value)
+    }
+    
+    /// Enforces values fall within a range.
+    public static func range(_ range: ClosedRange<Float>) -> GenerationGuide<Float> {
+        return GenerationGuide<Float>(type: .range, value: range.lowerBound)
+    }
+}
+
+
+extension GenerationGuide where Value == ClosedRange<Int> {
+    /// Enforces values fall within a range.
     /// 
     /// **Apple Foundation Models Documentation:**
     /// Enforces values fall within a range.
@@ -787,6 +891,8 @@ extension GenerationGuide where Value == ClosedRange<Int> {
     }
 }
 
+
+// MARK: - Int Guides
 extension GenerationGuide where Value == Int {
     /// Enforces a minimum value.
     /// 
@@ -982,323 +1088,6 @@ public struct AnyGenerationGuide: @unchecked Sendable, SendableMetatype {
     }
 }
 
-/// A generation schema that you can create at runtime.
-/// 
-/// **Apple Foundation Models Documentation:**
-/// The dynamic counterpart to the generation schema type that you use to construct schemas at runtime.
-/// An individual schema may reference other schemas by name, and references are resolved when converting a set of dynamic schemas into a GenerationSchema.
-/// 
-/// **Source:** https://developer.apple.com/documentation/foundationmodels/dynamicgenerationschema
-/// 
-/// **Apple Official API:** `struct DynamicGenerationSchema`
-/// - iOS 26.0+, iPadOS 26.0+, macOS 26.0+, visionOS 26.0+
-/// - Beta Software: Contains preliminary API information
-/// 
-/// **Conformances:**
-/// - Sendable
-/// - SendableMetatype
-public struct DynamicGenerationSchema: Sendable, SendableMetatype {
-    /// Internal representation of the schema type
-    private indirect enum SchemaType: Sendable {
-        case object(name: String, properties: [Property])
-        case array(elementSchema: DynamicGenerationSchema, minElements: Int?, maxElements: Int?)
-        case anyOf(name: String, choices: [DynamicGenerationSchema])
-        case reference(to: String)
-        case primitive(type: any Generable.Type, guides: [String])
-    }
-    
-    /// The internal schema type
-    private let schemaType: SchemaType
-    
-    /// A description of what this schema represents
-    private let _description: String?
-    
-    /// The name of this schema (for references)
-    public var name: String? {
-        switch schemaType {
-        case .object(let name, _), .anyOf(let name, _):
-            return name
-        case .array, .reference, .primitive:
-            return nil
-        }
-    }
-    
-    /// Computed property for description
-    public var description: String? {
-        return _description
-    }
-    
-    /// Creates an array schema.
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Creates an array schema.
-    /// 
-    /// **Source:** https://developer.apple.com/documentation/foundationmodels/dynamicgenerationschema/init(arrayof:minimumelements:maximumelements:)
-    /// 
-    /// **Apple Official API:** `init(arrayOf:minimumElements:maximumElements:)`
-    /// 
-    /// - Parameters:
-    ///   - itemSchema: The schema for array elements
-    ///   - minimumElements: The minimum number of elements
-    ///   - maximumElements: The maximum number of elements
-    public init(
-        arrayOf itemSchema: DynamicGenerationSchema,
-        minimumElements: Int? = nil,
-        maximumElements: Int? = nil
-    ) {
-        self.schemaType = .array(elementSchema: itemSchema, minElements: minimumElements, maxElements: maximumElements)
-        self._description = nil
-    }
-    
-    /// Creates an any-of schema.
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Creates an any-of schema.
-    /// 
-    /// **Source:** https://developer.apple.com/documentation/foundationmodels/dynamicgenerationschema/init(name:description:anyof:)
-    /// 
-    /// **Apple Official API:** `init(name:description:anyOf:)`
-    /// 
-    /// - Parameters:
-    ///   - name: A name this schema can be referenced by
-    ///   - description: A natural language description of this DynamicGenerationSchema
-    ///   - choices: An array of schemas this one will be a union of
-    public init(
-        name: String,
-        description: String? = nil,
-        anyOf choices: [DynamicGenerationSchema]
-    ) {
-        self.schemaType = .anyOf(name: name, choices: choices)
-        self._description = description
-    }
-    
-    /// Creates an object schema.
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Creates an object schema.
-    /// 
-    /// **Source:** https://developer.apple.com/documentation/foundationmodels/dynamicgenerationschema/init(name:description:properties:)
-    /// 
-    /// **Apple Official API:** `init(name:description:properties:)`
-    /// 
-    /// - Parameters:
-    ///   - name: A name this dynamic schema can be referenced by
-    ///   - description: A natural language description of this schema
-    ///   - properties: The properties to associated with this schema
-    public init(
-        name: String,
-        description: String? = nil,
-        properties: [DynamicGenerationSchema.Property]
-    ) {
-        self.schemaType = .object(name: name, properties: properties)
-        self._description = description
-    }
-    
-    /// Creates a reference schema.
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Creates an refrence schema.
-    /// 
-    /// **Source:** https://developer.apple.com/documentation/foundationmodels/dynamicgenerationschema/init(referenceto:)
-    /// 
-    /// **Apple Official API:** `init(referenceTo:)`
-    /// 
-    /// - Parameter name: The name of the DynamicGenerationSchema this is a reference to
-    public init(referenceTo name: String) {
-        self.schemaType = .reference(to: name)
-        self._description = nil
-    }
-    
-    /// Creates a schema from a generable type and guides.
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Creates a schema from a generable type and guides.
-    /// 
-    /// **Source:** https://developer.apple.com/documentation/foundationmodels/dynamicgenerationschema/init(type:guides:)
-    /// 
-    /// **Apple Official API:** `init<Value>(type:guides:) where Value : Generable`
-    /// 
-    /// - Parameters:
-    ///   - type: A Generable type
-    ///   - guides: Generation guides to apply to this DynamicGenerationSchema
-    public init<Value>(
-        type: Value.Type,
-        guides: [GenerationGuide<Value>] = []
-    ) where Value : Generable {
-        self.schemaType = .primitive(type: type, guides: guides.map { String(describing: $0) })
-        self._description = nil
-    }
-    
-    /// DEPRECATED: Legacy initializer for backward compatibility
-    /// This initializer doesn't match Apple's API and should not be used
-    @available(*, deprecated, message: "Use one of the specific initializers instead")
-    public init(
-        type: String,
-        properties: [String: GenerationSchema]? = nil,
-        required: [String]? = nil,
-        items: GenerationSchema? = nil,
-        description: String? = nil
-    ) {
-        // Convert to object schema for backward compatibility
-        if let properties = properties {
-            let props = properties.map { key, schema in
-                Property(name: key, description: schema.description, schema: DynamicGenerationSchema(schema), isOptional: !(required?.contains(key) ?? true))
-            }
-            self.schemaType = .object(name: "LegacySchema", properties: props)
-        } else if let items = items {
-            self.schemaType = .array(elementSchema: DynamicGenerationSchema(items), minElements: nil, maxElements: nil)
-        } else {
-            self.schemaType = .object(name: "EmptySchema", properties: [])
-        }
-        self._description = description
-    }
-    
-    /// Creates a dynamic generation schema from a static generation schema.
-    /// 
-    /// **Apple Foundation Models Documentation:**
-    /// Creates a dynamic generation schema from a static generation schema.
-    /// 
-    /// **Source:** https://developer.apple.com/documentation/foundationmodels/dynamicgenerationschema/init(_:)
-    /// 
-    /// **Apple Official API:** `init(_: GenerationSchema)`
-    /// 
-    /// - Parameter schema: The static generation schema to convert
-    public init(_ schema: GenerationSchema) {
-        // Convert static schema to dynamic (implementation detail)
-        // This is a simplified conversion
-        if let properties = schema.properties {
-            let props = properties.map { key, value in
-                Property(name: key, description: value.description, schema: DynamicGenerationSchema(value), isOptional: false)
-            }
-            self.schemaType = .object(name: "ConvertedSchema", properties: props)
-        } else {
-            self.schemaType = .object(name: "EmptySchema", properties: [])
-        }
-        self._description = schema.description
-    }
-    
-    // Legacy computed properties for backward compatibility
-    public var type: String {
-        switch schemaType {
-        case .object: return "object"
-        case .array: return "array"
-        case .anyOf: return "anyOf"
-        case .reference: return "reference"
-        case .primitive: return "primitive"
-        }
-    }
-    
-    public var properties: [String: GenerationSchema]? {
-        switch schemaType {
-        case .object(_, let props):
-            // Convert properties to GenerationSchema dictionary for compatibility
-            var dict: [String: GenerationSchema] = [:]
-            for prop in props {
-                // This is a simplified conversion
-                dict[prop.name] = GenerationSchema(type: "string", description: prop.description)
-            }
-            return dict.isEmpty ? nil : dict
-        default:
-            return nil
-        }
-    }
-    
-    public var required: [String]? {
-        switch schemaType {
-        case .object(_, let props):
-            let requiredProps = props.filter { !$0.isOptional }.map { $0.name }
-            return requiredProps.isEmpty ? nil : requiredProps
-        default:
-            return nil
-        }
-    }
-    
-    public var items: GenerationSchema? {
-        switch schemaType {
-        case .array(let elementSchema, _, _):
-            // Convert DynamicGenerationSchema to GenerationSchema
-            // This is a simplified conversion - in production would need proper mapping
-            return GenerationSchema(type: "array", description: elementSchema.description, properties: [:])
-        default:
-            return nil
-        }
-    }
-}
-
-// MARK: - DynamicGenerationSchema.Property
-
-/// A property that belongs to a dynamic generation schema.
-/// 
-/// **Apple Foundation Models Documentation:**
-/// Fields are named members of object types. Fields are strongly typed and have optional descriptions.
-/// 
-/// **Source:** https://developer.apple.com/documentation/foundationmodels/dynamicgenerationschema/property
-/// 
-/// **Apple Official API:** `struct Property`
-/// - iOS 26.0+, iPadOS 26.0+, macOS 26.0+, visionOS 26.0+
-/// - Beta Software: Contains preliminary API information
-extension DynamicGenerationSchema {
-    public struct Property: Sendable {
-        /// A name for this property
-        public let name: String
-        
-        /// An optional natural language description of this property's contents
-        public let description: String?
-        
-        /// A schema representing the type this property contains
-        public let schema: DynamicGenerationSchema
-        
-        /// Determines if this property is required or not
-        public let isOptional: Bool
-        
-        /// Creates a property referencing a dynamic schema.
-        /// 
-        /// **Apple Foundation Models Documentation:**
-        /// Creates a property referencing a dynamic schema.
-        /// 
-        /// **Source:** https://developer.apple.com/documentation/foundationmodels/dynamicgenerationschema/property/init(name:description:schema:isoptional:)
-        /// 
-        /// **Apple Official API:** `init(name:description:schema:isOptional:)`
-        /// 
-        /// - Parameters:
-        ///   - name: A name for this property
-        ///   - description: An optional natural language description of this property's contents
-        ///   - schema: A schema representing the type this property contains
-        ///   - isOptional: Determines if this property is required or not
-        public init(
-            name: String,
-            description: String? = nil,
-            schema: DynamicGenerationSchema,
-            isOptional: Bool = false
-        ) {
-            self.name = name
-            self.description = description
-            self.schema = schema
-            self.isOptional = isOptional
-        }
-    }
-}
-
-// MARK: - DynamicGenerationSchema Extensions
-
-extension DynamicGenerationSchema: CustomDebugStringConvertible {
-    /// String representation of the dynamic generation schema
-    public var debugDescription: String {
-        switch schemaType {
-        case .object(let name, let properties):
-            return "DynamicGenerationSchema.object(name: \(name), properties: \(properties.count))"
-        case .array(_, let min, let max):
-            return "DynamicGenerationSchema.array(min: \(min ?? 0), max: \(max ?? -1))"
-        case .anyOf(let name, let choices):
-            return "DynamicGenerationSchema.anyOf(name: \(name), choices: \(choices.count))"
-        case .reference(let to):
-            return "DynamicGenerationSchema.reference(to: \(to))"
-        case .primitive(let type, let guides):
-            return "DynamicGenerationSchema.primitive(type: \(type), guides: \(guides.count))"
-        }
-    }
-}
-
 // MARK: - Extension for Nested Types
 
 extension GenerationSchema {
@@ -1378,6 +1167,17 @@ extension GenerationSchema {
         internal var propertyDescription: String {
             return description ?? ""
         }
+    }
+}
+
+// MARK: - Property Equatable Conformance
+
+extension GenerationSchema.Property: Equatable {
+    public static func == (lhs: GenerationSchema.Property, rhs: GenerationSchema.Property) -> Bool {
+        return lhs.name == rhs.name &&
+               String(describing: lhs.type) == String(describing: rhs.type) &&
+               lhs.description == rhs.description &&
+               lhs.regexPatterns == rhs.regexPatterns
     }
 }
 

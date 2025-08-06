@@ -11,7 +11,7 @@ import Foundation
 /// - Tool.Arguments constraint
 /// - Generable protocol inheritance
 /// - PartiallyGenerated associated type constraint
-public protocol ConvertibleFromGeneratedContent {
+public protocol ConvertibleFromGeneratedContent: SendableMetatype {
     /// Create an instance from generated content
     /// - Parameter content: The generated content to convert from
     /// - Throws: If the content cannot be converted to this type

@@ -1,0 +1,225 @@
+// StandardTypeConformances.swift
+// OpenFoundationModels
+//
+// ✅ APPLE OFFICIAL: Standard type conformances to Generable
+
+import Foundation
+import OpenFoundationModelsCore
+
+// MARK: - Bool Generable Conformance
+
+extension Bool: Generable {
+    /// An instance of the generation schema.
+    public static var generationSchema: GenerationSchema {
+        return GenerationSchema(
+            type: "boolean",
+            description: "A boolean value"
+        )
+    }
+    
+    /// Creates an instance with the content.
+    public init(_ content: GeneratedContent) throws {
+        let text = content.text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        switch text {
+        case "true", "yes", "1":
+            self = true
+        case "false", "no", "0":
+            self = false
+        default:
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: [],
+                    debugDescription: "Unable to decode Bool from: \(content.text)"
+                )
+            )
+        }
+    }
+    
+    /// An instance that represents the generated content.
+    public var generatedContent: GeneratedContent {
+        return GeneratedContent(self ? "true" : "false")
+    }
+    
+    /// Convert to partially generated representation
+    public func asPartiallyGenerated() -> Bool {
+        return self
+    }
+}
+
+// MARK: - Int Generable Conformance
+
+extension Int: Generable {
+    /// An instance of the generation schema.
+    public static var generationSchema: GenerationSchema {
+        return GenerationSchema(
+            type: "integer",
+            description: "An integer value"
+        )
+    }
+    
+    /// Creates an instance with the content.
+    public init(_ content: GeneratedContent) throws {
+        let text = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let value = Int(text) else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: [],
+                    debugDescription: "Unable to decode Int from: \(content.text)"
+                )
+            )
+        }
+        self = value
+    }
+    
+    /// An instance that represents the generated content.
+    public var generatedContent: GeneratedContent {
+        return GeneratedContent(String(self))
+    }
+    
+    /// Convert to partially generated representation
+    public func asPartiallyGenerated() -> Int {
+        return self
+    }
+}
+
+// MARK: - Float Generable Conformance
+
+extension Float: Generable {
+    /// An instance of the generation schema.
+    public static var generationSchema: GenerationSchema {
+        return GenerationSchema(
+            type: "number",
+            description: "A floating-point number"
+        )
+    }
+    
+    /// Creates an instance with the content.
+    public init(_ content: GeneratedContent) throws {
+        let text = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let value = Float(text) else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: [],
+                    debugDescription: "Unable to decode Float from: \(content.text)"
+                )
+            )
+        }
+        self = value
+    }
+    
+    /// An instance that represents the generated content.
+    public var generatedContent: GeneratedContent {
+        return GeneratedContent(String(self))
+    }
+    
+    /// Convert to partially generated representation
+    public func asPartiallyGenerated() -> Float {
+        return self
+    }
+}
+
+// MARK: - Double Generable Conformance
+
+extension Double: Generable {
+    /// An instance of the generation schema.
+    public static var generationSchema: GenerationSchema {
+        return GenerationSchema(
+            type: "number",
+            description: "A double-precision floating-point number"
+        )
+    }
+    
+    /// Creates an instance with the content.
+    public init(_ content: GeneratedContent) throws {
+        let text = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let value = Double(text) else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: [],
+                    debugDescription: "Unable to decode Double from: \(content.text)"
+                )
+            )
+        }
+        self = value
+    }
+    
+    /// An instance that represents the generated content.
+    public var generatedContent: GeneratedContent {
+        return GeneratedContent(String(self))
+    }
+    
+    /// Convert to partially generated representation
+    public func asPartiallyGenerated() -> Double {
+        return self
+    }
+}
+
+// MARK: - Decimal Generable Conformance
+
+extension Decimal: Generable {
+    /// An instance of the generation schema.
+    public static var generationSchema: GenerationSchema {
+        return GenerationSchema(
+            type: "number",
+            description: "A decimal number with arbitrary precision"
+        )
+    }
+    
+    /// Creates an instance with the content.
+    public init(_ content: GeneratedContent) throws {
+        let text = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let value = Decimal(string: text) else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: [],
+                    debugDescription: "Unable to decode Decimal from: \(content.text)"
+                )
+            )
+        }
+        self = value
+    }
+    
+    /// An instance that represents the generated content.
+    public var generatedContent: GeneratedContent {
+        return GeneratedContent(String(describing: self))
+    }
+    
+    /// Convert to partially generated representation
+    public func asPartiallyGenerated() -> Decimal {
+        return self
+    }
+}
+
+// MARK: - Never Generable Conformance
+
+extension Never: Generable {
+    /// An instance of the generation schema.
+    public static var generationSchema: GenerationSchema {
+        return GenerationSchema(
+            type: "null",
+            description: "Never type (uninhabited)"
+        )
+    }
+    
+    /// Creates an instance with the content.
+    public init(_ content: GeneratedContent) throws {
+        throw DecodingError.dataCorrupted(
+            DecodingError.Context(
+                codingPath: [],
+                debugDescription: "Cannot create an instance of Never"
+            )
+        )
+    }
+    
+    /// An instance that represents the generated content.
+    public var generatedContent: GeneratedContent {
+        // This will never be called since Never has no instances
+        fatalError("Never has no instances")
+    }
+    
+    /// Convert to partially generated representation
+    public func asPartiallyGenerated() -> Never {
+        // This will never be called since Never has no instances
+        fatalError("Never has no instances")
+    }
+}
