@@ -166,12 +166,15 @@ struct GuidedGenerationTests {
     
     @Test("Generable protocol methods exist")
     func generableProtocolMethodsExist() throws {
-        let item = try TestItem(GeneratedContent("{}"))
+        // Test with actual JSON data containing a value
+        let json = #"{"value": "test"}"#
+        let item = try TestItem(GeneratedContent(json))
         
         // Test that protocol methods are generated
         let generatedContent = item.generatedContent
-        // With Kind.structure format, the output is different
+        // Check that it contains the value (format may differ)
         #expect(generatedContent.stringValue.contains("value"))
+        #expect(generatedContent.stringValue.contains("test"))
         
         // Test generatedContent property
         let converted = item.generatedContent
@@ -180,6 +183,11 @@ struct GuidedGenerationTests {
         // Test asPartiallyGenerated method
         let partial = item.asPartiallyGenerated()
         #expect(partial.value == item.value)
+        
+        // Also test with empty JSON
+        let emptyItem = try TestItem(GeneratedContent("{}"))
+        let emptyPartial = emptyItem.asPartiallyGenerated()
+        #expect(emptyPartial.value == nil) // Empty JSON has no value property
     }
     
     @Test("Generable with simple array properties")

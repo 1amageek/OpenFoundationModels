@@ -102,19 +102,18 @@ struct ResponseStreamTests {
         #expect(finalResponse.transcriptEntries.isEmpty) // No transcript entries in mock
     }
     
-    @Test("ResponseStream collect() with no complete response throws error")
-    func responseStreamCollectIncomplete() async throws {
+    @Test("ResponseStream collect() with String returns last value")
+    func responseStreamCollectWithString() async throws {
         let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
             continuation.yield("partial")
-            continuation.finish() // No complete response
+            continuation.finish()
         }
         
         let responseStream = ResponseStream<String>(stream: stream)
         
-        // Should throw when no complete response is found
-        await #expect(throws: GenerationError.self) {
-            try await responseStream.collect()
-        }
+        // For String type, collect() returns the last value since String has no concept of "complete"
+        let response = try await responseStream.collect()
+        #expect(response.content == "partial")
     }
     
     @Test("ResponseStream collectPartials() helper method")

@@ -170,8 +170,8 @@ struct PartiallyGeneratedTests {
         await withTaskGroup(of: Void.self) { group in
             group.addTask {
                 let asyncPartial = partial
-                #expect(asyncPartial.message == "")
-                #expect(asyncPartial.value == 0)
+                #expect(asyncPartial.message == nil)
+                #expect(asyncPartial.value == nil)
             }
         }
     }
@@ -249,8 +249,8 @@ struct PartiallyGeneratedTests {
         let partialA = typeA.asPartiallyGenerated()
         let partialB = typeB.asPartiallyGenerated()
         
-        #expect(partialA.valueA == "")
-        #expect(partialB.valueB == 0)
+        #expect(partialA.valueA == nil)
+        #expect(partialB.valueB == nil)
         
         // Test that they can be used in separate Response.Partial instances
         let responsePartialA = Response<TestTypeA>.Partial(content: typeA, isComplete: false)
