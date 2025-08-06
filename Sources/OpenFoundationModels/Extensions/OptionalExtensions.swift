@@ -75,15 +75,9 @@ extension Optional: ConvertibleFromGeneratedContent where Wrapped: ConvertibleFr
 extension Optional: Generable where Wrapped: Generable {
     /// An instance of the generation schema.
     public static var generationSchema: GenerationSchema {
-        // Optional types can be either the wrapped type or null
-        return GenerationSchema(
-            type: "object",
-            description: "Optional \(String(describing: Wrapped.self))",
-            anyOf: [
-                Wrapped.generationSchema,
-                GenerationSchema(type: "null", description: "Null value")
-            ]
-        )
+        // For optional types, we use the wrapped type's schema
+        // The framework handles optionality through the Property initializers
+        return Wrapped.generationSchema
     }
     
     /// Convert to partially generated representation

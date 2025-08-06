@@ -12,8 +12,9 @@ extension Bool: Generable {
     /// An instance of the generation schema.
     public static var generationSchema: GenerationSchema {
         return GenerationSchema(
-            type: "boolean",
-            description: "A boolean value"
+            type: Bool.self,
+            description: "A boolean value",
+            properties: []
         )
     }
     
@@ -52,8 +53,9 @@ extension Int: Generable {
     /// An instance of the generation schema.
     public static var generationSchema: GenerationSchema {
         return GenerationSchema(
-            type: "integer",
-            description: "An integer value"
+            type: Int.self,
+            description: "An integer value",
+            properties: []
         )
     }
     
@@ -88,8 +90,9 @@ extension Float: Generable {
     /// An instance of the generation schema.
     public static var generationSchema: GenerationSchema {
         return GenerationSchema(
-            type: "number",
-            description: "A floating-point number"
+            type: Float.self,
+            description: "A floating-point number",
+            properties: []
         )
     }
     
@@ -124,8 +127,9 @@ extension Double: Generable {
     /// An instance of the generation schema.
     public static var generationSchema: GenerationSchema {
         return GenerationSchema(
-            type: "number",
-            description: "A double-precision floating-point number"
+            type: Double.self,
+            description: "A double-precision floating-point number",
+            properties: []
         )
     }
     
@@ -160,8 +164,9 @@ extension Decimal: Generable {
     /// An instance of the generation schema.
     public static var generationSchema: GenerationSchema {
         return GenerationSchema(
-            type: "number",
-            description: "A decimal number with arbitrary precision"
+            type: Decimal.self,
+            description: "A decimal number with arbitrary precision",
+            properties: []
         )
     }
     
@@ -196,8 +201,9 @@ extension Never: Generable {
     /// An instance of the generation schema.
     public static var generationSchema: GenerationSchema {
         return GenerationSchema(
-            type: "null",
-            description: "Never type (uninhabited)"
+            type: Never.self,
+            description: "Never type (uninhabited)",
+            properties: []
         )
     }
     

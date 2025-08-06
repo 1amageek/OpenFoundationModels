@@ -120,12 +120,15 @@ extension GenerationID: Generable {
     /// The generation schema for GenerationID
     /// 
     /// **Apple Foundation Models Documentation:**
-    /// GenerationID uses a string-based schema for generation.
+    /// GenerationID uses a special schema for generation as it receives special treatment
+    /// by the framework to be both present and stable.
     public static var generationSchema: GenerationSchema {
+        // GenerationID is a special type that gets an identifier from the framework
+        // It uses an empty properties schema since it's generated automatically
         return GenerationSchema(
-            type: "string",
+            type: GenerationID.self,
             description: "A unique identifier that is stable for the duration of a response",
-            anyOf: []
+            properties: []
         )
     }
     

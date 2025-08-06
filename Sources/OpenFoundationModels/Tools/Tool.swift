@@ -220,11 +220,11 @@ extension Tool {
         if let generableType = Arguments.self as? any Generable.Type {
             return generableType.generationSchema
         }
-        // Otherwise, return a basic object schema
+        // Otherwise, return a basic object schema using GeneratedContent as placeholder
         return GenerationSchema(
-            type: "object",
+            type: GeneratedContent.self,
             description: "Tool arguments for \(name)",
-            properties: [:]
+            properties: []
         )
     }
 }

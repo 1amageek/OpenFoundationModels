@@ -29,10 +29,11 @@ extension String: Generable {
     /// **Apple Foundation Models Documentation:**
     /// String content uses a simple text schema for generation.
     public static var generationSchema: GenerationSchema {
+        // String is a primitive Generable type, uses empty properties
         return GenerationSchema(
-            type: "string",
+            type: String.self,
             description: "Text content",
-            anyOf: []
+            properties: []
         )
     }
     
@@ -86,8 +87,9 @@ extension GeneratedContent: Generable {
     /// GeneratedContent uses a flexible schema that can represent various content types.
     public static var generationSchema: GenerationSchema {
         return GenerationSchema(
-            type: "object",
-            description: "Generated content with flexible structure"
+            type: GeneratedContent.self,
+            description: "Generated content with flexible structure",
+            properties: []
         )
     }
     
@@ -123,10 +125,11 @@ extension Array: Generable where Element: Generable {
     
     /// An instance of the generation schema.
     public static var generationSchema: GenerationSchema {
+        // Array types need special handling - use Element's schema with array wrapper
         return GenerationSchema(
-            type: "array",
+            type: Array<Element>.self,
             description: "Array of \(String(describing: Element.self))",
-            items: Element.generationSchema
+            properties: []
         )
     }
     

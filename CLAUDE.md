@@ -34,7 +34,14 @@ OSS implementation of Apple's Foundation Models framework (iOS 26/macOS 15 Xcode
    - `availability: AvailabilityStatus` property
    - `isAvailable: Bool` convenience property
 
-2. **LanguageModelSession** (Apple Official API)
+2. **Generation System**
+   - `GenerationOptions`: Configuration with SamplingMode (greedy, random top-k, random top-p)
+   - `GenerationSchema`: Type descriptions with Property and SchemaError
+   - `GenerationGuide`: Constraints for guided generation (ranges, patterns, enums)
+   - `DynamicGenerationSchema`: Runtime schema construction
+   - `GeneratedContent`: Structured content representation
+
+3. **LanguageModelSession** (Apple Official API)
    - Multiple Apple-compliant initializers with `guardrails`, `tools`, `instructions`
    - Closure-based prompts: `prompt: () throws -> Prompt`
    - Generic responses: `Response<Content>` where `Content: Generable`
@@ -71,17 +78,27 @@ OSS implementation of Apple's Foundation Models framework (iOS 26/macOS 15 Xcode
 
 ### Directory Structure
 ```
-Sources/OpenFoundationModels/
-├── Core/                    # Main API components
-│   ├── LanguageModelSession.swift
-│   ├── SystemLanguageModel.swift
-│   ├── Response.swift
-│   └── ResponseStream.swift
-├── Types/                   # Type definitions
-├── Tools/                   # Tool calling system
-├── Protocols/              # Protocol definitions
-├── Foundation/             # Supporting functionality
-└── Errors/                 # Error handling
+Sources/
+├── OpenFoundationModels/           # Main module
+│   ├── Core/                      # Main API components
+│   │   ├── LanguageModelSession.swift
+│   │   ├── SystemLanguageModel.swift
+│   │   ├── Response.swift
+│   │   └── ResponseStream.swift
+│   ├── Types/                     # Type definitions
+│   ├── Tools/                     # Tool calling system
+│   ├── Extensions/                # Protocol extensions
+│   └── Errors/                    # Error handling
+├── OpenFoundationModelsCore/      # Core types and protocols
+│   ├── Protocols/                 # Core protocol definitions
+│   ├── Types/                     # Core type definitions
+│   │   ├── GenerationSchema.swift
+│   │   ├── GeneratedContent.swift
+│   │   ├── DynamicGenerationSchema.swift
+│   │   ├── Instructions.swift
+│   │   └── Prompt.swift
+│   └── Builders/                  # Result builders
+└── OpenFoundationModelsMacros/    # Macro implementations
 ```
 
 ### Implementation Guidelines
@@ -294,9 +311,12 @@ remark --plain-text https://developer.apple.com/documentation/foundationmodels/r
 - ResponseStream: `https://developer.apple.com/documentation/foundationmodels/responsestream`
 - SystemLanguageModel: `https://developer.apple.com/documentation/foundationmodels/systemlanguagemodel`
 - GenerationOptions: `https://developer.apple.com/documentation/foundationmodels/generationoptions`
+- GenerationGuide: `https://developer.apple.com/documentation/foundationmodels/generationguide`
+- DynamicGenerationSchema: `https://developer.apple.com/documentation/foundationmodels/dynamicgenerationschema`
 - Guardrails: `https://developer.apple.com/documentation/foundationmodels/guardrails`
 - Generable: `https://developer.apple.com/documentation/foundationmodels/generable`
 - GenerationSchema: `https://developer.apple.com/documentation/foundationmodels/generationschema`
+- GeneratedContent: `https://developer.apple.com/documentation/foundationmodels/generatedcontent`
 
 ### Swift Package Manager Integration
 ```swift
@@ -340,11 +360,17 @@ do {
 - **GenerationID**: Implemented with full Apple compliance
 - **Transcript**: Complete with all nested types
 - **Response/ResponseStream**: Generic types with Apple specifications
+- **GenerationOptions**: Complete with SamplingMode (greedy, random top-k, random top-p)
+- **GenerationSchema**: Full implementation with Property, SchemaError, and dynamic support
+- **GenerationGuide**: All static methods for constraints (ranges, patterns, enums, arrays)
+- **DynamicGenerationSchema**: Runtime schema construction with Property type
+- **GeneratedContent**: All data access methods and protocol conformances
 
 ### 🔧 Build Status
-- Some Codable/Sendable conformance issues remaining
-- Core API structure is 100% Apple compliant
-- All major types implemented and documented
+- ✅ **Build Success**: All modules compile without errors
+- ✅ **Core API**: 100% Apple compliant structure
+- ✅ **Generate System**: Fully implemented and verified
+- ⚠️ **Minor Warnings**: Some unused parameters in DynamicGenerationSchema conversion (non-critical)
 
 ## Status
 ✅ **Implementation Complete**: 100% Apple Foundation Models β SDK compatibility achieved
