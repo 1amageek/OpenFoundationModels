@@ -34,6 +34,7 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             
             // Generate the required members for struct
             return [
+                generateRawContentProperty(),  // Add property to store original GeneratedContent
                 generateInitFromGeneratedContent(structName: structName, properties: properties),
                 generateGeneratedContentProperty(structName: structName, description: description, properties: properties),
                 // Removed generateFromGeneratedContentMethod and generateToGeneratedContentMethod
@@ -216,6 +217,13 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         }
     }
     
+    /// Generate property to store original GeneratedContent
+    private static func generateRawContentProperty() -> DeclSyntax {
+        return DeclSyntax(stringLiteral: """
+        private let _rawGeneratedContent: GeneratedContent
+        """)
+    }
+    
     /// Generate init(_:) initializer according to Apple specs
     private static func generateInitFromGeneratedContent(structName: String, properties: [PropertyInfo]) -> DeclSyntax {
         // Generate property extraction code
@@ -226,6 +234,9 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         return DeclSyntax(stringLiteral: """
         public init(_ generatedContent: GeneratedContent) throws {
             // ✅ CONFIRMED: Apple generates init(_:) initializer
+            // Store the original GeneratedContent
+            self._rawGeneratedContent = generatedContent
+            
             // Extract properties from GeneratedContent
             let properties = try generatedContent.properties()
             
@@ -326,15 +337,8 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         return DeclSyntax(stringLiteral: """
         public var generatedContent: GeneratedContent {
             // ✅ CONFIRMED: Apple generates generatedContent property
-            // Convert this instance to GeneratedContent format using Kind.structure
-            return GeneratedContent(
-                kind: .structure(
-                    properties: [
-                        \(propertyConversions)
-                    ],
-                    orderedKeys: [\(orderedKeys)]
-                )
-            )
+            // Return the stored GeneratedContent
+            return self._rawGeneratedContent
         }
         """)
     }
@@ -438,6 +442,17 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             generatePartialPropertyExtraction(propertyName: prop.name, propertyType: prop.type)
         }.joined(separator: "\n            ")
         
+        // Generate required properties check for isComplete
+        // Only non-optional properties are required
+        let requiredProperties = properties.filter { !$0.type.hasSuffix("?") }
+        let requiredPropertiesCheck: String
+        if requiredProperties.isEmpty {
+            requiredPropertiesCheck = "true"
+        } else {
+            let checks = requiredProperties.map { "self.\($0.name) != nil" }.joined(separator: " && ")
+            requiredPropertiesCheck = "(\(checks))"
+        }
+        
         return DeclSyntax(stringLiteral: """
         /// Partially generated representation for streaming
         /// ✅ APPLE SPEC: Nested type for streaming support
@@ -454,14 +469,17 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             /// ConvertibleFromGeneratedContent conformance
             public init(_ generatedContent: GeneratedContent) throws {
                 self.rawContent = generatedContent
-                self.isComplete = generatedContent.isComplete
                 
                 // Try to extract properties, allowing partial parsing
                 if let properties = try? generatedContent.properties() {
                     \(propertyExtractions)
+                    
+                    // Check if JSON is syntactically complete AND all required properties are present
+                    self.isComplete = generatedContent.isComplete && \(requiredPropertiesCheck)
                 } else {
                     // If we can't parse as structure, initialize all as nil
                     \(properties.map { "self.\($0.name) = nil" }.joined(separator: "\n                    "))
+                    self.isComplete = false
                 }
             }
             

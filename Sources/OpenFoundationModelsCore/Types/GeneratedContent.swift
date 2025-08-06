@@ -157,13 +157,35 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
     /// - Parameter json: The JSON string to parse
     /// - Throws: GeneratedContentError.invalidJSON if the JSON is malformed
     public init(json: String) throws {
+        // Check if JSON is syntactically complete
+        let trimmed = json.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Empty string or whitespace
+        if trimmed.isEmpty {
+            self.init(content: .null, id: nil)
+            return
+        }
+        
+        // Check for incomplete JSON by validating brackets and quotes
+        if !Self.isJSONComplete(trimmed) {
+            // Store as partial JSON
+            self.init(kind: .partial(json: json), id: nil)
+            return
+        }
+        
+        // Try to parse complete JSON
         guard let data = json.data(using: .utf8) else {
             throw GeneratedContentError.invalidJSON("Unable to convert string to data")
         }
         
-        let jsonObject = try JSONSerialization.jsonObject(with: data)
-        self.content = try Self.parseJSONObject(jsonObject)
-        self.generationID = nil
+        do {
+            let jsonObject = try JSONSerialization.jsonObject(with: data)
+            let parsedContent = try Self.parseJSONObject(jsonObject)
+            self.init(content: parsedContent, id: nil)
+        } catch {
+            // If parsing fails despite being "complete", store as partial
+            self.init(kind: .partial(json: json), id: nil)
+        }
     }
     
     /// Private initializer for internal use
@@ -276,10 +298,18 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
     /// - Returns: Dictionary of property names to GeneratedContent values
     /// - Throws: GeneratedContentError.dictionaryExpected if content is not a dictionary
     public func properties() throws -> [String: GeneratedContent] {
-        guard case .dictionary(let dict) = content else {
+        switch content {
+        case .dictionary(let dict):
+            return dict
+        case .string(let str):
+            // Handle partial JSON stored as string
+            if let partialProps = Self.extractPartialProperties(from: str) {
+                return partialProps
+            }
+            throw GeneratedContentError.dictionaryExpected
+        default:
             throw GeneratedContentError.dictionaryExpected
         }
-        return dict
     }
     
     /// Reads a top level array of content.
@@ -433,6 +463,209 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
     }
     
     // MARK: - Helper Methods
+    
+    /// Extract available properties from partial JSON
+    private static func extractPartialProperties(from json: String) -> [String: GeneratedContent]? {
+        // Try to extract key-value pairs from partial JSON
+        let trimmed = json.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Must start with {
+        guard trimmed.hasPrefix("{") else { return nil }
+        
+        // Remove opening bracket
+        let content = String(trimmed.dropFirst())
+        
+        var properties: [String: GeneratedContent] = [:]
+        var currentKey: String?
+        var currentValue = ""
+        var inKey = false
+        var inValue = false
+        var inString = false
+        var escapeNext = false
+        var depth = 0
+        
+        var buffer = ""
+        
+        for char in content {
+            if escapeNext {
+                buffer.append(char)
+                escapeNext = false
+                continue
+            }
+            
+            if char == "\\" {
+                buffer.append(char)
+                escapeNext = true
+                continue
+            }
+            
+            if char == "\"" && !escapeNext {
+                if !inValue || depth == 0 {
+                    inString.toggle()
+                }
+                buffer.append(char)
+                
+                if !inString && !inValue && !inKey && buffer.count > 2 {
+                    // Just closed a key string
+                    inKey = true
+                    currentKey = String(buffer.dropFirst().dropLast())
+                    buffer = ""
+                }
+                continue
+            }
+            
+            if !inString {
+                switch char {
+                case ":":
+                    if depth == 0 && currentKey != nil && !inValue {
+                        inValue = true
+                        buffer = ""
+                        continue
+                    }
+                case ",", "}":
+                    if depth == 0 && inValue && currentKey != nil {
+                        // End of value
+                        let valueStr = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !valueStr.isEmpty {
+                            // Try to parse the value
+                            if let value = parsePartialValue(valueStr) {
+                                properties[currentKey!] = value
+                            }
+                        }
+                        currentKey = nil
+                        inValue = false
+                        inKey = false
+                        buffer = ""
+                        if char == "}" {
+                            break
+                        }
+                        continue
+                    }
+                case "{", "[":
+                    if inValue {
+                        depth += 1
+                    }
+                case "}", "]":
+                    if inValue && depth > 0 {
+                        depth -= 1
+                    }
+                default:
+                    break
+                }
+            }
+            
+            buffer.append(char)
+        }
+        
+        // Handle last value if incomplete
+        if inValue && currentKey != nil {
+            let valueStr = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !valueStr.isEmpty {
+                if let value = parsePartialValue(valueStr) {
+                    properties[currentKey!] = value
+                }
+            }
+        }
+        
+        return properties.isEmpty ? nil : properties
+    }
+    
+    /// Parse a partial value string into GeneratedContent
+    private static func parsePartialValue(_ value: String) -> GeneratedContent? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // String value
+        if trimmed.hasPrefix("\"") {
+            if trimmed.hasSuffix("\"") && trimmed.count > 1 {
+                let str = String(trimmed.dropFirst().dropLast())
+                return GeneratedContent(str)
+            } else {
+                // Incomplete string - use what we have
+                let str = String(trimmed.dropFirst())
+                return GeneratedContent(str)
+            }
+        }
+        
+        // Boolean
+        if trimmed == "true" || trimmed == "false" {
+            return GeneratedContent(trimmed)
+        }
+        
+        // Number
+        if let _ = Double(trimmed) {
+            return GeneratedContent(trimmed)
+        }
+        
+        // Null
+        if trimmed == "null" {
+            return GeneratedContent(content: .null)
+        }
+        
+        // Object or array (even if incomplete)
+        if trimmed.hasPrefix("{") || trimmed.hasPrefix("[") {
+            // Try to parse as complete JSON first
+            if let data = trimmed.data(using: .utf8),
+               let obj = try? JSONSerialization.jsonObject(with: data),
+               let parsed = try? parseJSONObject(obj) {
+                return GeneratedContent(content: parsed)
+            }
+            // Otherwise store as string
+            return GeneratedContent(trimmed)
+        }
+        
+        // Default: treat as incomplete number or string
+        return GeneratedContent(trimmed)
+    }
+    
+    /// Check if a JSON string is syntactically complete
+    private static func isJSONComplete(_ json: String) -> Bool {
+        var bracketStack: [Character] = []
+        var inString = false
+        var escapeNext = false
+        
+        for char in json {
+            if escapeNext {
+                escapeNext = false
+                continue
+            }
+            
+            if char == "\\" {
+                escapeNext = true
+                continue
+            }
+            
+            if char == "\"" && !escapeNext {
+                inString.toggle()
+                continue
+            }
+            
+            if !inString {
+                switch char {
+                case "{":
+                    bracketStack.append("{")
+                case "}":
+                    if bracketStack.last == "{" {
+                        bracketStack.removeLast()
+                    } else {
+                        return false // Mismatched bracket
+                    }
+                case "[":
+                    bracketStack.append("[")
+                case "]":
+                    if bracketStack.last == "[" {
+                        bracketStack.removeLast()
+                    } else {
+                        return false // Mismatched bracket
+                    }
+                default:
+                    break
+                }
+            }
+        }
+        
+        // JSON is complete if no unclosed brackets and not in a string
+        return bracketStack.isEmpty && !inString
+    }
     
     /// Parse JSON object into Content
     private static func parseJSONObject(_ object: Any) throws -> Content {
