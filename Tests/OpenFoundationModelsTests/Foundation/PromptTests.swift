@@ -281,6 +281,186 @@ struct PromptTests {
         #expect(prompt.description.components(separatedBy: "\n").count == 1000)
     }
     
+    // MARK: - PromptBuilder Tests
+    
+    @Test("Prompt creation with @PromptBuilder initializer")
+    func promptBuilderInitializer() {
+        // Test simple builder
+        let prompt1 = Prompt {
+            "Hello, world!"
+        }
+        #expect(prompt1.description == "Hello, world!")
+        
+        // Test builder with multiple components
+        let prompt2 = Prompt {
+            "Line 1"
+            "Line 2"
+            "Line 3"
+        }
+        #expect(prompt2.description.contains("Line 1"))
+        #expect(prompt2.description.contains("Line 2"))
+        #expect(prompt2.description.contains("Line 3"))
+    }
+    
+    @Test("Prompt builder with conditional content")
+    func promptBuilderConditional() {
+        let shouldRhyme = true
+        let userInput = "What is Swift?"
+        
+        let prompt = Prompt {
+            "Answer the following question from the user: \(userInput)"
+            if shouldRhyme {
+                "Your response MUST rhyme!"
+            }
+        }
+        
+        #expect(prompt.description.contains("Answer the following question"))
+        #expect(prompt.description.contains("What is Swift?"))
+        #expect(prompt.description.contains("Your response MUST rhyme!"))
+        
+        // Test with false condition
+        let shouldBeVerbose = false
+        let prompt2 = Prompt {
+            "Explain quantum physics"
+            if shouldBeVerbose {
+                "Provide extensive details and examples"
+            }
+        }
+        
+        #expect(prompt2.description.contains("Explain quantum physics"))
+        #expect(!prompt2.description.contains("Provide extensive details"))
+    }
+    
+    @Test("Prompt builder with loops")
+    func promptBuilderWithLoops() {
+        let items = ["apple", "banana", "orange"]
+        
+        let prompt = Prompt {
+            "List the following fruits:"
+            for item in items {
+                "- \(item)"
+            }
+            "End of list"
+        }
+        
+        #expect(prompt.description.contains("List the following fruits:"))
+        #expect(prompt.description.contains("- apple"))
+        #expect(prompt.description.contains("- banana"))
+        #expect(prompt.description.contains("- orange"))
+        #expect(prompt.description.contains("End of list"))
+    }
+    
+    @Test("Prompt builder with PromptRepresentable types")
+    func promptBuilderWithPromptRepresentable() {
+        let stringPrompt = "This is a string"
+        let generatedContent = GeneratedContent("Generated content")
+        
+        let prompt = Prompt {
+            stringPrompt
+            generatedContent
+            "Final line"
+        }
+        
+        #expect(prompt.description.contains("This is a string"))
+        #expect(prompt.description.contains("Generated content"))
+        #expect(prompt.description.contains("Final line"))
+    }
+    
+    @Test("Prompt builder with nested builders")
+    func promptBuilderNested() {
+        let nestedPrompt = Prompt {
+            "Nested content"
+            "More nested content"
+        }
+        
+        let prompt = Prompt {
+            "Outer content"
+            nestedPrompt
+            "After nested"
+        }
+        
+        #expect(prompt.description.contains("Outer content"))
+        #expect(prompt.description.contains("Nested content"))
+        #expect(prompt.description.contains("More nested content"))
+        #expect(prompt.description.contains("After nested"))
+    }
+    
+    @Test("Prompt builder with optional content")
+    func promptBuilderOptional() {
+        let optionalContent: String? = "Optional text"
+        let nilContent: String? = nil
+        
+        let prompt = Prompt {
+            "Start"
+            if let content = optionalContent {
+                content
+            }
+            if let content = nilContent {
+                content
+            }
+            "End"
+        }
+        
+        #expect(prompt.description.contains("Start"))
+        #expect(prompt.description.contains("Optional text"))
+        #expect(prompt.description.contains("End"))
+    }
+    
+    @Test("Prompt builder with switch statements")
+    func promptBuilderSwitch() {
+        enum ResponseStyle {
+            case formal, casual, technical
+        }
+        
+        let style = ResponseStyle.technical
+        
+        let prompt = Prompt {
+            "Answer this question:"
+            switch style {
+            case .formal:
+                "Use formal language and proper grammar"
+            case .casual:
+                "Use casual, friendly language"
+            case .technical:
+                "Use technical terminology and be precise"
+            }
+        }
+        
+        #expect(prompt.description.contains("Answer this question:"))
+        #expect(prompt.description.contains("Use technical terminology"))
+        #expect(!prompt.description.contains("formal language"))
+        #expect(!prompt.description.contains("casual"))
+    }
+    
+    @Test("Prompt builder with complex dynamic content")
+    func promptBuilderComplexDynamic() {
+        let includeExamples = true
+        let maxExamples = 3
+        let topics = ["Swift", "Objective-C", "SwiftUI"]
+        
+        let prompt = Prompt {
+            "Create a tutorial covering:"
+            for (index, topic) in topics.enumerated() {
+                "\(index + 1). \(topic)"
+            }
+            
+            if includeExamples {
+                "Include examples for each topic"
+                "Maximum \(maxExamples) examples per topic"
+            }
+            
+            "Format as markdown"
+        }
+        
+        #expect(prompt.description.contains("Create a tutorial"))
+        #expect(prompt.description.contains("1. Swift"))
+        #expect(prompt.description.contains("2. Objective-C"))
+        #expect(prompt.description.contains("3. SwiftUI"))
+        #expect(prompt.description.contains("Include examples"))
+        #expect(prompt.description.contains("Maximum 3 examples"))
+        #expect(prompt.description.contains("Format as markdown"))
+    }
+    
     // MARK: - Functional Tests
     
     @Test("Prompt for code generation")

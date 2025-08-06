@@ -196,6 +196,192 @@ struct InstructionsTests {
         #expect(instructions.description == component)
     }
     
+    // MARK: - Instructions @InstructionsBuilder Initializer Tests
+    
+    @Test("Instructions creation with @InstructionsBuilder initializer")
+    func instructionsBuilderInitializer() {
+        // Test simple builder
+        let instructions1 = Instructions {
+            "You are a helpful assistant."
+        }
+        #expect(instructions1.description == "You are a helpful assistant.")
+        
+        // Test builder with multiple components
+        let instructions2 = Instructions {
+            "You are a code review assistant."
+            "Focus on code quality and best practices."
+            "Provide constructive feedback."
+        }
+        #expect(instructions2.description.contains("code review assistant"))
+        #expect(instructions2.description.contains("code quality"))
+        #expect(instructions2.description.contains("constructive feedback"))
+    }
+    
+    @Test("Instructions builder with conditional content")
+    func instructionsBuilderConditional() {
+        let shouldBeVerbose = true
+        let shouldIncludeExamples = false
+        
+        let instructions = Instructions {
+            "You are a technical documentation writer."
+            if shouldBeVerbose {
+                "Provide detailed explanations for all concepts."
+            }
+            if shouldIncludeExamples {
+                "Include code examples for each topic."
+            }
+        }
+        
+        #expect(instructions.description.contains("technical documentation writer"))
+        #expect(instructions.description.contains("detailed explanations"))
+        #expect(!instructions.description.contains("code examples"))
+    }
+    
+    @Test("Instructions builder with loops")
+    func instructionsBuilderWithLoops() {
+        let topics = ["performance", "security", "maintainability"]
+        
+        let instructions = Instructions {
+            "Review the code focusing on:"
+            for topic in topics {
+                "- \(topic)"
+            }
+            "Provide specific recommendations."
+        }
+        
+        #expect(instructions.description.contains("Review the code"))
+        #expect(instructions.description.contains("- performance"))
+        #expect(instructions.description.contains("- security"))
+        #expect(instructions.description.contains("- maintainability"))
+        #expect(instructions.description.contains("specific recommendations"))
+    }
+    
+    @Test("Instructions builder with InstructionsRepresentable types")
+    func instructionsBuilderWithInstructionsRepresentable() {
+        let baseInstructions = "Base system instructions"
+        let additionalContext = GeneratedContent("Additional context from generation")
+        
+        let instructions = Instructions {
+            baseInstructions
+            additionalContext
+            "Final instructions"
+        }
+        
+        #expect(instructions.description.contains("Base system instructions"))
+        #expect(instructions.description.contains("Additional context from generation"))
+        #expect(instructions.description.contains("Final instructions"))
+    }
+    
+    @Test("Instructions builder with nested builders")
+    func instructionsBuilderNested() {
+        let nestedInstructions = Instructions {
+            "Nested instruction set"
+            "With multiple lines"
+        }
+        
+        let instructions = Instructions {
+            "Main instructions"
+            nestedInstructions
+            "After nested"
+        }
+        
+        #expect(instructions.description.contains("Main instructions"))
+        #expect(instructions.description.contains("Nested instruction set"))
+        #expect(instructions.description.contains("With multiple lines"))
+        #expect(instructions.description.contains("After nested"))
+    }
+    
+    @Test("Instructions builder with optional content")
+    func instructionsBuilderOptional() {
+        let optionalGuideline: String? = "Optional guideline"
+        let nilGuideline: String? = nil
+        
+        let instructions = Instructions {
+            "Core instructions"
+            if let guideline = optionalGuideline {
+                guideline
+            }
+            if let guideline = nilGuideline {
+                guideline
+            }
+            "End of instructions"
+        }
+        
+        #expect(instructions.description.contains("Core instructions"))
+        #expect(instructions.description.contains("Optional guideline"))
+        #expect(instructions.description.contains("End of instructions"))
+    }
+    
+    @Test("Instructions builder with switch statements")
+    func instructionsBuilderSwitch() {
+        enum ModelRole {
+            case assistant, reviewer, translator
+        }
+        
+        let role = ModelRole.reviewer
+        
+        let instructions = Instructions {
+            "You are acting as a:"
+            switch role {
+            case .assistant:
+                "General purpose assistant providing helpful responses"
+            case .reviewer:
+                "Code reviewer focusing on quality and best practices"
+            case .translator:
+                "Language translator ensuring accuracy and context"
+            }
+        }
+        
+        #expect(instructions.description.contains("You are acting as"))
+        #expect(instructions.description.contains("Code reviewer"))
+        #expect(!instructions.description.contains("General purpose assistant"))
+        #expect(!instructions.description.contains("Language translator"))
+    }
+    
+    @Test("Instructions builder matching Apple's example")
+    func instructionsBuilderAppleExample() {
+        // Recreate Apple's documentation example
+        let instructions = Instructions {
+            "Suggest related topics. Keep them concise (three to seven words) and"
+            "make sure they build naturally from the person's topic."
+        }
+        
+        #expect(instructions.description.contains("Suggest related topics"))
+        #expect(instructions.description.contains("three to seven words"))
+        #expect(instructions.description.contains("build naturally"))
+    }
+    
+    @Test("Instructions builder with complex dynamic content")
+    func instructionsBuilderComplexDynamic() {
+        let includePersona = true
+        let maxResponseLength = 500
+        let allowedTopics = ["Swift", "iOS", "macOS"]
+        
+        let instructions = Instructions {
+            if includePersona {
+                "You are an experienced Apple platforms developer."
+            }
+            
+            "When answering questions:"
+            for topic in allowedTopics {
+                "- You may discuss \(topic)"
+            }
+            
+            "Keep responses under \(maxResponseLength) words."
+            
+            if maxResponseLength < 1000 {
+                "Be concise and to the point."
+            }
+        }
+        
+        #expect(instructions.description.contains("experienced Apple platforms developer"))
+        #expect(instructions.description.contains("You may discuss Swift"))
+        #expect(instructions.description.contains("You may discuss iOS"))
+        #expect(instructions.description.contains("You may discuss macOS"))
+        #expect(instructions.description.contains("Keep responses under 500 words"))
+        #expect(instructions.description.contains("Be concise"))
+    }
+    
     // MARK: - Complex InstructionsBuilder Scenarios
     
     @Test("InstructionsBuilder with conditionals and optionals")
