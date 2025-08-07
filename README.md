@@ -91,158 +91,42 @@ let response = try await session.respond {
 }
 ```
 
-## Architecture
+## Key Features
 
-### System Overview
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Application Layer                    │
-├─────────────────────────────────────────────────────────┤
-│  LanguageModelSession  │  SystemLanguageModel  │ Tools  │
-├─────────────────────────────────────────────────────────┤
-│     Response<T>        │   ResponseStream<T>    │ @Macro │
-├─────────────────────────────────────────────────────────┤
-│   Generable Protocol   │ GenerationSchema │ Transcript  │
-├─────────────────────────────────────────────────────────┤
-│                   Provider Abstraction                  │
-├─────────────────────────────────────────────────────────┤
-│    OpenAI    │  Anthropic  │  Local Models  │   Mock    │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Core Components
-
-#### 1. **SystemLanguageModel** - Model Access Hub
-Apple's official model access point
-
-```swift
-public final class SystemLanguageModel: LanguageModel, Observable, Sendable {
-    /// Apple Official: Single default model instance
-    public static let `default`: SystemLanguageModel
-    
-    /// Apple Official: Model availability status
-    public var availability: AvailabilityStatus { get }
-    
-    /// Apple Official: Convenience availability property
-    public var isAvailable: Bool { get }
-}
-```
-
-#### 2. **LanguageModelSession** - Session Management
-Main class managing conversation state and context
-
-```swift
-public final class LanguageModelSession: Observable, @unchecked Sendable {
-    /// Apple Official initialization pattern
-    public convenience init(
-        model: SystemLanguageModel = SystemLanguageModel.default,
-        guardrails: Guardrails = .default,
-        tools: [any Tool] = [],
-        instructions: Instructions? = nil
-    )
-    
-    /// Apple Official response generation (closure-based)
-    public func respond(
-        options: GenerationOptions = .default,
-        isolation: isolated (any Actor)? = nil,
-        prompt: () throws -> Prompt
-    ) async throws -> Response<String>
-    
-    /// Apple Official structured generation
-    public func respond<Content: Generable>(
-        generating: Content.Type,
-        options: GenerationOptions = .default,
-        includeSchemaInPrompt: Bool = true,
-        isolation: isolated (any Actor)? = nil,
-        prompt: () throws -> Prompt
-    ) async throws -> Response<Content>
-}
-```
-
-#### 3. **Generable Protocol** - Structured Generation
-Core protocol for type-safe structured data generation
-
-```swift
-public protocol Generable: ConvertibleFromGeneratedContent, 
-                          ConvertibleToGeneratedContent, 
-                          PartiallyGenerable, 
-                          Sendable, 
-                          SendableMetatype {
-    /// Apple Official: Compile-time schema generation
-    static var generationSchema: GenerationSchema { get }
-    
-    /// Apple Official: Conversion from GeneratedContent
-    static func from(generatedContent: GeneratedContent) throws -> Self
-}
-```
-
-#### 4. **Tool Protocol** - Function Calling
-Protocol for LLM function execution
-
-```swift
-public protocol Tool: Sendable, SendableMetatype {
-    associatedtype Arguments: Generable
-    
-    /// Apple Official: Tool name
-    static var name: String { get }
-    
-    /// Apple Official: Tool description
-    static var description: String { get }
-    
-    /// Apple Official: Execution method
-    func call(arguments: Arguments) async throws -> ToolOutput
-}
-```
-
-#### 5. **Response System** - Response Processing
-Type-safe response processing and streaming
-
-```swift
-/// Apple Official: Generic response
-public struct Response<Content: Sendable>: Sendable {
-    public let content: Content
-    public let transcriptEntries: ArraySlice<Transcript.Entry>
-}
-
-/// Apple Official: Streaming response
-public struct ResponseStream<Content: Sendable>: AsyncSequence, Sendable {
-    public typealias Element = Response<Content>.Partial
-}
-```
+✅ **100% Apple API Compatible** - Same code as Apple Foundation Models, just change the import  
+✅ **Multi-Platform** - Works everywhere: Linux, Windows, Android, Docker, CI/CD  
+✅ **Provider Freedom** - OpenAI, Anthropic, Ollama, or any LLM provider  
+✅ **Structured Generation** - Type-safe data with `@Generable` macro  
+✅ **Real-time Streaming** - Responsive UI with partial updates  
+✅ **Tool Calling** - Let LLMs execute your functions  
+✅ **Production Ready** - 154 tests passing, memory efficient, thread-safe
 
 ## Installation
 
 ### Swift Package Manager
 
-#### Core Framework
 ```swift
+// Package.swift
 dependencies: [
-    .package(url: "https://github.com/1amageek/OpenFoundationModels.git", from: "1.0.0")
-]
-```
-
-#### With OpenAI Provider
-```swift
-dependencies: [
+    // Core framework
     .package(url: "https://github.com/1amageek/OpenFoundationModels.git", from: "1.0.0"),
+    
+    // Optional: OpenAI provider
     .package(url: "https://github.com/1amageek/OpenFoundationModels-OpenAI.git", from: "1.0.0")
 ]
 ```
 
-### Sample Applications
-
-Try the complete sample applications immediately:
+### Try Sample Apps (No Setup Required)
 
 ```bash
-# Clone samples repository
+# Clone and run sample applications
 git clone https://github.com/1amageek/OpenFoundationModels-Samples.git
 cd OpenFoundationModels-Samples
 
-# Run on-device chat (no API key required)
+# Option 1: On-device chat (no API key needed)
 swift run foundation-chat
 
-# Run OpenAI chat (requires API key)
+# Option 2: OpenAI-powered chat
 export OPENAI_API_KEY="your_api_key_here"
 swift run openai-chat
 ```
@@ -277,34 +161,33 @@ let response = try await session.respond {
 print(response.content)
 ```
 
-### 2. Structured Generation (@Generable Macro)
+### 2. Type-Safe Structured Generation
 
 ```swift
-// Apple Official @Generable macro (fully implemented)
+// Define your data structure with validation rules
 @Generable
 struct ProductReview {
     @Guide(description: "Product name", .pattern("^[A-Za-z0-9\\s]+$"))
     let productName: String
     
-    @Guide(description: "Rating score", .range(1...5))
+    @Guide(description: "Rating from 1 to 5", .range(1...5))
     let rating: Int
     
-    @Guide(description: "Review comment", .count(50...500))
+    @Guide(description: "Review between 50-500 chars", .count(50...500))
     let comment: String
     
-    @Guide(description: "Recommendation", .enumeration(["Highly Recommend", "Recommend", "Neutral", "Not Recommend"]))
+    @Guide(description: "Recommendation level", .anyOf(["Highly Recommend", "Recommend", "Neutral", "Not Recommend"]))
     let recommendation: String
 }
 
-// Generate structured data
+// LLM generates validated, type-safe data
 let response = try await session.respond(
-    generating: ProductReview.self,
-    includeSchemaInPrompt: true
+    generating: ProductReview.self
 ) {
     Prompt("Generate a review for iPhone 15 Pro")
 }
 
-// Type-safe access
+// Direct property access - no JSON parsing needed!
 print("Product: \(response.content.productName)")
 print("Rating: \(response.content.rating)/5")
 print("Comment: \(response.content.comment)")
@@ -328,7 +211,7 @@ for try await partial in stream {
 }
 ```
 
-### 4. Structured Data Streaming
+### 4. Stream Complex Data Structures
 
 ```swift
 @Generable
@@ -356,145 +239,147 @@ for try await partial in stream {
 }
 ```
 
-### 5. Tool Calling
+### 5. Function Calling (Tools)
 
 ```swift
-// Apple Official Tool protocol implementation
+// Define a tool that LLMs can call
 struct WeatherTool: Tool {
-    typealias Arguments = WeatherQuery
-    
     static let name = "get_weather"
     static let description = "Get current weather for a city"
     
-    func call(arguments: WeatherQuery) async throws -> ToolOutput {
-        // Weather API call (implementation example)
-        let weather = try await fetchWeather(city: arguments.city)
-        return ToolOutput("🌤️ Weather in \(arguments.city): \(weather)")
+    // Type-safe arguments
+    @Generable
+    struct Arguments {
+        @Guide(description: "City name")
+        let city: String
+    }
+    
+    func call(arguments: Arguments) async throws -> ToolOutput {
+        // Your actual API call here
+        let weather = try await weatherAPI.fetch(city: arguments.city)
+        return ToolOutput("Weather in \(arguments.city): \(weather)°C")
     }
 }
 
-@Generable
-struct WeatherQuery {
-    @Guide(description: "City name", .pattern("^[\\p{L}\\s]+$"))
-    let city: String
-}
-
-// Session with tools
+// LLM decides when to call tools
 let session = LanguageModelSession(
-    model: SystemLanguageModel.default,
-    guardrails: .default,
-    tools: [WeatherTool()],
-    instructions: nil
+    tools: [WeatherTool()]
 )
 
 let response = try await session.respond {
-    Prompt("What's the weather like in Tokyo today?")
+    Prompt("What's the weather in Tokyo and Paris?")
 }
-
-// LLM automatically calls WeatherTool and incorporates results
-print(response.content)
+// LLM calls WeatherTool twice and combines results
+// Output: "Tokyo is 22°C and sunny, while Paris is 15°C with clouds."
 ```
 
-### 6. Advanced Features
-
-#### Instructions and Guardrails
+### 6. Generation Control
 
 ```swift
-// Apple Official @InstructionsBuilder pattern
+// Fine-tune generation behavior
+let options = GenerationOptions(
+    sampling: .greedy,                    // Deterministic output
+    // sampling: .random(top: 50, seed: 42), // Top-K sampling
+    // sampling: .random(probabilityThreshold: 0.9, seed: nil), // Top-P sampling
+    temperature: 0.7,                     // Creativity level (0.0-1.0)
+    maximumResponseTokens: 500            // Length limit
+)
+
+// Apply custom instructions
 let session = LanguageModelSession {
-    "You are a helpful and knowledgeable Swift programming instructor."
-    "Explain concepts clearly with practical examples for beginners."
-    "Include appropriate comments in code samples."
+    "You are a Swift expert."
+    "Use modern Swift 6.1+ features."
+    "Include error handling in all examples."
 }
 
-// Guardrails configuration
-let guardrails = Guardrails(
-    allowedTopics: ["programming", "swift", "technology"],
-    restrictedContent: ["personal_info", "financial_advice"],
-    maxResponseLength: 1000
-)
-
-let session = LanguageModelSession(
-    model: SystemLanguageModel.default,
-    guardrails: guardrails,
-    tools: [],
-    instructions: Instructions("Swift technical advisor specialist")
-)
+let response = try await session.respond(options: options) {
+    Prompt("Write a networking function")
+}
 ```
 
-### 7. OpenAI Provider Integration
+### 7. Use Any LLM Provider
 
 ```swift
 import OpenFoundationModels
-import OpenFoundationModelsOpenAI
+import OpenFoundationModelsOpenAI  // Or Anthropic, Ollama, etc.
 
-// Initialize OpenAI provider
-let openAIProvider = OpenAIProvider(apiKey: "your_api_key_here")
-
-// Create session with OpenAI model (same Apple API!)
+// Same API, different providers
 let session = LanguageModelSession(
-    model: openAIProvider.gpt4o,  // GPT-4o model
-    guardrails: .default,
-    tools: [],
-    instructions: nil
+    model: OpenAIProvider(apiKey: key).gpt4o        // OpenAI
+    // model: AnthropicProvider(apiKey: key).claude3  // Anthropic
+    // model: OllamaProvider().llama3                 // Local
+    // model: SystemLanguageModel.default             // Apple
 )
 
-// Same Apple API, powered by OpenAI
+// Write once, run with any provider
 let response = try await session.respond {
-    Prompt("Explain quantum computing in simple terms")
-}
-
-print(response.content)
-
-// Structured generation with OpenAI
-@Generable
-struct TechnicalExplanation {
-    @Guide(description: "Main concept", .count(20...100))
-    let concept: String
-    
-    @Guide(description: "Simple explanation", .count(100...300))
-    let explanation: String
-    
-    @Guide(description: "Real-world applications", .count(50...200))
-    let applications: [String]
-}
-
-let structuredResponse = try await session.respond(
-    generating: TechnicalExplanation.self
-) {
     Prompt("Explain quantum computing")
 }
 
-print("Concept: \(structuredResponse.content.concept)")
-print("Explanation: \(structuredResponse.content.explanation)")
+// All advanced features work with all providers
+@Generable
+struct Analysis {
+    let summary: String
+    let keyPoints: [String]
+    let confidence: Double
+}
+
+let analysis = try await session.respond(
+    generating: Analysis.self
+) {
+    Prompt("Analyze this code: \(codeSnippet)")
+}
 ```
 
-## Testing and Quality Assurance
+## Real-World Use Cases
 
-### 154 Tests Passing
-
-```bash
-# Run all tests
-swift test
-
-# Category-specific tests
-swift test --filter tag:generable  # Structured generation tests
-swift test --filter tag:core       # Core API tests
-swift test --filter tag:integration # Integration tests
-swift test --filter tag:performance # Performance tests
+### 🤖 AI Chatbots
+```swift
+// Build chatbots that work on any platform
+let chatbot = LanguageModelSession(model: provider.model)
+let response = try await chatbot.respond { 
+    Prompt(userMessage) 
+}
 ```
 
-### Apple Compatibility Verification
+### 📊 Data Extraction
+```swift
+// Extract structured data from unstructured text
+@Generable
+struct Invoice {
+    let invoiceNumber: String
+    let totalAmount: Double
+    let items: [LineItem]
+}
 
-- ✅ **SystemLanguageModel**: 100% Apple official specification compliance
-- ✅ **LanguageModelSession**: All initialization patterns supported
-- ✅ **Tool Protocol**: SendableMetatype conformance verified
-- ✅ **Generable Protocol**: Fully implemented
-- ✅ **Response/ResponseStream**: Generic type support
-- ✅ **@Generable Macro**: Complete functionality verified
-- ✅ **Transcript**: All nested types implemented
+let invoice = try await session.respond(generating: Invoice.self) {
+    Prompt("Extract invoice data from: \(pdfText)")
+}
+```
 
-For detailed verification information, see [TESTING.md](./TESTING.md).
+### 🔍 Content Analysis
+```swift
+// Analyze and categorize content
+@Generable
+struct ContentAnalysis {
+    @Guide(description: "Sentiment", .anyOf(["positive", "neutral", "negative"]))
+    let sentiment: String
+    let topics: [String]
+    let summary: String
+}
+```
+
+### 🛠️ Code Generation
+```swift
+// Generate code with validation
+@Generable
+struct SwiftFunction {
+    @Guide(description: "Valid Swift function signature")
+    let signature: String
+    let implementation: String
+    let tests: [String]
+}
+```
 
 ## Development
 
@@ -545,24 +430,45 @@ Provider adapters can be added for:
 - **Azure OpenAI Service**
 - **AWS Bedrock**
 
-## Performance
+## Why Choose OpenFoundationModels?
 
-- **Warning-Free Compilation**: Zero compiler warnings
-- **Memory Efficient**: Proper memory management with transcript compaction
-- **Concurrent**: Full Swift 6.1+ concurrency support
-- **154 Tests Passing**: Comprehensive test coverage
-- **Type Safe**: Generic response system with compile-time checking
+### For Developers
+- **Zero Learning Curve**: If you know Apple's API, you already know ours
+- **Platform Freedom**: Deploy anywhere - cloud, edge, mobile, embedded
+- **Provider Flexibility**: Switch LLMs without changing code
+- **Type Safety**: Catch errors at compile time, not runtime
+
+### For Businesses  
+- **Vendor Independence**: No lock-in to Apple or any LLM provider
+- **Cost Control**: Use local models or choose the most cost-effective provider
+- **Compliance Ready**: Keep data on-premise with local models
+- **Future Proof**: Easy migration path when Apple's API goes public
+
+## Testing
+
+```bash
+# Run all 154 tests
+swift test
+
+# Test specific components
+swift test --filter GenerableTests      # @Generable macro
+swift test --filter LanguageModelTests  # Core functionality
+swift test --filter StreamingTests      # Async streaming
+```
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-### Development Setup
-
-1. Clone the repository
-2. Run `swift test` to verify everything works
-3. Implement your changes
-4. Submit a pull request
+```bash
+# Quick start
+git clone https://github.com/1amageek/OpenFoundationModels.git
+cd OpenFoundationModels
+swift test  # Verify setup
+# Make your changes
+git checkout -b feature/your-feature
+# Submit PR
+```
 
 ## License
 
