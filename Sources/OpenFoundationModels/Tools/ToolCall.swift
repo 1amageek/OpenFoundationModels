@@ -73,9 +73,14 @@ public extension ToolCall {
         // Convert GeneratedContent back to JSON data
         let jsonString = arguments.stringValue
         guard let data = jsonString.data(using: .utf8) else {
-            throw ToolCallError.invalidArguments(
+            throw ToolCallError(
                 toolName: name,
-                reason: "Failed to convert arguments to data"
+                underlying: NSError(
+                    domain: "ToolCallError",
+                    code: 400,
+                    userInfo: [NSLocalizedDescriptionKey: "Invalid arguments for tool '\(name)': Failed to convert arguments to data"]
+                ),
+                context: ["error_type": "invalid_arguments", "reason": "Failed to convert arguments to data"]
             )
         }
         let decoder = JSONDecoder()

@@ -26,7 +26,6 @@ import Foundation
 /// - InstructionsRepresentable
 /// - PromptRepresentable
 /// - Sendable
-/// - SendableMetatype
 public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertible {
     
     // MARK: - Public Types

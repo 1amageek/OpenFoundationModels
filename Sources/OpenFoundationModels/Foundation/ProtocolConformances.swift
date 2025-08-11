@@ -79,10 +79,6 @@ extension GeneratedContent: Generable {
     // asPartiallyGenerated() uses default implementation from protocol extension
 }
 
-// MARK: - Array SendableMetatype Conformance
-
-extension Array: SendableMetatype where Element: SendableMetatype {}
-
 // MARK: - Array Generable Conformance
 
 extension Array: Generable where Element: Generable {

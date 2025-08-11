@@ -24,7 +24,6 @@ import Foundation
 /// - ConvertibleToGeneratedContent
 /// - InstructionsRepresentable
 /// - PromptRepresentable
-/// - SendableMetatype
 /// 
 /// **Usage Example:**
 /// ```swift

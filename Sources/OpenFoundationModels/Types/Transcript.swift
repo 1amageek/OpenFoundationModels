@@ -26,7 +26,6 @@ import OpenFoundationModelsCore
 /// - Equatable
 /// - RandomAccessCollection
 /// - Sendable
-/// - SendableMetatype
 /// - Sequence
 /// 
 /// **Initialization:**
@@ -83,8 +82,7 @@ extension Transcript {
     /// - Equatable
     /// - Identifiable
     /// - Sendable
-    /// - SendableMetatype
-    public enum Entry: Codable, Sendable, SendableMetatype, Identifiable, CustomStringConvertible {
+    public enum Entry: Codable, Sendable, Identifiable, CustomStringConvertible {
         /// System instructions for the model
         /// 
         /// **Apple Foundation Models Documentation:**

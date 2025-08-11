@@ -16,8 +16,7 @@ extension LanguageModelSession {
     /// 
     /// **Conformances:**
     /// - Sendable
-    /// - SendableMetatype
-    public struct Guardrails: Sendable, SendableMetatype {
+    public struct Guardrails: Sendable {
     
         /// A type that indicates the system provides the guardrails.
         /// 

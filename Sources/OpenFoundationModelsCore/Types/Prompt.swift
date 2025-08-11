@@ -21,7 +21,6 @@ import Foundation
 /// - Copyable
 /// - PromptRepresentable
 /// - Sendable
-/// - SendableMetatype
 /// 
 /// **Usage:**
 /// ```swift
@@ -37,7 +36,7 @@ import Foundation
 ///     }
 /// }
 /// ```
-public struct Prompt: Sendable, SendableMetatype {
+public struct Prompt: Sendable {
     
     /// The internal content of the prompt
     internal let content: String

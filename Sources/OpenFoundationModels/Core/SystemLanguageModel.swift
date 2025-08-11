@@ -18,7 +18,6 @@ import Foundation
 /// - Copyable
 /// - Observable
 /// - Sendable
-/// - SendableMetatype
 /// 
 /// **Model Availability:**
 /// Verify the model availability before you use the model. Model availability depends on device factors like:
@@ -49,7 +48,7 @@ import Foundation
 ///     }
 /// }
 /// ```
-public final class SystemLanguageModel: Observable, Sendable, SendableMetatype, Copyable, LanguageModel {
+public final class SystemLanguageModel: Observable, Sendable, Copyable, LanguageModel {
     /// The base version of the model.
     /// 
     /// **Apple Foundation Models Documentation:**
@@ -252,8 +251,7 @@ extension SystemLanguageModel {
     /// **Conformances:**
     /// - Equatable
     /// - Sendable
-    /// - SendableMetatype
-    public struct UseCase: Equatable, Sendable, SendableMetatype {
+    public struct UseCase: Equatable, Sendable {
         /// Internal identifier for the use case
         private let identifier: String
         
@@ -306,8 +304,7 @@ extension SystemLanguageModel {
     /// **Conformances:**
     /// - Equatable
     /// - Sendable
-    /// - SendableMetatype
-    @frozen public enum Availability: Equatable, Sendable, SendableMetatype {
+    @frozen public enum Availability: Equatable, Sendable {
         /// The system is ready for making requests.
         /// 
         /// **Apple Foundation Models Documentation:**
@@ -342,8 +339,7 @@ extension SystemLanguageModel {
         /// - Equatable
         /// - Hashable
         /// - Sendable
-        /// - SendableMetatype
-        public enum UnavailableReason: Copyable, Equatable, Hashable, Sendable, SendableMetatype {
+        public enum UnavailableReason: Copyable, Equatable, Hashable, Sendable {
             /// Apple Intelligence is not enabled on the system.
             /// 
             /// **Apple Foundation Models Documentation:**

@@ -51,10 +51,6 @@ extension Optional: InstructionsRepresentable where Wrapped: ConvertibleToGenera
     }
 }
 
-// MARK: - Optional SendableMetatype Conformance
-
-extension Optional: SendableMetatype where Wrapped: SendableMetatype {}
-
 // MARK: - Optional ConvertibleFromGeneratedContent Conformance
 
 extension Optional: ConvertibleFromGeneratedContent where Wrapped: ConvertibleFromGeneratedContent {

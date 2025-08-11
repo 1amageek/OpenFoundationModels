@@ -19,8 +19,7 @@ import Foundation
 /// 
 /// **Conforms To:**
 /// - Sendable
-/// - SendableMetatype
-public struct DynamicGenerationSchema: Sendable, SendableMetatype {
+public struct DynamicGenerationSchema: Sendable {
     
     /// The name of the schema
     public let name: String

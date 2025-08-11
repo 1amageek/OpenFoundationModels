@@ -18,13 +18,11 @@ import Foundation
 /// 
 /// **Conformances:**
 /// - Sendable
-/// - SendableMetatype
 /// - iOS 26.0+, iPadOS 26.0+, macOS 26.0+, visionOS 26.0+
 /// - Beta Software: Contains preliminary API information
 /// 
 /// **Inheritance:**
 /// - Sendable
-/// - SendableMetatype
 /// 
 /// **Key Features:**
 /// - Tools must conform to Sendable so the framework can run them concurrently
@@ -56,7 +54,7 @@ import Foundation
 ///     }
 /// }
 /// ```
-public protocol Tool<Arguments, Output>: Sendable, SendableMetatype {
+public protocol Tool<Arguments, Output>: Sendable {
     /// The output that this tool produces for the language model to reason about in subsequent
     /// interactions.
     /// 

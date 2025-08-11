@@ -22,7 +22,6 @@ import Foundation
 /// - Equatable
 /// - Hashable
 /// - Sendable
-/// - SendableMetatype
 /// 
 /// **Usage:**
 /// ```swift
@@ -35,7 +34,7 @@ import Foundation
 ///     var searchTerm: String
 /// }
 /// ```
-public struct GenerationID: Equatable, Hashable, Sendable, SendableMetatype {
+public struct GenerationID: Equatable, Hashable, Sendable {
     /// The unique identifier value
     private let value: UUID
     

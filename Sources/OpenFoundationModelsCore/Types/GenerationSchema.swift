@@ -313,7 +313,6 @@ public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible 
 
 // MARK: - Protocol Conformances
 
-extension GenerationSchema: SendableMetatype { }
 
 extension GenerationSchema: Equatable {
     public static func ==(lhs: GenerationSchema, rhs: GenerationSchema) -> Bool {
@@ -429,8 +428,7 @@ extension GenerationSchema {
 /// - Error
 /// - LocalizedError
 /// - Sendable
-/// - SendableMetatype
-public enum SchemaError: Error, LocalizedError, Sendable, SendableMetatype {
+public enum SchemaError: Error, LocalizedError, Sendable {
     /// An error that represents an attempt to construct a dynamic schema with properties that have conflicting names.
     /// 
     /// **Apple Foundation Models Documentation:**
@@ -475,8 +473,7 @@ public enum SchemaError: Error, LocalizedError, Sendable, SendableMetatype {
     /// **Conformances:**
     /// - CustomDebugStringConvertible
     /// - Sendable
-    /// - SendableMetatype
-    public struct Context: CustomDebugStringConvertible, Sendable, SendableMetatype {
+    public struct Context: CustomDebugStringConvertible, Sendable {
         /// A string representation of the debug description.
         /// 
         /// **Apple Foundation Models Documentation:**
@@ -562,14 +559,13 @@ public enum SchemaError: Error, LocalizedError, Sendable, SendableMetatype {
 /// 
 /// **Conformances:**
 /// - Sendable
-/// - SendableMetatype
 /// 
 /// **Usage:**
 /// ```swift
 /// @Guide(description: "A number between 1 and 100", .range(1...100))
 /// var count: Int
 /// ```
-public struct GenerationGuide<Value: Sendable>: Sendable, SendableMetatype {
+public struct GenerationGuide<Value: Sendable>: Sendable {
     /// The type of guide constraint
     public enum GuideType: Sendable {
         /// Maximum count constraint
@@ -948,7 +944,7 @@ extension GenerationGuide where Value == Double {
 
 /// A constraint for generation guides (internal use).
 /// NOTE: This is an internal implementation detail, not part of Apple's public API.
-internal struct GuideConstraint<Value: Sendable>: Sendable, SendableMetatype {
+internal struct GuideConstraint<Value: Sendable>: Sendable {
     /// The type of constraint
     internal let type: GenerationGuide<Value>.GuideType
     
@@ -1024,7 +1020,7 @@ internal struct GuideConstraint<Value: Sendable>: Sendable, SendableMetatype {
 
 /// Type-erased generation guide for use in collections (internal use)
 /// NOTE: This is an internal implementation detail, not part of Apple's public API.
-internal struct AnyGenerationGuide: @unchecked Sendable, SendableMetatype {
+internal struct AnyGenerationGuide: @unchecked Sendable {
     /// The type of guide constraint
     internal enum GuideType: Sendable {
         case maximumCount, minimumCount, count, range, enumeration, pattern
@@ -1152,8 +1148,3 @@ extension GenerationSchema {
         }
     }
 }
-
-// MARK: - Property SendableMetatype Conformance
-
-extension GenerationSchema.Property: SendableMetatype { }
-

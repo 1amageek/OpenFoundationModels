@@ -183,7 +183,3 @@ public struct GenerationOptions: Sendable, Equatable, Codable {
     /// Default options with nil values, letting the system choose reasonable defaults.
     public static let `default` = GenerationOptions()
 }
-
-// MARK: - SendableMetatype Conformance
-
-extension GenerationOptions: SendableMetatype { }

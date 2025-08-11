@@ -18,8 +18,7 @@ import Foundation
 /// 
 /// **Conformances:**
 /// - Sendable
-/// - SendableMetatype
-public struct LanguageModelFeedback: Sendable, SendableMetatype {
+public struct LanguageModelFeedback: Sendable {
     
     // MARK: - Nested Types
     
@@ -40,8 +39,7 @@ public struct LanguageModelFeedback: Sendable, SendableMetatype {
     /// - Equatable
     /// - Hashable
     /// - Sendable
-    /// - SendableMetatype
-    public enum Sentiment: CaseIterable, Equatable, Hashable, Sendable, SendableMetatype {
+    public enum Sentiment: CaseIterable, Equatable, Hashable, Sendable {
         /// A positive sentiment
         /// ✅ APPLE SPEC: case positive
         case positive
@@ -68,8 +66,7 @@ public struct LanguageModelFeedback: Sendable, SendableMetatype {
     /// 
     /// **Conformances:**
     /// - Sendable
-    /// - SendableMetatype
-    public struct Issue: Sendable, SendableMetatype {
+    public struct Issue: Sendable {
         
         /// Categories for model response issues.
         /// 
@@ -88,8 +85,7 @@ public struct LanguageModelFeedback: Sendable, SendableMetatype {
         /// - Equatable
         /// - Hashable
         /// - Sendable
-        /// - SendableMetatype
-        public enum Category: CaseIterable, Equatable, Hashable, Sendable, SendableMetatype {
+        public enum Category: CaseIterable, Equatable, Hashable, Sendable {
             /// The model provided an incorrect response.
             /// ✅ APPLE SPEC: case incorrect
             case incorrect
