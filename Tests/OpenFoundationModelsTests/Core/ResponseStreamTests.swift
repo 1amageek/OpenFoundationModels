@@ -127,8 +127,11 @@ struct ResponseStreamTests {
         
         let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
-        // Test the collectPartials() helper method
-        let allPartials = try await responseStream.collectPartials()
+        // Collect all partials manually since collectPartials() doesn't exist
+        var allPartials: [String] = []
+        for try await partial in responseStream {
+            allPartials.append(partial)
+        }
         
         #expect(allPartials.count == 3)
         // Partials are now String

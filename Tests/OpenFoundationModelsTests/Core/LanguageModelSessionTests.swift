@@ -16,8 +16,12 @@ struct LanguageModelSessionTests {
     
     @Test("LanguageModelSession default initialization")
     func languageModelSessionDefaultInit() {
-        // Test default initialization
-        let session = LanguageModelSession()
+        // Test default initialization with required parameters
+        let session = LanguageModelSession(
+            model: SystemLanguageModel.default,
+            tools: [],
+            instructions: { Instructions("Default assistant") }
+        )
         #expect(type(of: session) == LanguageModelSession.self)
     }
     
@@ -29,9 +33,8 @@ struct LanguageModelSessionTests {
         
         let session = LanguageModelSession(
             model: SystemLanguageModel.default,
-            guardrails: .default,
             tools: tools,
-            instructions: instructions
+            instructions: { instructions }
         )
         #expect(type(of: session) == LanguageModelSession.self)
     }
@@ -46,7 +49,11 @@ struct LanguageModelSessionTests {
     @Test("LanguageModelSession basic async respond method works")
     func languageModelSessionRespondMethod() async throws {
         // Test that respond method is accessible and works
-        let session = LanguageModelSession()
+        let session = LanguageModelSession(
+            model: SystemLanguageModel.default,
+            tools: [],
+            instructions: { Instructions("You are a test assistant") }
+        )
         
         // This test verifies the method exists and can execute successfully
         let response = try await session.respond { Prompt("Hello") }
@@ -57,7 +64,11 @@ struct LanguageModelSessionTests {
     @Test("LanguageModelSession streaming method exists")
     func languageModelSessionStreamMethod() {
         // Test that streaming method is accessible (basic compilation test)
-        let session = LanguageModelSession()
+        let session = LanguageModelSession(
+            model: SystemLanguageModel.default,
+            tools: [],
+            instructions: { Instructions("You are a test assistant") }
+        )
         
         // This test verifies the method exists and returns correct type
         let stream = session.streamResponse { Prompt("Hello") }

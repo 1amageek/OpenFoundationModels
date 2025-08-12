@@ -168,17 +168,17 @@ struct GuidedGenerationTests {
     func generableProtocolMethodsExist() throws {
         // Test with actual JSON data containing a value
         let json = #"{"value": "test"}"#
-        let item = try TestItem(GeneratedContent(json))
+        let item = try TestItem(GeneratedContent(json: json))
         
         // Test that protocol methods are generated
         let generatedContent = item.generatedContent
         // Check that it contains the value (format may differ)
-        #expect(generatedContent.stringValue.contains("value"))
-        #expect(generatedContent.stringValue.contains("test"))
+        #expect(generatedContent.text.contains("value"))
+        #expect(generatedContent.text.contains("test"))
         
         // Test generatedContent property
         let converted = item.generatedContent
-        #expect(converted.stringValue == item.generatedContent.stringValue)
+        #expect(converted.text == item.generatedContent.text)
         
         // Test asPartiallyGenerated method
         let partial = item.asPartiallyGenerated()

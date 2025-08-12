@@ -41,11 +41,11 @@ extension Array: PromptRepresentable where Element: PromptRepresentable {
 
 extension GeneratedContent {
     public var instructionsRepresentation: Instructions {
-        return Instructions(self.stringValue)
+        return Instructions(self.text)
     }
     
     public var promptRepresentation: Prompt {
-        return Prompt(self.stringValue)
+        return Prompt(self.text)
     }
 }
 

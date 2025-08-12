@@ -102,7 +102,7 @@ struct GenerableMacroTests {
         // Test enum case to GeneratedContent conversion
         let activeStatus = TestGenerableStatus.active
         let content = activeStatus.generatedContent
-        #expect(content.stringValue == "active")
+        #expect(content.text == "active")
         
         // Test GeneratedContent to enum conversion
         let statusFromContent = try TestGenerableStatus(GeneratedContent("pending"))
@@ -127,26 +127,26 @@ struct GenerableMacroTests {
         let pendingResult = TestTaskResult.pending
         let pendingContent = pendingResult.generatedContent
         let pendingProps = try pendingContent.properties()
-        #expect(pendingProps["case"]?.stringValue == "pending")
+        #expect(pendingProps["case"]?.text == "pending")
         
         // Test labeled associated value case (treated as multiple values)
         let successResult = TestTaskResult.success(message: "Operation completed")
         let successContent = successResult.generatedContent
         let successProps = try successContent.properties()
-        #expect(successProps["case"]?.stringValue == "success")
+        #expect(successProps["case"]?.text == "success")
         
         // For labeled parameters, value is an object with properties
         let valueProps = try successProps["value"]?.properties()
-        #expect(valueProps?["message"]?.stringValue == "Operation completed")
+        #expect(valueProps?["message"]?.text == "Operation completed")
         
         // Test multiple associated values case
         let failureResult = TestTaskResult.failure(error: "Network error", code: 500)
         let failureContent = failureResult.generatedContent
         let failureProps = try failureContent.properties()
-        #expect(failureProps["case"]?.stringValue == "failure")
+        #expect(failureProps["case"]?.text == "failure")
         let failureValueProps = try failureProps["value"]?.properties()
-        #expect(failureValueProps?["error"]?.stringValue == "Network error")
-        #expect(failureValueProps?["code"]?.stringValue == "500")
+        #expect(failureValueProps?["error"]?.text == "Network error")
+        #expect(failureValueProps?["code"]?.text == "500")
     }
     
     @Test("@Generable macro generates init from GeneratedContent for enum with associated values")

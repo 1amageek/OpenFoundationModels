@@ -24,7 +24,7 @@ struct StreamingIntegrationTests {
         var valueIndex = 0
         
         let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
-            for (index, value) in expectedValues.enumerated() {
+            for value in expectedValues {
                 // String.PartiallyGenerated = String (default)
                 continuation.yield(value)
             }
@@ -190,8 +190,11 @@ struct StreamingIntegrationTests {
         
         let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
-        // Test collectPartials() captures all intermediate states
-        let allPartials = try await responseStream.collectPartials()
+        // Collect all partials manually 
+        var allPartials: [String] = []
+        for try await partial in responseStream {
+            allPartials.append(partial)
+        }
         
         #expect(allPartials.count == expectedPartials.count)
         for (index, partial) in allPartials.enumerated() {
@@ -284,7 +287,7 @@ struct StreamingIntegrationTests {
         let startTime = Date()
         
         var processedCount = 0
-        for try await partial in responseStream {
+        for try await _ in responseStream {
             processedCount += 1
             // For String, we need to track completion differently
             // Since we're just counting items, we can continue until the stream ends

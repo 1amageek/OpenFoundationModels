@@ -157,7 +157,7 @@ extension GenerationID: Generable {
     /// 
     /// - Returns: The generated content representation
     public var generatedContent: GeneratedContent {
-        return GeneratedContent(value.uuidString)
+        return try! GeneratedContent(json: "\"\(value.uuidString)\"")
     }
     
     /// Convert to partially generated representation

@@ -31,7 +31,7 @@ struct BasicToolTests {
             
             init(_ content: GeneratedContent) throws {
                 // Simple implementation - parse city from content
-                let value = content.stringValue
+                let value = content.text
                 self.city = value.isEmpty ? "Unknown" : value
             }
         }
@@ -59,7 +59,7 @@ struct BasicToolTests {
             let expression: String
             
             init(_ content: GeneratedContent) throws {
-                self.expression = content.stringValue
+                self.expression = content.text
             }
         }
         
@@ -68,7 +68,14 @@ struct BasicToolTests {
         func call(arguments: Arguments) async throws -> String {
             // Simple calculator logic
             if arguments.expression.contains("/0") {
-                throw ToolCallError.invalidArguments(toolName: "calculate", reason: "Division by zero")
+                throw LanguageModelSession.ToolCallError(
+                    toolName: "calculate",
+                    underlying: NSError(
+                        domain: "CalculateError",
+                        code: 400,
+                        userInfo: [NSLocalizedDescriptionKey: "Division by zero"]
+                    )
+                )
             }
             
             let result = CalculationResult(
@@ -194,8 +201,8 @@ struct BasicToolTests {
             Issue.record("Expected error to be thrown")
         } catch let error as ToolCallError {
             #expect(error.toolName == "calculate")
-            #expect(error.errorType == .invalidArguments)
-            #expect(error.localizedDescription.contains("Division by zero"))
+            // Check underlying error instead of errorType
+            #expect(error.underlying.localizedDescription.contains("Division by zero"))
         } catch {
             Issue.record("Wrong error type thrown: \(error)")
         }

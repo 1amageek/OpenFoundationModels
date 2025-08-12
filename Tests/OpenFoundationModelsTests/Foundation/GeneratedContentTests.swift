@@ -26,18 +26,18 @@ struct GeneratedContentTests {
     func generatedContentStringCreation() {
         let content = GeneratedContent("Hello, world!")
         
-        #expect(content.stringValue == "Hello, world!")
         #expect(content.text == "Hello, world!")
-        #expect(!content.stringValue.isEmpty)
+        #expect(content.text == "Hello, world!")
+        #expect(!content.text.isEmpty)
     }
     
     @Test("GeneratedContent creation with empty string")
     func generatedContentEmptyCreation() {
         let content = GeneratedContent("")
         
-        #expect(content.stringValue == "")
         #expect(content.text == "")
-        #expect(content.stringValue.isEmpty)
+        #expect(content.text == "")
+        #expect(content.text.isEmpty)
     }
     
     @Test("GeneratedContent text property access")
@@ -46,7 +46,7 @@ struct GeneratedContentTests {
         let content = GeneratedContent(text)
         
         #expect(content.text == text)
-        #expect(content.stringValue == text)
+        #expect(content.text == text)
     }
     
     // MARK: - JSON Content Tests
@@ -65,9 +65,9 @@ struct GeneratedContentTests {
         
         // JSON parsing converts to structured data, not raw string
         let properties = try content.properties()
-        #expect(properties["name"]?.stringValue == "John Doe")
-        #expect(properties["age"]?.stringValue == "30")
-        #expect(properties["email"]?.stringValue == "john@example.com")
+        #expect(properties["name"]?.text == "John Doe")
+        #expect(properties["age"]?.text == "30")
+        #expect(properties["email"]?.text == "john@example.com")
     }
     
     @Test("GeneratedContent with structured JSON data")
@@ -84,15 +84,15 @@ struct GeneratedContentTests {
         let content = try GeneratedContent(json: jsonString)
         
         let properties = try content.properties()
-        #expect(properties["title"]?.stringValue == "Sample Article")
-        #expect(properties["wordCount"]?.stringValue == "500")
-        #expect(properties["published"]?.stringValue == "true")
+        #expect(properties["title"]?.text == "Sample Article")
+        #expect(properties["wordCount"]?.text == "500")
+        #expect(properties["published"]?.text == "true")
         
         let tags = try properties["tags"]?.elements()
         #expect(tags?.count == 3)
-        #expect(tags?[0].stringValue == "technology")
-        #expect(tags?[1].stringValue == "AI")
-        #expect(tags?[2].stringValue == "swift")
+        #expect(tags?[0].text == "technology")
+        #expect(tags?[1].text == "AI")
+        #expect(tags?[2].text == "swift")
     }
     
     @Test("GeneratedContent with nested JSON structure")
@@ -119,12 +119,12 @@ struct GeneratedContentTests {
         let profileContent = userProperties?["profile"]
         let profileProperties = try profileContent?.properties()
         
-        #expect(profileProperties?["name"]?.stringValue == "Alice")
+        #expect(profileProperties?["name"]?.text == "Alice")
         
         let settingsContent = profileProperties?["settings"]
         let settingsProperties = try settingsContent?.properties()
-        #expect(settingsProperties?["theme"]?.stringValue == "dark")
-        #expect(settingsProperties?["notifications"]?.stringValue == "true")
+        #expect(settingsProperties?["theme"]?.text == "dark")
+        #expect(settingsProperties?["notifications"]?.text == "true")
     }
     
     // MARK: - Protocol Conformance Tests
@@ -147,7 +147,7 @@ struct GeneratedContentTests {
         // Should be able to convert from itself
         let convertedContent = try GeneratedContent(originalContent)
         
-        #expect(convertedContent.stringValue == originalContent.stringValue)
+        #expect(convertedContent.text == originalContent.text)
         #expect(convertedContent.text == originalContent.text)
     }
     
@@ -158,7 +158,7 @@ struct GeneratedContentTests {
         // Should convert to itself
         let converted = content.generatedContent
         
-        #expect(converted.stringValue == content.stringValue)
+        #expect(converted.text == content.text)
         #expect(converted.text == content.text)
     }
     
@@ -177,7 +177,7 @@ struct GeneratedContentTests {
         // GeneratedContent.PartiallyGenerated = GeneratedContent (default)
         // Only asPartiallyGenerated() is available (from protocol extension)
         let asPartial = content.asPartiallyGenerated()
-        #expect(asPartial.stringValue == content.stringValue)
+        #expect(asPartial.text == content.text)
     }
     
     // MARK: - Content Manipulation Tests
@@ -194,10 +194,10 @@ struct GeneratedContentTests {
         
         let content = GeneratedContent(multilineContent)
         
-        #expect(content.stringValue == multilineContent)
-        #expect(content.stringValue.contains("Line 1"))
-        #expect(content.stringValue.contains("Line 3"))
-        #expect(content.stringValue.contains("Additional paragraph"))
+        #expect(content.text == multilineContent)
+        #expect(content.text.contains("Line 1"))
+        #expect(content.text.contains("Line 3"))
+        #expect(content.text.contains("Additional paragraph"))
     }
     
     @Test("GeneratedContent with special characters")
@@ -205,10 +205,10 @@ struct GeneratedContentTests {
         let specialContent = "Content with émojis 🚀, quotes \"hello\", and symbols: ©®™"
         let content = GeneratedContent(specialContent)
         
-        #expect(content.stringValue == specialContent)
-        #expect(content.stringValue.contains("🚀"))
-        #expect(content.stringValue.contains("\"hello\""))
-        #expect(content.stringValue.contains("©®™"))
+        #expect(content.text == specialContent)
+        #expect(content.text.contains("🚀"))
+        #expect(content.text.contains("\"hello\""))
+        #expect(content.text.contains("©®™"))
     }
     
     @Test("GeneratedContent with Unicode characters")
@@ -216,11 +216,11 @@ struct GeneratedContentTests {
         let unicodeContent = "多言語テスト: English, 日本語, العربية, русский, 中文"
         let content = GeneratedContent(unicodeContent)
         
-        #expect(content.stringValue == unicodeContent)
-        #expect(content.stringValue.contains("日本語"))
-        #expect(content.stringValue.contains("العربية"))
-        #expect(content.stringValue.contains("русский"))
-        #expect(content.stringValue.contains("中文"))
+        #expect(content.text == unicodeContent)
+        #expect(content.text.contains("日本語"))
+        #expect(content.text.contains("العربية"))
+        #expect(content.text.contains("русский"))
+        #expect(content.text.contains("中文"))
     }
     
     // MARK: - Edge Cases and Validation
@@ -230,8 +230,8 @@ struct GeneratedContentTests {
         let longContent = String(repeating: "A", count: 10000)
         let content = GeneratedContent(longContent)
         
-        #expect(content.stringValue.count == 10000)
-        #expect(content.stringValue.allSatisfy { $0 == "A" })
+        #expect(content.text.count == 10000)
+        #expect(content.text.allSatisfy { $0 == "A" })
         #expect(content.text.count == 10000)
     }
     
@@ -240,9 +240,9 @@ struct GeneratedContentTests {
         let whitespaceContent = "   \n\t   \n   "
         let content = GeneratedContent(whitespaceContent)
         
-        #expect(content.stringValue == whitespaceContent)
-        #expect(!content.stringValue.isEmpty)
-        #expect(content.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        #expect(content.text == whitespaceContent)
+        #expect(!content.text.isEmpty)
+        #expect(content.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
     
     @Test("GeneratedContent with null characters")
@@ -250,8 +250,8 @@ struct GeneratedContentTests {
         let contentWithNull = "Content\u{0000}with\u{0000}null"
         let content = GeneratedContent(contentWithNull)
         
-        #expect(content.stringValue == contentWithNull)
-        #expect(content.stringValue.contains("\u{0000}"))
+        #expect(content.text == contentWithNull)
+        #expect(content.text.contains("\u{0000}"))
     }
     
     // MARK: - Complex Data Tests
@@ -296,16 +296,16 @@ struct GeneratedContentTests {
         let content = GeneratedContent(complexObject)
         
         // Test that the content was parsed correctly and contains expected elements
-        #expect(content.stringValue.contains("Alice"))
-        #expect(content.stringValue.contains("Bob"))
-        #expect(content.stringValue.contains("notifications"))
-        #expect(content.stringValue.contains("metadata"))
+        #expect(content.text.contains("Alice"))
+        #expect(content.text.contains("Bob"))
+        #expect(content.text.contains("notifications"))
+        #expect(content.text.contains("metadata"))
         
         // Verify JSON structure is preserved (though formatting may differ)
-        #expect(content.stringValue.contains("users"))
-        #expect(content.stringValue.contains("preferences"))
-        #expect(content.stringValue.contains("theme"))
-        #expect(content.stringValue.contains("language"))
+        #expect(content.text.contains("users"))
+        #expect(content.text.contains("preferences"))
+        #expect(content.text.contains("theme"))
+        #expect(content.text.contains("language"))
     }
     
     @Test("GeneratedContent representing code")
@@ -328,10 +328,10 @@ struct GeneratedContentTests {
         
         let content = GeneratedContent(swiftCode)
         
-        #expect(content.stringValue == swiftCode)
-        #expect(content.stringValue.contains("struct User"))
-        #expect(content.stringValue.contains("func isValid()"))
-        #expect(content.stringValue.contains("extension User: Codable"))
+        #expect(content.text == swiftCode)
+        #expect(content.text.contains("struct User"))
+        #expect(content.text.contains("func isValid()"))
+        #expect(content.text.contains("extension User: Codable"))
     }
     
     // MARK: - Performance Tests
@@ -342,7 +342,7 @@ struct GeneratedContentTests {
         
         for _ in 0..<1000 {
             let generated = GeneratedContent(content)
-            #expect(generated.stringValue == content)
+            #expect(generated.text == content)
         }
     }
     
@@ -357,7 +357,7 @@ struct GeneratedContentTests {
         
         // Check first element
         let firstElement = try elements[0].properties()
-        #expect(firstElement["key1"]?.stringValue == "value1")
+        #expect(firstElement["key1"]?.text == "value1")
     }
     
     // MARK: - Integration Tests
@@ -372,7 +372,7 @@ struct GeneratedContentTests {
         // Should be safe to use across concurrency boundaries
         Task {
             let asyncContent = content
-            #expect(asyncContent.stringValue == "Sendable test")
+            #expect(asyncContent.text == "Sendable test")
         }
     }
 }

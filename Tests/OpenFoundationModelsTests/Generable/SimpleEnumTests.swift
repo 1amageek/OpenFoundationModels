@@ -45,10 +45,10 @@ struct SimpleEnumTests {
         
         // Test conversion to GeneratedContent
         let activeContent = TestStatus.active.generatedContent
-        #expect(activeContent.stringValue == "active")
+        #expect(activeContent.text == "active")
         
         let inactiveContent = TestStatus.inactive.generatedContent
-        #expect(inactiveContent.stringValue == "inactive")
+        #expect(inactiveContent.text == "inactive")
     }
     
     @Test("Enum error handling with invalid case")

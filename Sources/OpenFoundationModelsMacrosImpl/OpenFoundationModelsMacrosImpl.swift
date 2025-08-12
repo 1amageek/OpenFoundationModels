@@ -181,7 +181,20 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
     
     /// Get default value for a type
     private static func getDefaultValue(for type: String) -> String {
-        switch type.trimmingCharacters(in: .whitespacesAndNewlines) {
+        let trimmedType = type.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Check for Optional types (ends with ?)
+        if trimmedType.hasSuffix("?") {
+            return "nil"
+        }
+        
+        // Check for Array types (starts with [ and ends with ])
+        if trimmedType.hasPrefix("[") && trimmedType.hasSuffix("]") {
+            return "[]"
+        }
+        
+        // Handle basic types
+        switch trimmedType {
         case "String":
             return "\"\""
         case "Int":
@@ -191,7 +204,8 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         case "Bool":
             return "false"
         default:
-            return "\"\""
+            // For custom types, return nil (will need proper handling in generatePropertyExtraction)
+            return "nil"
         }
     }
     
@@ -295,50 +309,106 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             """
         default:
             // For complex types, try to use their init(_:) if they conform to ConvertibleFromGeneratedContent
-            return """
-            if let value = properties["\(propertyName)"] {
-                self.\(propertyName) = try \(propertyType)(value)
+            // Check if the type is optional or an array
+            let isOptional = propertyType.hasSuffix("?")
+            let isArray = propertyType.hasPrefix("[") && propertyType.hasSuffix("]")
+            
+            if isOptional {
+                // For optional types, can safely use nil
+                return """
+                if let value = properties["\(propertyName)"] {
+                    self.\(propertyName) = try \(propertyType.replacingOccurrences(of: "?", with: ""))(value)
+                } else {
+                    self.\(propertyName) = nil
+                }
+                """
+            } else if isArray {
+                // For array types, use empty array as default
+                return """
+                if let value = properties["\(propertyName)"] {
+                    self.\(propertyName) = try \(propertyType)(value)
+                } else {
+                    self.\(propertyName) = []
+                }
+                """
             } else {
-                // TODO: Handle missing property - for now use default
-                self.\(propertyName) = \(getDefaultValue(for: propertyType))
+                // For non-optional custom types, we need to handle carefully
+                // In PartiallyGenerated context, everything is optional, so this shouldn't happen
+                // But for normal init, we might want to throw an error or use a default constructor
+                return """
+                if let value = properties["\(propertyName)"] {
+                    self.\(propertyName) = try \(propertyType)(value)
+                } else {
+                    // For non-optional custom types, attempt default initialization
+                    // This will fail at compile time if no default init exists
+                    self.\(propertyName) = try \(propertyType)(GeneratedContent("{}"))
+                }
+                """
             }
-            """
         }
     }
     
     /// Generate generatedContent property according to Apple specs
     private static func generateGeneratedContentProperty(structName: String, description: String?, properties: [PropertyInfo]) -> DeclSyntax {
-        // Generate property conversions
+        // Generate property conversion code for each property
         let propertyConversions = properties.map { prop in
             let propName = prop.name
             let propType = prop.type
             
-            // Handle different types
-            switch propType {
-            case "String", "String?":
-                return "\"\(propName)\": GeneratedContent(kind: .string(self.\(propName)))"
-            case "Int", "Int?":
-                return "\"\(propName)\": GeneratedContent(kind: .number(Double(self.\(propName))))"
-            case "Double", "Double?":
-                return "\"\(propName)\": GeneratedContent(kind: .number(self.\(propName)))"
-            case "Float", "Float?":
-                return "\"\(propName)\": GeneratedContent(kind: .number(Double(self.\(propName))))"
-            case "Bool", "Bool?":
-                return "\"\(propName)\": GeneratedContent(kind: .bool(self.\(propName)))"
-            default:
-                // For other types, assume they have generatedContent property
-                return "\"\(propName)\": self.\(propName).generatedContent"
+            if propType.hasSuffix("?") {
+                // Optional property
+                let baseType = String(propType.dropLast()) // Remove "?"
+                if baseType == "String" {
+                    return "properties[\"\(propName)\"] = \(propName).map { GeneratedContent($0) } ?? GeneratedContent(kind: .null)"
+                } else if baseType == "Int" || baseType == "Double" || baseType == "Float" || baseType == "Bool" {
+                    return "properties[\"\(propName)\"] = \(propName).map { GeneratedContent(String($0)) } ?? GeneratedContent(kind: .null)"
+                } else if baseType.hasPrefix("[") && baseType.hasSuffix("]") {
+                    // Optional array
+                    return "properties[\"\(propName)\"] = \(propName).map { GeneratedContent(elements: $0) } ?? GeneratedContent(kind: .null)"
+                } else {
+                    // Custom optional type
+                    return "properties[\"\(propName)\"] = \(propName)?.generatedContent ?? GeneratedContent(kind: .null)"
+                }
+            } else if propType.hasPrefix("[") && propType.hasSuffix("]") {
+                // Array property
+                let elementType = String(propType.dropFirst().dropLast())
+                if elementType == "String" {
+                    return "properties[\"\(propName)\"] = GeneratedContent(elements: \(propName))"
+                } else if elementType == "Int" || elementType == "Double" || elementType == "Bool" || elementType == "Float" {
+                    return "properties[\"\(propName)\"] = GeneratedContent(elements: \(propName).map { String($0) })"
+                } else {
+                    // Custom type array
+                    return "properties[\"\(propName)\"] = GeneratedContent(elements: \(propName))"
+                }
+            } else {
+                // Required non-array property
+                switch propType {
+                case "String":
+                    return "properties[\"\(propName)\"] = GeneratedContent(\(propName))"
+                case "Int", "Double", "Float", "Bool":
+                    return "properties[\"\(propName)\"] = GeneratedContent(String(\(propName)))"
+                default:
+                    // Custom type
+                    return "properties[\"\(propName)\"] = \(propName).generatedContent"
+                }
             }
-        }.joined(separator: ",\n                ")
+        }.joined(separator: "\n            ")
         
-        // Get ordered keys
         let orderedKeys = properties.map { "\"\($0.name)\"" }.joined(separator: ", ")
         
         return DeclSyntax(stringLiteral: """
         public var generatedContent: GeneratedContent {
             // ✅ CONFIRMED: Apple generates generatedContent property
-            // Return the stored GeneratedContent
-            return self._rawGeneratedContent
+            // Build GeneratedContent from current property values
+            var properties: [String: GeneratedContent] = [:]
+            \(propertyConversions)
+            
+            return GeneratedContent(
+                kind: .structure(
+                    properties: properties,
+                    orderedKeys: [\(orderedKeys)]
+                )
+            )
         }
         """)
     }
@@ -433,8 +503,17 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
     /// Generate PartiallyGenerated nested struct according to Apple specs
     private static func generatePartiallyGeneratedStruct(structName: String, properties: [PropertyInfo]) -> DeclSyntax {
         // Generate optional properties for partial representation
+        // Avoid double optionals by checking if the type is already optional
         let optionalProperties = properties.map { prop in
-            "public let \(prop.name): \(prop.type)?"
+            let propertyType = prop.type
+            // Check if the type already ends with ?
+            if propertyType.hasSuffix("?") {
+                // Already optional, don't add another ?
+                return "public let \(prop.name): \(propertyType)"
+            } else {
+                // Make it optional
+                return "public let \(prop.name): \(propertyType)?"
+            }
         }.joined(separator: "\n        ")
         
         // Generate property extraction from GeneratedContent
@@ -495,7 +574,7 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
     private static func generateInstructionsRepresentationProperty() -> DeclSyntax {
         return DeclSyntax(stringLiteral: """
         public var instructionsRepresentation: Instructions {
-            return Instructions(self.generatedContent.stringValue)
+            return Instructions(self.generatedContent.text)
         }
         """)
     }
@@ -504,7 +583,7 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
     private static func generatePromptRepresentationProperty() -> DeclSyntax {
         return DeclSyntax(stringLiteral: """
         public var promptRepresentation: Prompt {
-            return Prompt(self.generatedContent.stringValue)
+            return Prompt(self.generatedContent.text)
         }
         """)
     }
@@ -576,7 +655,7 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                 do {
                     let properties = try generatedContent.properties()
                     
-                    guard let caseValue = properties["case"]?.stringValue else {
+                    guard let caseValue = properties["case"]?.text else {
                         throw GenerationError.decodingFailure(
                             GenerationError.Context(debugDescription: "Missing 'case' property in enum data for \(enumName)")
                         )
@@ -593,7 +672,7 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                     }
                 } catch {
                     // Fallback: try simple string parsing for backward compatibility
-                    let value = generatedContent.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let value = generatedContent.text.trimmingCharacters(in: .whitespacesAndNewlines)
                     switch value {
                     \(cases.filter { !$0.hasAssociatedValues }.map { "case \"\($0.name)\": self = .\($0.name)" }.joined(separator: "\n                    "))
                     default:
@@ -614,7 +693,7 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             public init(_ generatedContent: GeneratedContent) throws {
                 // ✅ CONFIRMED: Apple generates init(_:) initializer for simple enums
                 // Parse enum case from GeneratedContent string value
-                let value = generatedContent.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                let value = generatedContent.text.trimmingCharacters(in: .whitespacesAndNewlines)
                 
                 switch value {
                 \(switchCases)
@@ -635,7 +714,7 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             return """
             case "\(caseName)":
                 if let valueContent = valueContent {
-                    let stringValue = valueContent.stringValue
+                    let stringValue = valueContent.text
                     self = .\(caseName)(stringValue)
                 } else {
                     self = .\(caseName)("")
@@ -645,7 +724,7 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             return """
             case "\(caseName)":
                 if let valueContent = valueContent,
-                   let intValue = Int(valueContent.stringValue) {
+                   let intValue = Int(valueContent.text) {
                     self = .\(caseName)(intValue)
                 } else {
                     self = .\(caseName)(0)
@@ -655,7 +734,7 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             return """
             case "\(caseName)":
                 if let valueContent = valueContent,
-                   let doubleValue = Double(valueContent.stringValue) {
+                   let doubleValue = Double(valueContent.text) {
                     self = .\(caseName)(doubleValue)
                 } else {
                     self = .\(caseName)(0.0)
@@ -665,7 +744,7 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             return """
             case "\(caseName)":
                 if let valueContent = valueContent {
-                    let boolValue = valueContent.stringValue.lowercased() == "true"
+                    let boolValue = valueContent.text.lowercased() == "true"
                     self = .\(caseName)(boolValue)
                 } else {
                     self = .\(caseName)(false)
@@ -695,13 +774,13 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             
             switch type {
             case "String":
-                return "let \(label) = valueProperties[\"\(label)\"]?.stringValue ?? \"\""
+                return "let \(label) = valueProperties[\"\(label)\"]?.text ?? \"\""
             case "Int":
-                return "let \(label) = Int(valueProperties[\"\(label)\"]?.stringValue ?? \"0\") ?? 0"
+                return "let \(label) = Int(valueProperties[\"\(label)\"]?.text ?? \"0\") ?? 0"
             case "Double":
-                return "let \(label) = Double(valueProperties[\"\(label)\"]?.stringValue ?? \"0.0\") ?? 0.0"
+                return "let \(label) = Double(valueProperties[\"\(label)\"]?.text ?? \"0.0\") ?? 0.0"
             case "Bool":
-                return "let \(label) = valueProperties[\"\(label)\"]?.stringValue?.lowercased() == \"true\""
+                return "let \(label) = valueProperties[\"\(label)\"]?.text?.lowercased() == \"true\""
             default:
                 return "let \(label) = try \(type)(valueProperties[\"\(label)\"] ?? GeneratedContent(\"{}\"))"
             }
@@ -857,7 +936,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         if hasAnyAssociatedValues {
             // Mixed enum with both simple and associated value cases
             // Use object type with discriminated union approach
-            let caseNames = cases.map { "\"\($0.name)\"" }.joined(separator: ", ")
             
             // Create properties for discriminated union
             let caseProperty = """
