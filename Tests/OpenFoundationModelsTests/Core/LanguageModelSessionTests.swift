@@ -39,12 +39,6 @@ struct LanguageModelSessionTests {
         #expect(type(of: session) == LanguageModelSession.self)
     }
     
-    @Test("LanguageModelSession Guardrails nested type")
-    func languageModelSessionGuardrails() {
-        // Test that Guardrails default is accessible
-        let guardrails = LanguageModelSession.Guardrails.default
-        #expect(type(of: guardrails) == LanguageModelSession.Guardrails.self)
-    }
     
     @Test("LanguageModelSession basic async respond method works")
     func languageModelSessionRespondMethod() async throws {

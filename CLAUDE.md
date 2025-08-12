@@ -413,7 +413,7 @@ public enum GenerationError: Error {
    - `GeneratedContent`: Structured content representation
 
 3. **LanguageModelSession** (Apple Official API)
-   - Multiple Apple-compliant initializers with `guardrails`, `tools`, `instructions`
+   - Multiple Apple-compliant initializers with `tools`, `instructions`
    - Closure-based prompts: `prompt: () throws -> Prompt`
    - Generic responses: `Response<Content>` where `Content: Generable`
    - Streaming: `ResponseStream<Content>` with AsyncSequence
@@ -442,8 +442,8 @@ public enum GenerationError: Error {
    - `ToolCallError`: Tool execution errors
    - `LanguageModelError`: Model-specific errors
 
-6. **Safety & Guardrails**
-   - `Guardrails`: Content safety system
+6. **Error Handling**
+   - `GenerationError`: Apple-compliant error enum (includes guardrailViolation)
    - `GenerationOptions`: Generation configuration
    - `GenerationSchema`: Structured generation schemas
 
@@ -568,14 +568,12 @@ This methodical approach ensures rock-solid test coverage and prevents accumulat
 // Apple official convenience initializers
 convenience init(
     model: SystemLanguageModel = SystemLanguageModel.default,
-    guardrails: Guardrails = .default,
     tools: [any Tool] = [],
-    instructions: Instructions? = nil
-)
+    @InstructionsBuilder instructions: () throws -> Instructions
+) rethrows
 
 convenience init(
     model: SystemLanguageModel = SystemLanguageModel.default,
-    guardrails: Guardrails = .default,
     tools: [any Tool] = [],
     transcript: Transcript
 )
@@ -684,7 +682,6 @@ remark --plain-text https://developer.apple.com/documentation/foundationmodels/r
 - GenerationOptions: `https://developer.apple.com/documentation/foundationmodels/generationoptions`
 - GenerationGuide: `https://developer.apple.com/documentation/foundationmodels/generationguide`
 - DynamicGenerationSchema: `https://developer.apple.com/documentation/foundationmodels/dynamicgenerationschema`
-- Guardrails: `https://developer.apple.com/documentation/foundationmodels/guardrails`
 - Generable: `https://developer.apple.com/documentation/foundationmodels/generable`
 - GenerationSchema: `https://developer.apple.com/documentation/foundationmodels/generationschema`
 - GeneratedContent: `https://developer.apple.com/documentation/foundationmodels/generatedcontent`
@@ -759,8 +756,7 @@ func useFromAnotherTask<T: P & SendableMetatype>(_: T.Type) {
 ### Foundation Models での使用
 Apple Foundation Modelsでは、以下の型がSendableMetatypeに準拠：
 - GenerationSchema
-- GenerationOptions  
-- Guardrails
+- GenerationOptions
 - Tool（プロトコル）
 - LanguageModelFeedback およびネスト型（Sentiment, Issue, Issue.Category）
 - Transcript およびすべてのネスト型
@@ -777,7 +773,7 @@ Apple Foundation Modelsでは、以下の型がSendableMetatypeに準拠：
 - **Transcript**: Complete with all nested types
 - **Response/ResponseStream**: Generic types with Apple specifications
 - **SendableMetatype準拠**: すべての必要な型で正しく実装
-  - GenerationSchema, GenerationOptions, Guardrails（Extension経由）
+  - GenerationSchema, GenerationOptions
   - LanguageModelFeedback.Sentiment/Issue/Category
   - Transcript.Entry（Apple仕様通り）
   - Tool プロトコル
