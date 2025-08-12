@@ -60,7 +60,7 @@ struct GenerableMacroTests {
     func generableMacroCompilation() throws {
         // Test that the macro generates required functionality
         // Create instance from GeneratedContent to verify init(_:) was generated
-        let content = GeneratedContent("{\"value\": \"test\"}")
+        let content = try GeneratedContent(json: "{\"value\": \"test\"}")
         let instance = try TestSimpleStruct(content)
         
         // Verify generatedContent property was generated
@@ -155,7 +155,7 @@ struct GenerableMacroTests {
         let pendingJson = """
         {"case": "pending", "value": ""}
         """
-        let pendingContent = GeneratedContent(pendingJson)
+        let pendingContent = try GeneratedContent(json: pendingJson)
         let pendingResult = try TestTaskResultInit(pendingContent)
         if case .pending = pendingResult {
             // Test passes - correct case parsed
@@ -167,7 +167,7 @@ struct GenerableMacroTests {
         let successJson = """
         {"case": "success", "value": {"message": "Operation completed"}}
         """
-        let successContent = GeneratedContent(successJson)
+        let successContent = try GeneratedContent(json: successJson)
         let successResult = try TestTaskResultInit(successContent)
         if case .success(let message) = successResult {
             #expect(message == "Operation completed")
@@ -179,7 +179,7 @@ struct GenerableMacroTests {
         let failureJson = """
         {"case": "failure", "value": {"error": "Network error", "code": "500"}}
         """
-        let failureContent = GeneratedContent(failureJson)
+        let failureContent = try GeneratedContent(json: failureJson)
         let failureResult = try TestTaskResultInit(failureContent)
         if case .failure(let error, let code) = failureResult {
             #expect(error == "Network error")
