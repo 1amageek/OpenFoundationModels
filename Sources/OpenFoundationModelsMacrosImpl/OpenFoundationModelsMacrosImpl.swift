@@ -60,7 +60,7 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                 // Removed generateEnumFromGeneratedContentMethod and generateToGeneratedContentMethod
                 // as they are not needed with the new protocol design
                 generateEnumGenerationSchemaProperty(enumName: enumName, description: description, cases: cases),
-                generateAsPartiallyGeneratedMethod(structName: enumName),
+                generateAsPartiallyGeneratedMethodForEnum(enumName: enumName),
                 // Need to generate these properties as they don't have default implementations
                 generateInstructionsRepresentationProperty(),
                 generatePromptRepresentationProperty()
@@ -490,11 +490,23 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         """)
     }
     
-    /// Generate asPartiallyGenerated method
+    /// Generate asPartiallyGenerated method for structs
     private static func generateAsPartiallyGeneratedMethod(structName: String) -> DeclSyntax {
         return DeclSyntax(stringLiteral: """
         public func asPartiallyGenerated() -> PartiallyGenerated {
             // Convert this instance to its PartiallyGenerated representation
+            // Use the raw generated content to preserve the original JSON structure
+            return try! PartiallyGenerated(self._rawGeneratedContent)
+        }
+        """)
+    }
+    
+    /// Generate asPartiallyGenerated method for enums
+    private static func generateAsPartiallyGeneratedMethodForEnum(enumName: String) -> DeclSyntax {
+        return DeclSyntax(stringLiteral: """
+        public func asPartiallyGenerated() -> PartiallyGenerated {
+            // For enums, convert to generatedContent and then to PartiallyGenerated
+            // Enums don't store raw content, so we use the generated representation
             return try! PartiallyGenerated(self.generatedContent)
         }
         """)
