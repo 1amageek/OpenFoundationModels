@@ -18,7 +18,7 @@ extension ConvertibleToGeneratedContent {
     /// 
     /// **Apple Official API:** `var instructionsRepresentation: Instructions`
     public var instructionsRepresentation: Instructions {
-        return Instructions(self.generatedContent.stringValue)
+        return Instructions(self.generatedContent.text)
     }
     
     /// An instance that represents a prompt.
@@ -30,6 +30,6 @@ extension ConvertibleToGeneratedContent {
     /// 
     /// **Apple Official API:** `var promptRepresentation: Prompt`
     public var promptRepresentation: Prompt {
-        return Prompt(self.generatedContent.stringValue)
+        return Prompt(self.generatedContent.text)
     }
 }

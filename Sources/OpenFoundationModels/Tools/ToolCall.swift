@@ -71,7 +71,7 @@ public extension ToolCall {
     /// - Throws: DecodingError if decoding fails
     func decodeArguments<T: Decodable>(as type: T.Type) throws -> T {
         // Convert GeneratedContent back to JSON data
-        let jsonString = arguments.stringValue
+        let jsonString = arguments.text
         guard let data = jsonString.data(using: .utf8) else {
             throw ToolCallError(
                 toolName: name,
@@ -104,7 +104,7 @@ public extension ToolCall {
                 result[key] = try elements.map { try convertToSwiftObject($0) }
             } else {
                 // Simple value
-                result[key] = value.stringValue
+                result[key] = value.text
             }
         }
         return result
@@ -121,7 +121,7 @@ public extension ToolCall {
         } else if let elements = try? content.elements() {
             return try elements.map { try convertToSwiftObject($0) }
         } else {
-            return content.stringValue
+            return content.text
         }
     }
 }
@@ -131,6 +131,6 @@ public extension ToolCall {
 
 extension ToolCall: CustomStringConvertible {
     public var description: String {
-        return "ToolCall(id: \(id), name: \(name), arguments: \(arguments.stringValue))"
+        return "ToolCall(id: \(id), name: \(name), arguments: \(arguments.text))"
     }
 }

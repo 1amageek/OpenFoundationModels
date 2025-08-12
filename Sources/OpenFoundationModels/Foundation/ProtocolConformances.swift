@@ -49,7 +49,7 @@ extension String: Generable {
     /// Converts string to generated content format.
     /// ✅ CONFIRMED: Required by ConvertibleToGeneratedContent
     public var generatedContent: GeneratedContent {
-        return GeneratedContent(self)
+        return GeneratedContent(kind: .string(self))
     }
     
     // asPartiallyGenerated() uses default implementation from protocol extension
@@ -107,10 +107,7 @@ extension Array: ConvertibleToGeneratedContent where Element: ConvertibleToGener
     /// An instance that represents the generated content.
     public var generatedContent: GeneratedContent {
         let elements = self.map { $0.generatedContent }
-        // Create a JSON array representation
-        let jsonArray = elements.map { $0.text }
-        let jsonString = "[\(jsonArray.map { "\"\($0)\"" }.joined(separator: ", "))]"
-        return GeneratedContent(jsonString)
+        return GeneratedContent(kind: .array(elements))
     }
 }
 

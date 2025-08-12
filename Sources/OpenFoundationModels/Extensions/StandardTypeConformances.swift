@@ -38,7 +38,7 @@ extension Bool: Generable {
     
     /// An instance that represents the generated content.
     public var generatedContent: GeneratedContent {
-        return GeneratedContent(self ? "true" : "false")
+        return GeneratedContent(kind: .bool(self))
     }
     
     // asPartiallyGenerated() uses default implementation from protocol extension
@@ -73,7 +73,7 @@ extension Int: Generable {
     
     /// An instance that represents the generated content.
     public var generatedContent: GeneratedContent {
-        return GeneratedContent(String(self))
+        return GeneratedContent(kind: .number(Double(self)))
     }
     
     // asPartiallyGenerated() uses default implementation from protocol extension
@@ -108,7 +108,7 @@ extension Float: Generable {
     
     /// An instance that represents the generated content.
     public var generatedContent: GeneratedContent {
-        return GeneratedContent(String(self))
+        return GeneratedContent(kind: .number(Double(self)))
     }
     
     // asPartiallyGenerated() uses default implementation from protocol extension
@@ -143,7 +143,7 @@ extension Double: Generable {
     
     /// An instance that represents the generated content.
     public var generatedContent: GeneratedContent {
-        return GeneratedContent(String(self))
+        return GeneratedContent(kind: .number(self))
     }
     
     // asPartiallyGenerated() uses default implementation from protocol extension
