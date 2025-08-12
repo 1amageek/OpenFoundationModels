@@ -2,7 +2,7 @@
 
 [![Swift](https://img.shields.io/badge/Swift-6.1+-orange.svg)](https://swift.org)
 [![Platform](https://img.shields.io/badge/Platform-iOS%20%7C%20macOS%20%7C%20tvOS%20%7C%20watchOS%20%7C%20visionOS-blue.svg)](https://developer.apple.com)
-[![Tests](https://img.shields.io/badge/Tests-154%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/Tests-221%20passing-brightgreen.svg)](#testing)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/1amageek/OpenFoundationModels)
 
@@ -35,10 +35,10 @@ import OpenFoundationModels
 // 🎯 100% API Compatible - No code changes required
 let session = LanguageModelSession(
     model: SystemLanguageModel.default,
-    guardrails: .default,
-    tools: [],
-    instructions: nil
-)
+    tools: []
+) {
+    Instructions("You are a helpful assistant")
+}
 ```
 
 **✅ Apple Official API Compliant**: Code migration with just `import` change  
@@ -71,7 +71,13 @@ swift run openai-chat
 import OpenFoundationModels
 
 // Apple's official API - works everywhere
-let session = LanguageModelSession()
+let session = LanguageModelSession(
+    model: SystemLanguageModel.default,
+    tools: []
+) {
+    Instructions("You are a helpful assistant")
+}
+
 let response = try await session.respond {
     Prompt("Hello, OpenFoundationModels!")
 }
@@ -99,7 +105,7 @@ let response = try await session.respond {
 ✅ **Structured Generation** - Type-safe data with `@Generable` macro  
 ✅ **Real-time Streaming** - Responsive UI with partial updates  
 ✅ **Tool Calling** - Let LLMs execute your functions  
-✅ **Production Ready** - 154 tests passing, memory efficient, thread-safe
+✅ **Production Ready** - 221 tests passing, memory efficient, thread-safe
 
 ## Installation
 
@@ -148,10 +154,10 @@ guard model.isAvailable else {
 // Create session (Apple Official API)
 let session = LanguageModelSession(
     model: model,
-    guardrails: .default,
-    tools: [],
-    instructions: nil
-)
+    tools: []
+) {
+    Instructions("You are a helpful assistant")
+}
 
 // Apple Official closure-based prompt
 let response = try await session.respond {
@@ -263,8 +269,11 @@ struct WeatherTool: Tool {
 
 // LLM decides when to call tools
 let session = LanguageModelSession(
+    model: SystemLanguageModel.default,
     tools: [WeatherTool()]
-)
+) {
+    Instructions("You are a helpful assistant that can check weather")
+}
 
 let response = try await session.respond {
     Prompt("What's the weather in Tokyo and Paris?")
@@ -286,10 +295,15 @@ let options = GenerationOptions(
 )
 
 // Apply custom instructions
-let session = LanguageModelSession {
-    "You are a Swift expert."
-    "Use modern Swift 6.1+ features."
-    "Include error handling in all examples."
+let session = LanguageModelSession(
+    model: SystemLanguageModel.default,
+    tools: []
+) {
+    Instructions("""
+        You are a Swift expert.
+        Use modern Swift 6.1+ features.
+        Include error handling in all examples.
+        """)
 }
 
 let response = try await session.respond(options: options) {
@@ -336,7 +350,12 @@ let analysis = try await session.respond(
 ### 🤖 AI Chatbots
 ```swift
 // Build chatbots that work on any platform
-let chatbot = LanguageModelSession(model: provider.model)
+let chatbot = LanguageModelSession(
+    model: provider.model,
+    tools: []
+) {
+    Instructions("You are a helpful chatbot assistant")
+}
 let response = try await chatbot.respond { 
     Prompt(userMessage) 
 }
@@ -408,7 +427,7 @@ OpenFoundationModels provides a complete ecosystem with core framework, provider
 ### 🏗️ Core Framework
 - **[OpenFoundationModels](https://github.com/1amageek/OpenFoundationModels)** - Apple Foundation Models compatible core framework
 - 100% API compatibility with Apple's official specification
-- 154 tests passing with comprehensive coverage
+- 221 tests passing with comprehensive coverage
 
 ### 🔗 Provider Integrations
 - **[OpenFoundationModels-OpenAI](https://github.com/1amageek/OpenFoundationModels-OpenAI)** ✅ **Complete**
@@ -447,7 +466,7 @@ Provider adapters can be added for:
 ## Testing
 
 ```bash
-# Run all 154 tests
+# Run all 221 tests
 swift test
 
 # Test specific components
