@@ -16,15 +16,17 @@ public protocol LanguageModel: Sendable {
     /// - Parameters:
     ///   - prompt: The input prompt
     ///   - options: Generation options (optional)
+    ///   - tools: Available tools for function calling (optional)
     /// - Returns: The generated response as a string
-    func generate(prompt: String, options: GenerationOptions?) async throws -> String
+    func generate(prompt: String, options: GenerationOptions?, tools: [any Tool]?) async throws -> String
     
     /// Stream a response for the given prompt
     /// - Parameters:
     ///   - prompt: The input prompt
     ///   - options: Generation options (optional)
+    ///   - tools: Available tools for function calling (optional)
     /// - Returns: An async stream of partial responses
-    func stream(prompt: String, options: GenerationOptions?) -> AsyncStream<String>
+    func stream(prompt: String, options: GenerationOptions?, tools: [any Tool]?) -> AsyncStream<String>
     
     /// Check if the model is available for use
     /// - Returns: true if the model is ready for requests

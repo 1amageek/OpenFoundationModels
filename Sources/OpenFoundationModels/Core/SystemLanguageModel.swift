@@ -159,7 +159,7 @@ public final class SystemLanguageModel: Observable, Sendable, Copyable, Language
     
     /// Generate text response from prompt
     /// ✅ APPLE SPEC: Public method for LanguageModel protocol conformance
-    public func generate(prompt: String, options: GenerationOptions?) async throws -> String {
+    public func generate(prompt: String, options: GenerationOptions?, tools: [any Tool]? = nil) async throws -> String {
         // Mock implementation - replace with actual model integration
         // For now, simulate basic response generation
         try await Task.sleep(nanoseconds: 100_000_000) // 0.1 second delay
@@ -198,11 +198,11 @@ public final class SystemLanguageModel: Observable, Sendable, Copyable, Language
     
     /// Generate streaming text response
     /// ✅ APPLE SPEC: Public method for LanguageModel protocol conformance
-    public func stream(prompt: String, options: GenerationOptions?) -> AsyncStream<String> {
+    public func stream(prompt: String, options: GenerationOptions?, tools: [any Tool]? = nil) -> AsyncStream<String> {
         return AsyncStream { continuation in
             Task {
                 // Mock streaming implementation
-                let response = try await generate(prompt: prompt, options: options)
+                let response = try await generate(prompt: prompt, options: options, tools: tools)
                 let chunks = response.chunked(into: 10) // Split into chunks
                 
                 for chunk in chunks {

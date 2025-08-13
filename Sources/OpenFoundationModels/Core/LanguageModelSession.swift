@@ -103,7 +103,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
     ) async throws -> LanguageModelSession.Response<String> {
         let promptValue = try prompt()
         let promptText = promptValue.description
-        let content = try await model.generate(prompt: promptText, options: options)
+        let content = try await model.generate(prompt: promptText, options: options, tools: tools)
         
         // Create transcript entries
         let promptEntry = Transcript.Entry.prompt(
@@ -146,7 +146,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
             "\(promptText)\n\nGenerate response following this schema: \(Content.generationSchema)" : 
             promptText
         
-        let text = try await model.generate(prompt: schemaPrompt, options: options)
+        let text = try await model.generate(prompt: schemaPrompt, options: options, tools: tools)
         let generatedContent = GeneratedContent(text)
         let content = try Content(generatedContent)
         
@@ -191,7 +191,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
             "\(promptText)\n\nGenerate response following this schema: \(schema)" : 
             promptText
         
-        let text = try await model.generate(prompt: schemaPrompt, options: options)
+        let text = try await model.generate(prompt: schemaPrompt, options: options, tools: tools)
         let content = GeneratedContent(text)
         
         // Create transcript entries
@@ -275,7 +275,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         
         let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
             Task<Void, Never> {
-                let stringStream = model.stream(prompt: promptText, options: options)
+                let stringStream = model.stream(prompt: promptText, options: options, tools: tools)
                 var accumulatedContent = ""
                 
                 for await chunk in stringStream {
@@ -309,7 +309,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                     "\(promptText)\n\nGenerate response following this schema: \(Content.generationSchema)" : 
                     promptText
                 
-                let stringStream = model.stream(prompt: schemaPrompt, options: options)
+                let stringStream = model.stream(prompt: schemaPrompt, options: options, tools: tools)
                 var accumulatedText = ""
                 
                 for await chunk in stringStream {
@@ -350,7 +350,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                     "\(promptText)\n\nGenerate response following this schema: \(schema)" : 
                     promptText
                 
-                let stringStream = model.stream(prompt: schemaPrompt, options: options)
+                let stringStream = model.stream(prompt: schemaPrompt, options: options, tools: tools)
                 var accumulatedText = ""
                 
                 for await chunk in stringStream {
