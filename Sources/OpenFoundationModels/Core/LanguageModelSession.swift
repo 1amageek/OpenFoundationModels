@@ -51,7 +51,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
     /// Start a new session in blank slate state with instructions builder.
     /// ✅ APPLE SPEC: convenience init(model:tools:instructions:)
     public convenience init(
-        model: SystemLanguageModel = .default,
+        model: any LanguageModel = SystemLanguageModel.default,
         tools: [any Tool] = [],
         @InstructionsBuilder instructions: () throws -> Instructions
     ) rethrows {
@@ -64,7 +64,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
     /// Start a session by rehydrating from a transcript.
     /// ✅ APPLE SPEC: convenience init(model:tools:transcript:)
     public convenience init(
-        model: SystemLanguageModel = .default,
+        model: any LanguageModel = SystemLanguageModel.default,
         tools: [any Tool] = [],
         transcript: Transcript
     ) {
