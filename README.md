@@ -100,6 +100,7 @@ let response = try await session.respond {
 ## Key Features
 
 ✅ **100% Apple API Compatible** - Same code as Apple Foundation Models, just change the import  
+✅ **Transcript-Centric Design** - Apple's official conversation management system  
 ✅ **Multi-Platform** - Works everywhere: Linux, Windows, Android, Docker, CI/CD  
 ✅ **Provider Freedom** - OpenAI, Anthropic, Ollama, or any LLM provider  
 ✅ **Structured Generation** - Type-safe data with `@Generable` macro  
@@ -151,7 +152,8 @@ guard model.isAvailable else {
     return
 }
 
-// Create session (Apple Official API)
+// Create session with instructions (Apple Official API)
+// Instructions and tools are stored in Transcript as the first entry
 let session = LanguageModelSession(
     model: model,
     tools: []
@@ -160,11 +162,15 @@ let session = LanguageModelSession(
 }
 
 // Apple Official closure-based prompt
+// Each prompt is added to the Transcript, maintaining full conversation history
 let response = try await session.respond {
     Prompt("Tell me about Swift 6.1 new features")
 }
 
 print(response.content)
+
+// Access the complete conversation history via Transcript
+print("Total conversation entries: \(session.transcript.count)")
 ```
 
 ### 2. Type-Safe Structured Generation
@@ -317,7 +323,7 @@ let response = try await session.respond(options: options) {
 import OpenFoundationModels
 import OpenFoundationModelsOpenAI  // Or Anthropic, Ollama, etc.
 
-// Same API, different providers
+// Same API, different providers - all using Transcript-based interface
 let session = LanguageModelSession(
     model: OpenAIProvider(apiKey: key).gpt4o        // OpenAI
     // model: AnthropicProvider(apiKey: key).claude3  // Anthropic
@@ -326,6 +332,7 @@ let session = LanguageModelSession(
 )
 
 // Write once, run with any provider
+// Each provider receives the full Transcript and interprets it appropriately
 let response = try await session.respond {
     Prompt("Explain quantum computing")
 }
@@ -343,6 +350,9 @@ let analysis = try await session.respond(
 ) {
     Prompt("Analyze this code: \(codeSnippet)")
 }
+
+// Providers implement the simple LanguageModel protocol
+// They receive Transcript and return responses - implementation details are provider-specific
 ```
 
 ## Real-World Use Cases
@@ -399,6 +409,48 @@ struct SwiftFunction {
     let tests: [String]
 }
 ```
+
+## Architecture
+
+### Transcript-Centric Design
+
+OpenFoundationModels follows Apple's Foundation Models design philosophy where `Transcript` is the single source of truth for all conversation context:
+
+```swift
+// Transcript manages the complete conversation
+public struct Transcript {
+    public enum Entry {
+        case instructions(Instructions)  // System instructions & tool definitions
+        case prompt(Prompt)              // User input
+        case response(Response)          // Model output
+        case toolCalls(ToolCalls)        // Tool invocations
+        case toolOutput(ToolOutput)      // Tool results
+    }
+}
+
+// LanguageModelSession manages Transcript
+let session = LanguageModelSession(model: model, tools: tools) {
+    Instructions("You are a helpful assistant")
+    // Automatically added as first Transcript.Entry
+}
+
+// Each interaction updates the Transcript
+let response = try await session.respond {
+    Prompt("Hello")  // Added to Transcript before sending to model
+}
+// Response is added to Transcript after generation
+
+// LanguageModel receives complete context
+protocol LanguageModel {
+    // Receives full Transcript with all history, instructions, and tools
+    func generate(transcript: Transcript, options: GenerationOptions?) async throws -> String
+}
+```
+
+This design ensures:
+- **Stateless Models**: LanguageModel implementations don't manage state
+- **Complete Context**: Every request includes full conversation history
+- **Clear Responsibilities**: Session manages Transcript, Model generates responses
 
 ## Development
 
