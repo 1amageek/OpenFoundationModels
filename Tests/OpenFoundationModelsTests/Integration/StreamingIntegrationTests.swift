@@ -23,10 +23,13 @@ struct StreamingIntegrationTests {
         let expectedValues = ["Hello", "Hello, world", "Hello, world!"]
         var valueIndex = 0
         
-        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
+        let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
             for value in expectedValues {
-                // String.PartiallyGenerated = String (default)
-                continuation.yield(value)
+                let snapshot = LanguageModelSession.ResponseStream<String>.Snapshot(
+                    content: value,
+                    rawContent: GeneratedContent(value)
+                )
+                continuation.yield(snapshot)
             }
             continuation.finish()
         }
@@ -34,10 +37,8 @@ struct StreamingIntegrationTests {
         let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
         // Test iteration through complete lifecycle
-        for try await partial in responseStream {
-            // partial is now String (String.PartiallyGenerated = String)
-            #expect(partial == expectedValues[valueIndex])
-            // For String, we don't have isComplete tracking in streaming
+        for try await snapshot in responseStream {
+            #expect(snapshot.content == expectedValues[valueIndex])
             valueIndex += 1
         }
         
@@ -46,12 +47,27 @@ struct StreamingIntegrationTests {
     
     @Test("Streaming with early termination on complete")
     func streamingWithEarlyTerminationOnComplete() async throws {
-        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
-            // String.PartiallyGenerated = String (default)
-            continuation.yield("partial1")
-            continuation.yield("partial2")
-            continuation.yield("complete")
-            continuation.yield("after complete")
+        let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
+            let snapshot1 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "partial1",
+                rawContent: GeneratedContent("partial1")
+            )
+            let snapshot2 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "partial2",
+                rawContent: GeneratedContent("partial2")
+            )
+            let snapshot3 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "complete",
+                rawContent: GeneratedContent("complete")
+            )
+            let snapshot4 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "after complete",
+                rawContent: GeneratedContent("after complete")
+            )
+            continuation.yield(snapshot1)
+            continuation.yield(snapshot2)
+            continuation.yield(snapshot3)
+            continuation.yield(snapshot4)
             continuation.finish()
         }
         
@@ -59,11 +75,10 @@ struct StreamingIntegrationTests {
         var receivedValues: [String] = []
         
         // Test early termination when isComplete is reached
-        for try await partial in responseStream {
-            // partial is now String
-            receivedValues.append(partial)
+        for try await snapshot in responseStream {
+            receivedValues.append(snapshot.content)
             // For String streaming, we need a different completion strategy
-            if partial == "complete" {
+            if snapshot.content == "complete" {
                 break
             }
         }
@@ -76,9 +91,13 @@ struct StreamingIntegrationTests {
     func concurrentStreamingOperations() async throws {
         // Test multiple concurrent streaming operations
         func createStringStream(identifier: String, count: Int) -> LanguageModelSession.ResponseStream<String> {
-            let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
+            let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
                 for i in 0..<count {
-                    continuation.yield("\(identifier)-\(i)")
+                    let snapshot = LanguageModelSession.ResponseStream<String>.Snapshot(
+                        content: "\(identifier)-\(i)",
+                        rawContent: GeneratedContent("\(identifier)-\(i)")
+                    )
+                    continuation.yield(snapshot)
                 }
                 continuation.finish()
             }
@@ -104,9 +123,17 @@ struct StreamingIntegrationTests {
             GenerationError.Context(debugDescription: "Rate limited during streaming")
         )
         
-        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
-            continuation.yield("success1")
-            continuation.yield("success2")
+        let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
+            let snapshot1 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "success1",
+                rawContent: GeneratedContent("success1")
+            )
+            let snapshot2 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "success2",
+                rawContent: GeneratedContent("success2")
+            )
+            continuation.yield(snapshot1)
+            continuation.yield(snapshot2)
             continuation.finish(throwing: testError)
         }
         
@@ -115,9 +142,8 @@ struct StreamingIntegrationTests {
         
         // Test error propagation preserves successful partials
         do {
-            for try await partial in responseStream {
-                // partial is now String
-                successfulPartials.append(partial)
+            for try await snapshot in responseStream {
+                successfulPartials.append(snapshot.content)
             }
             #expect(Bool(false), "Should have thrown an error")
         } catch let error as GenerationError {
@@ -133,17 +159,29 @@ struct StreamingIntegrationTests {
     @Test("Streaming with timeout behavior simulation")
     func streamingWithTimeoutBehaviorSimulation() async throws {
         // Simulate timeout scenario with delayed streaming
-        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
+        let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
             Task {
                 // Immediate first partial
-                continuation.yield("immediate")
+                let snapshot1 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                    content: "immediate",
+                    rawContent: GeneratedContent("immediate")
+                )
+                continuation.yield(snapshot1)
                 
                 // Simulated delay
                 try await Task.sleep(nanoseconds: 10_000_000) // 10ms
-                continuation.yield("delayed")
+                let snapshot2 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                    content: "delayed",
+                    rawContent: GeneratedContent("delayed")
+                )
+                continuation.yield(snapshot2)
                 
                 // Final completion
-                continuation.yield("final")
+                let snapshot3 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                    content: "final",
+                    rawContent: GeneratedContent("final")
+                )
+                continuation.yield(snapshot3)
                 continuation.finish()
             }
         }
@@ -153,12 +191,11 @@ struct StreamingIntegrationTests {
         var contents: [String] = []
         
         let startTime = Date()
-        for try await partial in responseStream {
+        for try await snapshot in responseStream {
             timestamps.append(Date())
-            // partial is now String
-            contents.append(partial)
+            contents.append(snapshot.content)
             // Check for final content
-            if partial == "final" {
+            if snapshot.content == "final" {
                 break
             }
         }
@@ -181,9 +218,13 @@ struct StreamingIntegrationTests {
             ("Complete!", true)
         ]
         
-        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
+        let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
             for (content, _) in expectedPartials {
-                continuation.yield(content)
+                let snapshot = LanguageModelSession.ResponseStream<String>.Snapshot(
+                    content: content,
+                    rawContent: GeneratedContent(content)
+                )
+                continuation.yield(snapshot)
             }
             continuation.finish()
         }
@@ -192,25 +233,35 @@ struct StreamingIntegrationTests {
         
         // Collect all partials manually 
         var allPartials: [String] = []
-        for try await partial in responseStream {
-            allPartials.append(partial)
+        for try await snapshot in responseStream {
+            allPartials.append(snapshot.content)
         }
         
         #expect(allPartials.count == expectedPartials.count)
         for (index, partial) in allPartials.enumerated() {
             let expected = expectedPartials[index]
-            // partial is now String
             #expect(partial == expected.0)
-            // isComplete tracking not available for String
         }
     }
     
     @Test("Streaming with empty content handling")
     func streamingWithEmptyContentHandling() async throws {
-        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
-            continuation.yield("")
-            continuation.yield("content")
-            continuation.yield("")
+        let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
+            let snapshot1 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "",
+                rawContent: GeneratedContent("")
+            )
+            let snapshot2 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "content",
+                rawContent: GeneratedContent("content")
+            )
+            let snapshot3 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "",
+                rawContent: GeneratedContent("")
+            )
+            continuation.yield(snapshot1)
+            continuation.yield(snapshot2)
+            continuation.yield(snapshot3)
             continuation.finish()
         }
         
@@ -223,10 +274,22 @@ struct StreamingIntegrationTests {
     
     @Test("Multiple iterator instances from same stream")
     func multipleIteratorInstancesFromSameStream() async throws {
-        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
-            continuation.yield("first")
-            continuation.yield("second")
-            continuation.yield("third")
+        let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
+            let snapshot1 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "first",
+                rawContent: GeneratedContent("first")
+            )
+            let snapshot2 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "second",
+                rawContent: GeneratedContent("second")
+            )
+            let snapshot3 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "third",
+                rawContent: GeneratedContent("third")
+            )
+            continuation.yield(snapshot1)
+            continuation.yield(snapshot2)
+            continuation.yield(snapshot3)
             continuation.finish()
         }
         
@@ -246,8 +309,12 @@ struct StreamingIntegrationTests {
     
     @Test("Streaming integration with Sendable requirements")
     func streamingIntegrationWithSendableRequirements() async throws {
-        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
-            continuation.yield("sendable test")
+        let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
+            let snapshot = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "sendable test",
+                rawContent: GeneratedContent("sendable test")
+            )
+            continuation.yield(snapshot)
             continuation.finish()
         }
         
@@ -276,9 +343,13 @@ struct StreamingIntegrationTests {
     @Test("Streaming pipeline performance characteristics")
     func streamingPipelinePerformanceCharacteristics() async throws {
         let itemCount = 100
-        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
+        let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
             for i in 0..<itemCount {
-                continuation.yield("item-\(i)")
+                let snapshot = LanguageModelSession.ResponseStream<String>.Snapshot(
+                    content: "item-\(i)",
+                    rawContent: GeneratedContent("item-\(i)")
+                )
+                continuation.yield(snapshot)
             }
             continuation.finish()
         }
@@ -289,8 +360,6 @@ struct StreamingIntegrationTests {
         var processedCount = 0
         for try await _ in responseStream {
             processedCount += 1
-            // For String, we need to track completion differently
-            // Since we're just counting items, we can continue until the stream ends
         }
         
         let duration = Date().timeIntervalSince(startTime)

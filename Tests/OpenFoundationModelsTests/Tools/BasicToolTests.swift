@@ -69,8 +69,8 @@ struct BasicToolTests {
             // Simple calculator logic
             if arguments.expression.contains("/0") {
                 throw LanguageModelSession.ToolCallError(
-                    toolName: "calculate",
-                    underlying: NSError(
+                    tool: CalculatorTool(),
+                    underlyingError: NSError(
                         domain: "CalculateError",
                         code: 400,
                         userInfo: [NSLocalizedDescriptionKey: "Division by zero"]
@@ -200,9 +200,9 @@ struct BasicToolTests {
             let _ = try await tool.call(arguments: args)
             Issue.record("Expected error to be thrown")
         } catch let error as ToolCallError {
-            #expect(error.toolName == "calculate")
+            #expect(error.tool.name == "calculate")
             // Check underlying error instead of errorType
-            #expect(error.underlying.localizedDescription.contains("Division by zero"))
+            #expect(error.underlyingError.localizedDescription.contains("Division by zero"))
         } catch {
             Issue.record("Wrong error type thrown: \(error)")
         }

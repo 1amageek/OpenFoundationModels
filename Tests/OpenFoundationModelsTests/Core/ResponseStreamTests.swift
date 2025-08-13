@@ -18,33 +18,49 @@ struct ResponseStreamTests {
     @Test("ResponseStream creation and basic properties")
     func responseStreamCreation() {
         // Create a simple stream with string content
-        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
-            continuation.yield("Hello")
-            continuation.yield("Hello, world!")
+        let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
+            let snapshot1 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "Hello",
+                rawContent: GeneratedContent("Hello")
+            )
+            let snapshot2 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "Hello, world!",
+                rawContent: GeneratedContent("Hello, world!")
+            )
+            continuation.yield(snapshot1)
+            continuation.yield(snapshot2)
             continuation.finish()
         }
         
         let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
         // Verify the stream is created successfully
-        #expect(responseStream.last == nil) // Initially no last value
+        // ResponseStream doesn't have a last property - it's just an AsyncSequence
     }
     
     @Test("ResponseStream AsyncSequence iteration with String content")
     func responseStreamStringIteration() async throws {
         // Create a stream that yields partial string responses
-        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
-            continuation.yield("Hello")
-            continuation.yield("Hello, world!")
+        let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
+            let snapshot1 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "Hello",
+                rawContent: GeneratedContent("Hello")
+            )
+            let snapshot2 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "Hello, world!",
+                rawContent: GeneratedContent("Hello, world!")
+            )
+            continuation.yield(snapshot1)
+            continuation.yield(snapshot2)
             continuation.finish()
         }
         
         let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
-        var collectedPartials: [String.PartiallyGenerated] = []
+        var collectedPartials: [String] = []
         
         // Test AsyncSequence iteration
-        for try await partial in responseStream {
-            collectedPartials.append(partial)
+        for try await snapshot in responseStream {
+            collectedPartials.append(snapshot.content)
         }
         
         // Verify we collected the expected partial responses
@@ -57,9 +73,17 @@ struct ResponseStreamTests {
     @Test("ResponseStream with String Generable content")
     func responseStreamStringGenerableIteration() async throws {
         // String already conforms to Generable, so we can test with it
-        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
-            continuation.yield("partial content")
-            continuation.yield("complete content")
+        let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
+            let snapshot1 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "partial content",
+                rawContent: GeneratedContent("partial content")
+            )
+            let snapshot2 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "complete content",
+                rawContent: GeneratedContent("complete content")
+            )
+            continuation.yield(snapshot1)
+            continuation.yield(snapshot2)
             continuation.finish()
         }
         
@@ -68,13 +92,13 @@ struct ResponseStreamTests {
         var lastContent = ""
         
         // Test iteration with String Generable content
-        for try await partial in responseStream {
+        for try await snapshot in responseStream {
             partialCount += 1
-            // partial is now String (String.PartiallyGenerated = String)
-            lastContent = partial
+            // snapshot contains the content and rawContent
+            lastContent = snapshot.content
             
             // For String, check if we've reached the expected final content
-            if partial == "complete content" {
+            if snapshot.content == "complete content" {
                 break
             }
         }
@@ -86,9 +110,17 @@ struct ResponseStreamTests {
     @Test("ResponseStream collect() method")
     func responseStreamCollect() async throws {
         // Use String content for collect() testing
-        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
-            continuation.yield("partial")
-            continuation.yield("final content")
+        let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
+            let snapshot1 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "partial",
+                rawContent: GeneratedContent("partial")
+            )
+            let snapshot2 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "final content",
+                rawContent: GeneratedContent("final content")
+            )
+            continuation.yield(snapshot1)
+            continuation.yield(snapshot2)
             continuation.finish()
         }
         
@@ -104,8 +136,12 @@ struct ResponseStreamTests {
     
     @Test("ResponseStream collect() with String returns last value")
     func responseStreamCollectWithString() async throws {
-        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
-            continuation.yield("partial")
+        let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
+            let snapshot = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "partial",
+                rawContent: GeneratedContent("partial")
+            )
+            continuation.yield(snapshot)
             continuation.finish()
         }
         
@@ -118,10 +154,22 @@ struct ResponseStreamTests {
     
     @Test("ResponseStream collectPartials() helper method")
     func responseStreamCollectPartials() async throws {
-        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
-            continuation.yield("first")
-            continuation.yield("second")
-            continuation.yield("final")
+        let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
+            let snapshot1 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "first",
+                rawContent: GeneratedContent("first")
+            )
+            let snapshot2 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "second",
+                rawContent: GeneratedContent("second")
+            )
+            let snapshot3 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "final",
+                rawContent: GeneratedContent("final")
+            )
+            continuation.yield(snapshot1)
+            continuation.yield(snapshot2)
+            continuation.yield(snapshot3)
             continuation.finish()
         }
         
@@ -129,8 +177,8 @@ struct ResponseStreamTests {
         
         // Collect all partials manually since collectPartials() doesn't exist
         var allPartials: [String] = []
-        for try await partial in responseStream {
-            allPartials.append(partial)
+        for try await snapshot in responseStream {
+            allPartials.append(snapshot.content)
         }
         
         #expect(allPartials.count == 3)
@@ -142,19 +190,23 @@ struct ResponseStreamTests {
     
     @Test("ResponseStream error handling")
     func responseStreamErrorHandling() async throws {
-        let expectedError = GenerationError.rateLimited(
-            GenerationError.Context(debugDescription: "Test rate limit")
+        let expectedError = LanguageModelSession.GenerationError.rateLimited(
+            LanguageModelSession.GenerationError.Context(debugDescription: "Test rate limit")
         )
         
-        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
-            continuation.yield("partial")
+        let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
+            let snapshot = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "partial",
+                rawContent: GeneratedContent("partial")
+            )
+            continuation.yield(snapshot)
             continuation.finish(throwing: expectedError)
         }
         
         let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
         // Test error propagation through AsyncSequence
-        await #expect(throws: GenerationError.self) {
+        await #expect(throws: LanguageModelSession.GenerationError.self) {
             for try await _ in responseStream {
                 // Should throw before completing iteration
             }
@@ -163,11 +215,22 @@ struct ResponseStreamTests {
     
     @Test("ResponseStream AsyncIterator works correctly")
     func responseStreamIteratorCorrectness() async throws {
-        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
-            // String.PartiallyGenerated = String (default)
-            continuation.yield("one")
-            continuation.yield("two")
-            continuation.yield("three")
+        let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
+            let snapshot1 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "one",
+                rawContent: GeneratedContent("one")
+            )
+            let snapshot2 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "two",
+                rawContent: GeneratedContent("two")
+            )
+            let snapshot3 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "three",
+                rawContent: GeneratedContent("three")
+            )
+            continuation.yield(snapshot1)
+            continuation.yield(snapshot2)
+            continuation.yield(snapshot3)
             continuation.finish()
         }
         
@@ -181,16 +244,16 @@ struct ResponseStreamTests {
         let third = try await iterator.next()
         let fourth = try await iterator.next()
         
-        // Partials are now String
-        #expect(first == "one")
-        #expect(second == "two")
-        #expect(third == "three")
+        // Snapshots contain content and rawContent
+        #expect(first?.content == "one")
+        #expect(second?.content == "two")
+        #expect(third?.content == "three")
         #expect(fourth == nil) // Stream should be finished
     }
     
     @Test("ResponseStream Sendable conformance")
     func responseStreamSendableConformance() {
-        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
+        let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
             continuation.finish()
         }
         

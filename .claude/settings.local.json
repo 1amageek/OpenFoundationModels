@@ -20,7 +20,9 @@
       "Bash(git commit:*)",
       "Bash(git mv:*)",
       "Bash(swift:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "WebSearch",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ],
     "deny": []
   }

@@ -77,11 +77,15 @@ struct ConcurrentGenerationTests {
         
         // Create multiple concurrent streams
         let streams = (0..<streamCount).map { streamIndex in
-            AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
+            AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
                 Task {
                     for itemIndex in 0..<itemsPerStream {
-                        // String.PartiallyGenerated = String (default)
-                        continuation.yield("stream-\(streamIndex)-item-\(itemIndex)")
+                        let content = "stream-\(streamIndex)-item-\(itemIndex)"
+                        let snapshot = LanguageModelSession.ResponseStream<String>.Snapshot(
+                            content: content,
+                            rawContent: GeneratedContent(content)
+                        )
+                        continuation.yield(snapshot)
                     }
                     continuation.finish()
                 }
@@ -238,18 +242,26 @@ struct ConcurrentGenerationTests {
         
         // Create successful streams
         let successStreams = (0..<successStreamCount).map { index in
-            AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
-                // String.PartiallyGenerated = String (default)
-                continuation.yield("success-\(index)")
+            AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
+                let content = "success-\(index)"
+                let snapshot = LanguageModelSession.ResponseStream<String>.Snapshot(
+                    content: content,
+                    rawContent: GeneratedContent(content)
+                )
+                continuation.yield(snapshot)
                 continuation.finish()
             }
         }
         
         // Create error streams
         let errorStreams = (0..<errorStreamCount).map { index in
-            AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
-                // String.PartiallyGenerated = String (default)
-                continuation.yield("partial-\(index)")
+            AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
+                let content = "partial-\(index)"
+                let snapshot = LanguageModelSession.ResponseStream<String>.Snapshot(
+                    content: content,
+                    rawContent: GeneratedContent(content)
+                )
+                continuation.yield(snapshot)
                 let error = GenerationError.rateLimited(
                     GenerationError.Context(debugDescription: "Concurrent test error \(index)")
                 )

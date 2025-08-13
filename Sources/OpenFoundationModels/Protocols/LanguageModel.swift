@@ -11,7 +11,14 @@ import Foundation
 /// - Supports both synchronous and streaming generation
 /// - Provides availability and capability checking
 /// - Enables dependency injection for testing
+/// - Supports chat-based interactions with associated types
 public protocol LanguageModel: Sendable {
+    /// The type representing a chat message
+    associatedtype MessageType = String
+    
+    /// The type representing a chat response
+    associatedtype ChatResponseType = String
+    
     /// Generate a response for the given prompt
     /// - Parameters:
     ///   - prompt: The input prompt
@@ -28,6 +35,22 @@ public protocol LanguageModel: Sendable {
     /// - Returns: An async stream of partial responses
     func stream(prompt: String, options: GenerationOptions?, tools: [any Tool]?) -> AsyncStream<String>
     
+    /// Generate a chat response for the given messages
+    /// - Parameters:
+    ///   - messages: Array of messages in the conversation
+    ///   - options: Generation options (optional)
+    ///   - tools: Available tools for function calling (optional)
+    /// - Returns: The chat response
+    func chat(messages: [MessageType], options: GenerationOptions?, tools: [any Tool]?) async throws -> ChatResponseType
+    
+    /// Stream a chat response for the given messages
+    /// - Parameters:
+    ///   - messages: Array of messages in the conversation
+    ///   - options: Generation options (optional)
+    ///   - tools: Available tools for function calling (optional)
+    /// - Returns: An async stream of partial chat responses
+    func streamChat(messages: [MessageType], options: GenerationOptions?, tools: [any Tool]?) -> AsyncStream<ChatResponseType>
+    
     /// Check if the model is available for use
     /// - Returns: true if the model is ready for requests
     var isAvailable: Bool { get }
@@ -36,15 +59,4 @@ public protocol LanguageModel: Sendable {
     /// - Parameter locale: The locale to check
     /// - Returns: true if the locale is supported
     func supports(locale: Locale) -> Bool
-}
-
-// MARK: - Default Implementations
-
-public extension LanguageModel {
-    /// Default locale support check
-    /// - Parameter locale: The locale to check
-    /// - Returns: true for English, false for others (override for specific support)
-    func supports(locale: Locale) -> Bool {
-        return locale.identifier.hasPrefix("en")
-    }
 }

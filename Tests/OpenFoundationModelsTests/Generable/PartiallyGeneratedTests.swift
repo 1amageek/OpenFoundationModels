@@ -181,10 +181,24 @@ struct PartiallyGeneratedTests {
         let finalPartial = "Final content"
         
         // Create a stream that simulates progressive generation
-        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
-            continuation.yield(initialPartial)
-            continuation.yield(midPartial)
-            continuation.yield(finalPartial)
+        let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
+            let snapshot1 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: initialPartial,
+                rawContent: GeneratedContent(initialPartial)
+            )
+            continuation.yield(snapshot1)
+            
+            let snapshot2 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: midPartial,
+                rawContent: GeneratedContent(midPartial)
+            )
+            continuation.yield(snapshot2)
+            
+            let snapshot3 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: finalPartial,
+                rawContent: GeneratedContent(finalPartial)
+            )
+            continuation.yield(snapshot3)
             continuation.finish()
         }
         
@@ -193,11 +207,11 @@ struct PartiallyGeneratedTests {
         var lastComplete = false
         
         // Test progressive updates
-        for try await partial in responseStream {
+        for try await snapshot in responseStream {
             partialCount += 1
             // For String, we don't have isComplete tracking
             // Check for specific final content instead
-            if partial == "Final content" {
+            if snapshot.content == "Final content" {
                 lastComplete = true
                 break
             }
@@ -253,12 +267,24 @@ struct PartiallyGeneratedTests {
     @Test("Streaming collect() with PartiallyGenerated")
     func streamingCollectWithPartiallyGenerated() async throws {
         // Use String content for collect() testing
-        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
-            // Partial updates (String.PartiallyGenerated = String)
-            continuation.yield("partial1")
-            continuation.yield("partial2")
-            // Final complete
-            continuation.yield("complete content")
+        let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
+            let snapshot1 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "partial1",
+                rawContent: GeneratedContent("partial1")
+            )
+            continuation.yield(snapshot1)
+            
+            let snapshot2 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "partial2",
+                rawContent: GeneratedContent("partial2")
+            )
+            continuation.yield(snapshot2)
+            
+            let snapshot3 = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "complete content",
+                rawContent: GeneratedContent("complete content")
+            )
+            continuation.yield(snapshot3)
             continuation.finish()
         }
         
@@ -279,9 +305,12 @@ struct PartiallyGeneratedTests {
         )
         
         // Create stream that fails during partial generation using String content
-        let stream = AsyncThrowingStream<String.PartiallyGenerated, Error> { continuation in
-            // String.PartiallyGenerated = String (default)
-            continuation.yield("partial content")
+        let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
+            let snapshot = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "partial content",
+                rawContent: GeneratedContent("partial content")
+            )
+            continuation.yield(snapshot)
             continuation.finish(throwing: error)
         }
         
