@@ -23,9 +23,6 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
     /// The underlying language model
     private var model: any LanguageModel
     
-    /// Session instructions
-    private var instructions: Instructions?
-    
     /// Available tools for the session
     private var tools: [any Tool]
     
@@ -84,7 +81,21 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
     ) {
         self.init(model: model)
         self.tools = tools
-        self.instructions = instructions
+        
+        // Add instructions as the first Transcript entry
+        if let instructions = instructions {
+            let instructionEntry = Transcript.Entry.instructions(
+                Transcript.Instructions(
+                    id: UUID().uuidString,
+                    segments: [.text(Transcript.TextSegment(
+                        id: UUID().uuidString,
+                        content: instructions.description
+                    ))],
+                    toolDefinitions: tools.map { Transcript.ToolDefinition(tool: $0) }
+                )
+            )
+            self._transcript.append(instructionEntry)
+        }
     }
     
     /// Start a session by rehydrating from a transcript.
@@ -103,7 +114,6 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
     private init(model: any LanguageModel) {
         self.model = model
         self.tools = []
-        self.instructions = nil
         self._transcript = Transcript()
     }
     
@@ -168,13 +178,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         _isResponding = true
         defer { _isResponding = false }
         
-        let content = try await model.generate(
-            prompt: promptText,
-            options: options,
-            tools: tools
-        )
-        
-        // Create transcript entries
+        // Create and add prompt entry to transcript
         let promptEntry = Transcript.Entry.prompt(
             Transcript.Prompt(
                 id: UUID().uuidString,
@@ -182,6 +186,13 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 options: options,
                 responseFormat: nil
             )
+        )
+        _transcript.append(promptEntry)
+        
+        // Pass complete transcript to model
+        let content = try await model.generate(
+            transcript: _transcript,
+            options: options
         )
         let responseEntry = Transcript.Entry.response(
             Transcript.Response(
@@ -191,10 +202,10 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
             )
         )
         
-        _transcript.append(promptEntry)
         _transcript.append(responseEntry)
         
-        let entries = [promptEntry, responseEntry]
+        // Return the last two entries (prompt and response)
+        let entries = Array(_transcript.entries.suffix(2))
         let entriesSlice = ArraySlice(entries)
         
         return Response(
@@ -254,27 +265,23 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         _isResponding = true
         defer { _isResponding = false }
         
-        // Generate schema-guided content
-        let schemaPrompt = includeSchemaInPrompt ? 
-            "\(promptText)\n\nGenerate response following this schema: \(schema)" : 
-            promptText
-        
-        let text = try await model.generate(
-            prompt: schemaPrompt,
-            options: options,
-            tools: tools
-        )
-        let content = GeneratedContent(text)
-        
-        // Create transcript entries
+        // Create and add prompt entry with schema to transcript
         let promptEntry = Transcript.Entry.prompt(
             Transcript.Prompt(
                 id: UUID().uuidString,
                 segments: [.text(Transcript.TextSegment(id: UUID().uuidString, content: promptText))],
                 options: options,
-                responseFormat: Transcript.ResponseFormat(schema: schema)
+                responseFormat: includeSchemaInPrompt ? Transcript.ResponseFormat(schema: schema) : nil
             )
         )
+        _transcript.append(promptEntry)
+        
+        // Pass complete transcript to model
+        let text = try await model.generate(
+            transcript: _transcript,
+            options: options
+        )
+        let content = GeneratedContent(text)
         let responseEntry = Transcript.Entry.response(
             Transcript.Response(
                 id: UUID().uuidString,
@@ -287,10 +294,10 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
             )
         )
         
-        _transcript.append(promptEntry)
         _transcript.append(responseEntry)
         
-        let entries = [promptEntry, responseEntry]
+        // Return the last two entries (prompt and response)
+        let entries = Array(_transcript.entries.suffix(2))
         let entriesSlice = ArraySlice(entries)
         
         return Response(
@@ -350,28 +357,24 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         _isResponding = true
         defer { _isResponding = false }
         
-        // Generate schema-guided content
-        let schemaPrompt = includeSchemaInPrompt ? 
-            "\(promptText)\n\nGenerate response following this schema: \(Content.generationSchema)" : 
-            promptText
-        
-        let text = try await model.generate(
-            prompt: schemaPrompt,
-            options: options,
-            tools: tools
-        )
-        let generatedContent = GeneratedContent(text)
-        let content = try Content(generatedContent)
-        
-        // Create transcript entries
+        // Create and add prompt entry with type schema to transcript
         let promptEntry = Transcript.Entry.prompt(
             Transcript.Prompt(
                 id: UUID().uuidString,
                 segments: [.text(Transcript.TextSegment(id: UUID().uuidString, content: promptText))],
                 options: options,
-                responseFormat: Transcript.ResponseFormat(type: Content.self)
+                responseFormat: includeSchemaInPrompt ? Transcript.ResponseFormat(type: Content.self) : nil
             )
         )
+        _transcript.append(promptEntry)
+        
+        // Pass complete transcript to model
+        let text = try await model.generate(
+            transcript: _transcript,
+            options: options
+        )
+        let generatedContent = GeneratedContent(text)
+        let content = try Content(generatedContent)
         let responseEntry = Transcript.Entry.response(
             Transcript.Response(
                 id: UUID().uuidString,
@@ -384,10 +387,10 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
             )
         )
         
-        _transcript.append(promptEntry)
         _transcript.append(responseEntry)
         
-        let entries = [promptEntry, responseEntry]
+        // Return the last two entries (prompt and response)
+        let entries = Array(_transcript.entries.suffix(2))
         let entriesSlice = ArraySlice(entries)
         
         return Response(
@@ -426,15 +429,25 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         let promptValue = try prompt()
         let promptText = promptValue.description
         
+        // Create and add prompt entry to transcript
+        let promptEntry = Transcript.Entry.prompt(
+            Transcript.Prompt(
+                id: UUID().uuidString,
+                segments: [.text(Transcript.TextSegment(id: UUID().uuidString, content: promptText))],
+                options: options,
+                responseFormat: nil
+            )
+        )
+        _transcript.append(promptEntry)
+        
         let stream = AsyncThrowingStream<ResponseStream<String>.Snapshot, Error> { continuation in
             Task {
                 _isResponding = true
                 defer { _isResponding = false }
                 
                 let stringStream = model.stream(
-                    prompt: promptText,
-                    options: options,
-                    tools: tools
+                    transcript: _transcript,
+                    options: options
                 )
                 var accumulatedContent = ""
                 
@@ -445,6 +458,18 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                         rawContent: GeneratedContent(accumulatedContent)
                     )
                     continuation.yield(snapshot)
+                }
+                
+                // Add response entry to transcript when streaming completes
+                if !accumulatedContent.isEmpty {
+                    let responseEntry = Transcript.Entry.response(
+                        Transcript.Response(
+                            id: UUID().uuidString,
+                            assetIDs: [],
+                            segments: [.text(Transcript.TextSegment(id: UUID().uuidString, content: accumulatedContent))]
+                        )
+                    )
+                    _transcript.append(responseEntry)
                 }
                 
                 continuation.finish()
@@ -503,14 +528,20 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 _isResponding = true
                 defer { _isResponding = false }
                 
-                let schemaPrompt = includeSchemaInPrompt ? 
-                    "\(promptText)\n\nGenerate response following this schema: \(schema)" : 
-                    promptText
+                // Create and add prompt entry with schema to transcript
+                let promptEntry = Transcript.Entry.prompt(
+                    Transcript.Prompt(
+                        id: UUID().uuidString,
+                        segments: [.text(Transcript.TextSegment(id: UUID().uuidString, content: promptText))],
+                        options: options,
+                        responseFormat: includeSchemaInPrompt ? Transcript.ResponseFormat(schema: schema) : nil
+                    )
+                )
+                _transcript.append(promptEntry)
                 
                 let stringStream = model.stream(
-                    prompt: schemaPrompt,
-                    options: options,
-                    tools: tools
+                    transcript: _transcript,
+                    options: options
                 )
                 var accumulatedText = ""
                 
@@ -522,6 +553,22 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                         rawContent: partialContent
                     )
                     continuation.yield(snapshot)
+                }
+                
+                // Add response entry to transcript when streaming completes
+                if !accumulatedText.isEmpty {
+                    let responseEntry = Transcript.Entry.response(
+                        Transcript.Response(
+                            id: UUID().uuidString,
+                            assetIDs: [],
+                            segments: [.structure(Transcript.StructuredSegment(
+                                id: UUID().uuidString,
+                                source: "model",
+                                content: GeneratedContent(accumulatedText)
+                            ))]
+                        )
+                    )
+                    _transcript.append(responseEntry)
                 }
                 
                 continuation.finish()
@@ -582,14 +629,20 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 _isResponding = true
                 defer { _isResponding = false }
                 
-                let schemaPrompt = includeSchemaInPrompt ? 
-                    "\(promptText)\n\nGenerate response following this schema: \(Content.generationSchema)" : 
-                    promptText
+                // Create and add prompt entry with type schema to transcript
+                let promptEntry = Transcript.Entry.prompt(
+                    Transcript.Prompt(
+                        id: UUID().uuidString,
+                        segments: [.text(Transcript.TextSegment(id: UUID().uuidString, content: promptText))],
+                        options: options,
+                        responseFormat: includeSchemaInPrompt ? Transcript.ResponseFormat(type: Content.self) : nil
+                    )
+                )
+                _transcript.append(promptEntry)
                 
                 let stringStream = model.stream(
-                    prompt: schemaPrompt,
-                    options: options,
-                    tools: tools
+                    transcript: _transcript,
+                    options: options
                 )
                 var accumulatedText = ""
                 

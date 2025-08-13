@@ -1,55 +1,32 @@
 // LanguageModel.swift
 // OpenFoundationModels
 //
-// ✅ PHASE 4.1: Protocol abstraction for dependency injection and testing
+// ✅ TRANSCRIPT-BASED: Protocol for Transcript-centric language model interface
 
 import Foundation
 
 /// Protocol defining the interface for language models
 /// 
-/// ✅ APPLE SPEC: Common interface for SystemLanguageModel, MockLanguageModel, etc.
+/// ✅ APPLE SPEC: Transcript-based interface following Apple Foundation Models design
+/// - Receives complete Transcript containing Instructions, Tools, and conversation history
+/// - Stateless interface - all context provided via Transcript
 /// - Supports both synchronous and streaming generation
-/// - Provides availability and capability checking
-/// - Enables dependency injection for testing
-/// - Supports chat-based interactions with associated types
+/// - Model implementation decides how to interpret Transcript
 public protocol LanguageModel: Sendable {
-    /// The type representing a chat message
-    associatedtype MessageType = String
     
-    /// The type representing a chat response
-    associatedtype ChatResponseType = String
-    
-    /// Generate a response for the given prompt
+    /// Generate a response for the given transcript
     /// - Parameters:
-    ///   - prompt: The input prompt
+    ///   - transcript: Complete conversation transcript including instructions, tools, and history
     ///   - options: Generation options (optional)
-    ///   - tools: Available tools for function calling (optional)
     /// - Returns: The generated response as a string
-    func generate(prompt: String, options: GenerationOptions?, tools: [any Tool]?) async throws -> String
+    func generate(transcript: Transcript, options: GenerationOptions?) async throws -> String
     
-    /// Stream a response for the given prompt
+    /// Stream a response for the given transcript
     /// - Parameters:
-    ///   - prompt: The input prompt
+    ///   - transcript: Complete conversation transcript including instructions, tools, and history
     ///   - options: Generation options (optional)
-    ///   - tools: Available tools for function calling (optional)
     /// - Returns: An async stream of partial responses
-    func stream(prompt: String, options: GenerationOptions?, tools: [any Tool]?) -> AsyncStream<String>
-    
-    /// Generate a chat response for the given messages
-    /// - Parameters:
-    ///   - messages: Array of messages in the conversation
-    ///   - options: Generation options (optional)
-    ///   - tools: Available tools for function calling (optional)
-    /// - Returns: The chat response
-    func chat(messages: [MessageType], options: GenerationOptions?, tools: [any Tool]?) async throws -> ChatResponseType
-    
-    /// Stream a chat response for the given messages
-    /// - Parameters:
-    ///   - messages: Array of messages in the conversation
-    ///   - options: Generation options (optional)
-    ///   - tools: Available tools for function calling (optional)
-    /// - Returns: An async stream of partial chat responses
-    func streamChat(messages: [MessageType], options: GenerationOptions?, tools: [any Tool]?) -> AsyncStream<ChatResponseType>
+    func stream(transcript: Transcript, options: GenerationOptions?) -> AsyncStream<String>
     
     /// Check if the model is available for use
     /// - Returns: true if the model is ready for requests
