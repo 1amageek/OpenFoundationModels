@@ -5,819 +5,742 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 **100% Apple Foundation Models β SDK Compatible Implementation**
 
-OSS implementation of Apple's Foundation Models framework (iOS 26/macOS 15 Xcode 17b3), providing on-device LLM capabilities with structured generation, tool calling, and streaming support.
+OSS implementation of Apple's Foundation Models framework (iOS 18.2+/macOS 15.2+), providing on-device LLM capabilities with structured generation, tool calling, and streaming support.
 
-## Implementation Policy
+### Swift 6.2 Requirements
+This project requires **Swift 6.2** or later for development. Swift 6.2 introduces critical features that are essential for Apple Foundation Models compatibility:
 
-### Deprecated API Handling
-- **Deprecated APIは実装しない**: Apple Foundation ModelsのDeprecatedとマークされたAPIは追加しません
-- **不要になったものは削除**: 古くなったAPIは削除して対応します
-- **ベータ版への対応**: Foundation Modelsはベータ版のため、厳密な互換性追従は不要です
+- **Complete Concurrency Checking**: Ensures thread-safe implementations with strict Sendable conformance
+- **Isolated Parameters**: Support for `isolated` and `sending` keywords in async methods
+- **SendableMetatype Protocol**: Required for Tool and Generable protocol implementations
+- **Improved Macro System**: Enhanced @Generable and @Guide macro capabilities
+- **Non-copyable Types**: Support for `~Copyable` and `~Escapable` constraints
 
-### Development Principles
-1. **実用性を重視**: 100%の互換性よりも、実際に動作する実装を優先
-2. **クリーンなAPI**: Deprecatedなものを含めず、モダンで使いやすいAPIを提供
-3. **前向きな進化**: ベータ版の変更に柔軟に対応し、常に最新のベストプラクティスに従う
+**Important**: Earlier Swift versions will not compile this project due to missing language features.
+
+## Protocol Relationships Diagram
+
+```mermaid
+graph TB
+    %% Core Protocol Hierarchy
+    CFG[ConvertibleFromGeneratedContent]
+    CTG[ConvertibleToGeneratedContent]
+    IR[InstructionsRepresentable]
+    PR[PromptRepresentable]
+    SM[SendableMetatype]
+    S[Sendable]
+    
+    %% Main Protocols
+    G[Generable]
+    T["Tool<Arguments, Output>"]
+    
+    %% Types
+    GC[GeneratedContent]
+    GS[GenerationSchema]
+    GG[GenerationGuide]
+    DGS[DynamicGenerationSchema]
+    GID[GenerationID]
+    TO[ToolOutput]
+    
+    %% Generable inherits from multiple protocols
+    CFG --> G
+    CTG --> G
+    IR --> G
+    PR --> G
+    SM --> G
+    
+    %% Tool inheritance
+    S --> T
+    SM --> T
+    
+    %% GeneratedContent conforms to Generable
+    G --> GC
+    
+    %% Associated types and requirements
+    G -.->|"static var"| GS
+    G -.->|"associatedtype"| PG["PartiallyGenerated: CFG"]
+    G -.->|"func"| APG["asPartiallyGenerated()"]
+    
+    %% Tool associated types
+    T -.->|"associatedtype"| TA["Arguments: CFG"]
+    T -.->|"associatedtype"| TOP["Output: PR"]
+    T -.->|"var"| TP["parameters: GenerationSchema"]
+    
+    %% Macro relationships
+    GM["@Generable macro"] ===>|generates| G
+    GuM["@Guide macro"] ===>|generates| GG
+    
+    %% Standard type conformances
+    ST["String, Bool, Int, Float, Double"] --> G
+    AR["Array<Element: Generable>"] --> G
+    OP["Optional<Wrapped: Generable>"] --> G
+    
+    %% Legend
+    classDef protocol fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef type fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef macro fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef standard fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    
+    class CFG,CTG,IR,PR,SM,S,G,T protocol
+    class GC,GS,GG,DGS,GID,TO type
+    class GM,GuM macro
+    class ST,AR,OP standard
+```
+
+## Apple Foundation Models Complete Specification
+
+### Core Architecture
+
+#### LanguageModelSession
+The central class for interacting with language models, maintaining conversation context through a Transcript.
+
+**Key Properties:**
+- `transcript: Transcript` - Complete conversation history
+- `isResponding: Bool` - Indicates if response is being generated
+
+**Initialization:**
+```swift
+// With string instructions
+init(model: any LanguageModel, tools: [any Tool] = [], instructions: String? = nil)
+
+// With Instructions builder
+init(model: any LanguageModel, tools: [any Tool] = [], @InstructionsBuilder instructions: () throws -> Instructions)
+
+// With existing transcript
+init(model: any LanguageModel, tools: [any Tool] = [], transcript: Transcript)
+```
+
+**Response Methods:**
+- `respond(to:options:)` - Generate string responses
+- `respond(to:generating:options:)` - Generate typed responses with Generable
+- `respond(to:schema:options:)` - Generate responses with explicit schema
+- `streamResponse(...)` - Streaming variants of all response methods
+
+**Response Structure:**
+```swift
+struct Response<Content: Sendable> {
+    let content: Content
+    let rawContent: GeneratedContent
+    let transcriptEntries: ArraySlice<Transcript.Entry>
+}
+
+struct ResponseStream<Content: Sendable>: AsyncSequence {
+    struct Snapshot {
+        var content: Content
+        var rawContent: GeneratedContent
+    }
+    func collect() async throws -> Response<Content>
+}
+```
+
+### GeneratedContent System
+
+#### GeneratedContent.Kind Enum
+The fundamental representation of generated data:
+
+```swift
+enum Kind {
+    case null                    // JSON null
+    case bool(Bool)             // JSON boolean
+    case number(Double)         // JSON number
+    case string(String)         // JSON string
+    case array([GeneratedContent])  // JSON array
+    case structure(properties: [String: GeneratedContent], orderedKeys: [String])  // JSON object
+}
+```
+
+**Important:** There is NO `partial` case. Partial JSON is handled internally through storage mechanisms, not as a Kind variant.
+
+#### Data Access Methods
+```swift
+// Get properties from structure
+func properties() throws -> [String: GeneratedContent]
+
+// Get elements from array
+func elements() throws -> [GeneratedContent]
+
+// Get typed value
+func value<Value>(_ type: Value.Type) throws -> Value where Value: ConvertibleFromGeneratedContent
+
+// Get property value
+func value<Value>(_ type: Value.Type, forProperty: String) throws -> Value
+```
+
+### Generable Protocol System
+
+#### Core Protocol
+```swift
+protocol Generable: ConvertibleFromGeneratedContent, ConvertibleToGeneratedContent {
+    associatedtype PartiallyGenerated: ConvertibleFromGeneratedContent = Self
+    static var generationSchema: GenerationSchema { get }
+    func asPartiallyGenerated() -> PartiallyGenerated
+}
+```
+
+#### Supporting Protocols
+```swift
+protocol ConvertibleFromGeneratedContent {
+    init(_ content: GeneratedContent) throws
+}
+
+protocol ConvertibleToGeneratedContent {
+    var generatedContent: GeneratedContent { get }
+}
+```
+
+#### Standard Type Conformances
+
+**Primitive Types:**
+- `String` - Converts to/from Kind.string
+- `Bool` - Converts to/from Kind.bool (with string parsing fallback)
+- `Int` - Converts to/from Kind.number (validates integer values)
+- `Double/Float` - Converts to/from Kind.number
+- `UUID` - String-based UUID format validation
+- `Date` - ISO 8601 format support
+- `URL` - String-based URL validation
+
+**Collection Types:**
+- `Array` where Element: Generable
+  - PartiallyGenerated = [Element.PartiallyGenerated]
+  - Handles both Kind.array and string-based JSON arrays
+- `Optional` where Wrapped: Generable
+  - PartiallyGenerated = Wrapped.PartiallyGenerated (no Optional wrapper)
+  - Kind.null represents nil values
+
+### GenerationSchema System
+
+#### Schema Definition
+```swift
+struct GenerationSchema {
+    let type: any Sendable.Type
+    let description: String?
+    let properties: [Property]
+    
+    struct Property {
+        let name: String
+        let description: String?
+        let type: any Sendable.Type
+        let guides: [Any]  // GenerationGuide or Regex
+    }
+}
+```
+
+#### GenerationGuide Constraints
+```swift
+struct GenerationGuide<Value> {
+    // Range constraints
+    static func range(_ range: ClosedRange<Value>) -> GenerationGuide
+    
+    // Pattern constraints (String only)
+    static func pattern(_ regex: Regex<some Any>) -> GenerationGuide
+    
+    // Enumeration constraints
+    static func anyOf(_ values: [Value]) -> GenerationGuide
+    
+    // Array constraints
+    static func minimumCount(_ count: Int) -> GenerationGuide
+    static func maximumCount(_ count: Int) -> GenerationGuide
+}
+```
+
+### Transcript System
+
+Transcript is the core data structure in Apple Foundation Models that manages the complete history of interactions with the language model.
+
+#### Core Structure
+```swift
+struct Transcript: BidirectionalCollection, Collection, RandomAccessCollection, 
+                  Sequence, Codable, Equatable, Sendable, SendableMetatype {
+    init(entries: some Sequence<Transcript.Entry>)
+}
+```
+
+#### Entry Types
+```swift
+enum Transcript.Entry: Identifiable, CustomStringConvertible, Equatable, Sendable {
+    case instructions(Transcript.Instructions)  // Developer-defined model behavior
+    case prompt(Transcript.Prompt)              // User input
+    case response(Transcript.Response)          // Model response
+    case toolCalls(Transcript.ToolCalls)        // Model-generated tool invocations
+    case toolOutput(Transcript.ToolOutput)      // Tool execution results
+}
+```
+
+#### Segment Types
+```swift
+enum Transcript.Segment: Identifiable, CustomStringConvertible, Equatable, Sendable {
+    case text(Transcript.TextSegment)           // Text content
+    case structure(Transcript.StructuredSegment) // Structured content (GeneratedContent)
+}
+```
+
+#### Key Nested Types
+
+##### Transcript.Instructions
+- segments: [Transcript.Segment] - Instruction content
+- toolDefinitions: [Transcript.ToolDefinition] - Available tool definitions
+
+##### Transcript.Prompt  
+- segments: [Transcript.Segment] - Prompt content
+- options: GenerationOptions - Generation options
+- responseFormat: Transcript.ResponseFormat? - Expected response format
+
+##### Transcript.Response
+- segments: [Transcript.Segment] - Response content
+- assetIDs: [String] - Related asset IDs
+
+##### Transcript.ResponseFormat
+```swift
+struct ResponseFormat {
+    init(schema: GenerationSchema)               // Create from schema
+    init<Content: Generable>(type: Content.Type) // Create from Generable type
+    var name: String { get }                     // Format name
+}
+```
+
+##### Transcript.ToolDefinition
+- Auto-generated from Tool protocol
+- Contains name, description, parameters
+
+##### Transcript.ToolCall
+- id: String - Call identifier
+- toolName: String - Tool name
+- arguments: GeneratedContent - Arguments
+
+##### Transcript.ToolCalls
+- id: String - Collection identifier
+- calls: [Transcript.ToolCall] - Multiple tool calls
+
+##### Transcript.ToolOutput
+- id: String - Output identifier
+- toolName: String - Tool name
+- segments: [Transcript.Segment] - Output content
+
+#### Data Flow
+
+```
+1. Create Instructions/Prompt
+   ↓
+2. LanguageModelSession creates Entry
+   ↓
+3. Add to Transcript
+   ↓
+4. Model receives complete Transcript
+   ↓
+5. Generate Response/ToolCalls
+   ↓
+6. Add to Transcript (maintain history)
+```
+
+#### Key Design Principles
+
+1. **Immutable History**: Entries cannot be modified once added
+2. **Complete Context**: Model always receives the complete Transcript
+3. **Type Safety**: Each entry type is clearly distinguished
+4. **Streaming Support**: StructuredSegment supports partial GeneratedContent
+
+#### Collection Protocol Conformance
+Transcript conforms to Collection protocols, enabling standard collection operations:
+- Iteration: `for entry in transcript`
+- Filtering: `transcript.filter { ... }`
+- Mapping: `transcript.map { ... }`
+
+### Tool System
+
+#### Tool Protocol
+```swift
+protocol Tool<Arguments, Output>: Sendable {
+    associatedtype Arguments: ConvertibleFromGeneratedContent
+    associatedtype Output: PromptRepresentable
+    
+    var name: String { get }
+    var description: String { get }
+    var includesSchemaInInstructions: Bool { get }  // Default: true
+    var parameters: GenerationSchema { get }
+    
+    func call(arguments: Arguments) async throws -> Output
+}
+```
+
+#### ToolOutput Type
+```swift
+struct ToolOutput: Sendable {
+    init<T: PromptRepresentable>(_ content: T)
+}
+```
+
+**Note:** ToolOutput exists as both:
+1. A standalone struct in OpenFoundationModels/Foundation/ToolOutput.swift
+2. Transcript.ToolOutput nested type for transcript entries
+
+### Generation Options
+
+#### SamplingMode
+```swift
+enum SamplingMode {
+    case greedy                    // Deterministic selection
+    case random(topK: Int)        // Sample from top K tokens
+    case random(topP: Double)     // Sample from cumulative probability
+}
+```
+
+#### GenerationOptions
+```swift
+struct GenerationOptions {
+    var samplingMode: SamplingMode
+    var maxTokens: Int?
+    var temperature: Double?
+    // Additional parameters for generation control
+}
+```
+
+### Error Handling
+
+#### GenerationError
+```swift
+enum GenerationError: Error {
+    case exceededContextWindowSize(Context)
+    case assetsUnavailable(Context)
+    case guardrailViolation(Context)
+    case unsupportedGuide(Context)
+    case unsupportedLanguageOrLocale(Context)
+    case decodingFailure(Context)
+    case rateLimited(Context)
+    case concurrentRequests(Context)
+    case refusal(Refusal, Context)
+}
+```
+
+### Streaming and Partial Generation
+
+#### PartiallyGenerated
+For streaming responses, types can define a PartiallyGenerated associated type:
+- Represents incomplete data during streaming
+- Must be ConvertibleFromGeneratedContent
+- Defaults to Self for simple types (String, Int, etc.)
+- Custom types can define specialized partial representations
+
+#### Streaming Flow
+1. Model generates text incrementally
+2. Text converted to GeneratedContent (may be incomplete JSON)
+3. PartiallyGenerated type created from partial content
+4. UI can display partial results
+5. Final complete object created when isComplete = true
+
+### System Language Model
+
+**Note:** SystemLanguageModel is not implemented in this repository. It requires custom implementation specific to each deployment environment.
+
+```swift
+struct SystemLanguageModel: LanguageModel {
+    static var `default`: SystemLanguageModel { get }
+    var availability: AvailabilityStatus { get }
+    var isAvailable: Bool { get }
+    
+    // LanguageModel protocol requirements
+    func generate(transcript: Transcript, options: GenerationOptions) async throws -> String
+    func stream(transcript: Transcript, options: GenerationOptions) -> AsyncStream<String>
+}
+```
+
+### Protocol Conformance Requirements
+
+#### SendableMetatype
+Protocol indicating that a type's metatype is safe to share across concurrent contexts:
+```swift
+protocol SendableMetatype: ~Copyable, ~Escapable { }
+```
+
+Types conforming to SendableMetatype:
+- All Tool implementations
+- GenerationSchema
+- GenerationOptions
+- LanguageModelFeedback and nested types
+- Transcript and nested types
+
+## Implementation Guidelines
+
+### Type Conversion Best Practices
+1. **Kind-based conversion**: Always prioritize GeneratedContent.Kind for type detection
+2. **String fallback**: Provide string parsing for backward compatibility
+3. **Null handling**: Use Kind.null for Optional.none, not string "null"
+4. **Array parsing**: Check Kind.array first, then fall back to JSON string parsing
+
+### Error Handling
+- Use appropriate DecodingError for type conversion failures
+- Provide descriptive debug descriptions
+- Handle partial content gracefully in streaming contexts
+
+### Thread Safety
+- All public types must be Sendable
+- Use @unchecked Sendable only when necessary with proper documentation
+- Metatypes requiring concurrent access must conform to SendableMetatype
 
 ## Build Commands
+
+### Prerequisites
+- **Swift 6.2+** required (check with `swift --version`)
+- **Xcode 16.2+** for macOS development
+- **macOS 15.2+** or **iOS 18.2+** deployment target
+
+### Build Commands
 - Build: `swift build`
 - Test: `swift test`
 - Test specific: `swift test --filter TestName`
 - Release build: `swift build -c release`
-- Lint/Format: `swift-format --in-place --recursive Sources/ Tests/`
+- Clean build: `swift package clean && swift build`
 
-## Apple Foundation Models 完全仕様
-
-### Generable プロトコルとJSON Schema の関係
-
-Apple の Generable は TypeScript の JSON Schema に相当する機能で、LLM の出力を構造化するための仕組みです。
-
-#### JSON Schema との対応表
-
-| JSON Schema | Apple Generable | 説明 |
-|------------|----------------|------|
-| `type: "object"` | `@Generable struct` | オブジェクト型 |
-| `type: "string"` | `String` | 文字列型 |
-| `type: "integer"` | `Int` | 整数型 |
-| `type: "number"` | `Double/Float` | 数値型 |
-| `type: "boolean"` | `Bool` | 真偽値型 |
-| `type: "array"` | `[T]` | 配列型 |
-| `enum: [...]` | `enum` または `.anyOf()` | 列挙型 |
-| `pattern: "regex"` | `.pattern(/regex/)` | 正規表現制約 |
-| `minimum/maximum` | `.range(min...max)` | 範囲制約 |
-| `minItems/maxItems` | `.minimumCount()/.maximumCount()` | 配列要素数制約 |
-| `required: [...]` | 非Optional プロパティ | 必須フィールド |
-| `properties: {...}` | `GenerationSchema.Property` | プロパティ定義 |
-
-### PartiallyGenerated の設計思想
-
-PartiallyGenerated は Apple Foundation Models の素晴らしい機能で、ストリーミングレスポンス中の部分的なデータを UI で利用可能にするための仕組みです。
-
-#### 動作原理
-
+### Swift 6.2 Compiler Flags
+The project uses these Swift 6.2 specific settings in Package.swift:
 ```swift
-// ストリーミング中の状態遷移例
-@Generable
-struct UserProfile {
-    let name: String
-    let age: Int
-    let bio: String
-}
-
-// 1. 初期状態: {}
-// isComplete: false
-let partial1 = UserProfile.PartiallyGenerated(GeneratedContent(json: "{}"))
-
-// 2. name が到着: {"name": "John"}
-// isComplete: false
-let partial2 = UserProfile.PartiallyGenerated(GeneratedContent(json: #"{"name": "John"}"#))
-
-// 3. 完全なJSON: {"name": "John", "age": 25, "bio": "Developer"}
-// isComplete: true
-let complete = UserProfile(GeneratedContent(json: #"{"name": "John", "age": 25, "bio": "Developer"}"#))
+.swiftLanguageMode(.v6),
+.enableExperimentalFeature("StrictConcurrency"),
+.enableUpcomingFeature("ExistentialAny")
 ```
 
-### GeneratedContent の詳細設計
+## Testing Strategy
+See [TESTING.md](./TESTING.md) for comprehensive testing documentation.
 
-#### Kind enum
+## Detailed Explanation of Generable Macro and Protocol
 
-GeneratedContent は JSON 互換のデータ構造を表現します：
+### @Generable Macro
 
-```swift
-public enum Kind: Sendable, Equatable {
-    case null                                                           // JSON null
-    case bool(Bool)                                                     // JSON boolean
-    case number(Double)                                                 // JSON number
-    case string(String)                                                 // JSON string
-    case array([GeneratedContent])                                      // JSON array
-    case structure(properties: [String: GeneratedContent], orderedKeys: [String])  // JSON object
-    case partial(json: String)                                          // 不完全なJSON（ストリーミング中）
-}
-```
+#### Overview
+The `@Generable` macro is an attribute macro that can be applied to Swift structures, enumerations, and actors. When applied, it automatically conforms the type to the `Generable` protocol, enabling LLMs to generate structured output.
 
-#### isComplete の判定ロジック
+#### How the Macro Works
 
 ```swift
-public var isComplete: Bool {
-    switch kind {
-    case .structure(_, _):
-        // JSON として完全にパース可能か
-        return isValidCompleteJSON()
-    case .array(let elements):
-        // すべての要素が complete か
-        return elements.allSatisfy { $0.isComplete }
-    case .partial:
-        // 部分的なJSONは常に incomplete
-        return false
-    case .string, .number, .bool, .null:
-        // プリミティブ型は常に complete
-        return true
-    }
-}
-```
-
-### @Generable マクロの生成コード仕様
-
-#### 構造体の場合
-
-```swift
-@Generable(description: "User profile data")
-struct UserProfile {
-    @Guide(description: "User's full name", .pattern(/^[A-Za-z ]+$/))
-    let name: String
+@Generable(description: "Search suggestions")
+struct SearchSuggestions {
+    @Guide(description: "List of search terms", .count(4))
+    var searchTerms: [SearchTerm]
     
-    @Guide(description: "Age in years", .range(0...150))
-    let age: Int
-}
-
-// マクロが生成するコード:
-extension UserProfile: Generable {
-    // ConvertibleFromGeneratedContent 要件
-    public init(_ content: GeneratedContent) throws {
-        let props = try content.properties()
+    @Generable
+    struct SearchTerm {
+        var id: GenerationID  // Unique identifier during generation
         
-        // 各プロパティの取得（部分的なパースも許容）
-        self.name = try props["name"]?.value(String.self) ?? ""
-        self.age = try props["age"]?.value(Int.self) ?? 0
-    }
-    
-    // ConvertibleToGeneratedContent 要件
-    public var generatedContent: GeneratedContent {
-        GeneratedContent(
-            kind: .structure(
-                properties: [
-                    "name": GeneratedContent(kind: .string(self.name)),
-                    "age": GeneratedContent(kind: .number(Double(self.age)))
-                ],
-                orderedKeys: ["name", "age"]  // スキーマ順序を保持
-            )
-        )
-    }
-    
-    // Generable 要件
-    public static var generationSchema: GenerationSchema {
-        GenerationSchema(
-            type: UserProfile.self,
-            description: "User profile data",
-            properties: [
-                GenerationSchema.Property(
-                    name: "name",
-                    description: "User's full name",
-                    type: String.self,
-                    guides: [/^[A-Za-z ]+$/]
-                ),
-                GenerationSchema.Property(
-                    name: "age",
-                    description: "Age in years",
-                    type: Int.self,
-                    guides: [GenerationGuide.range(0...150)]
-                )
-            ]
-        )
-    }
-    
-    // PartiallyGenerated 型（必要な場合のみ生成）
-    public struct PartiallyGenerated: ConvertibleFromGeneratedContent {
-        public let name: String?
-        public let age: Int?
-        private let content: GeneratedContent
-        
-        public init(_ content: GeneratedContent) throws {
-            self.content = content
-            
-            // 部分的なパースを許容
-            if let props = try? content.properties() {
-                self.name = try? props["name"]?.value(String.self)
-                self.age = try? props["age"]?.value(Int.self)
-            } else {
-                self.name = nil
-                self.age = nil
-            }
-        }
-        
-        public var isComplete: Bool {
-            content.isComplete
-        }
-    }
-    
-    // デフォルト実装
-    public func asPartiallyGenerated() -> PartiallyGenerated {
-        try! PartiallyGenerated(self.generatedContent)
+        @Guide(description: "2-3 word search term")
+        var searchTerm: String
     }
 }
 ```
 
-#### 列挙型の場合
+Code generated by the macro:
+
+1. **Generable Protocol Conformance**
+   - Implementation of `ConvertibleFromGeneratedContent`
+   - Implementation of `ConvertibleToGeneratedContent`
+   - Implementation of `InstructionsRepresentable`
+   - Implementation of `PromptRepresentable`
+   - Conformance to `SendableMetatype`
+
+2. **Static Schema Generation**
+   ```swift
+   static var generationSchema: GenerationSchema {
+       // Auto-generates schema definitions for each property
+       GenerationSchema(
+           type: SearchSuggestions.self,
+           description: "Search suggestions",
+           properties: [
+               GenerationSchema.Property(
+                   name: "searchTerms",
+                   description: "List of search terms",
+                   type: [SearchTerm].self,
+                   guides: [GenerationGuide.count(4)]
+               )
+           ]
+       )
+   }
+   ```
+
+3. **Initialization Method**
+   ```swift
+   init(_ content: GeneratedContent) throws {
+       // Auto-implements conversion from GeneratedContent to type
+       let props = try content.properties()
+       self.searchTerms = try props["searchTerms"]?.value([SearchTerm].self) ?? []
+   }
+   ```
+
+4. **PartiallyGenerated Type Generation** (when needed)
+   ```swift
+   struct PartiallyGenerated: ConvertibleFromGeneratedContent {
+       let searchTerms: [SearchTerm]?
+       private let content: GeneratedContent
+       
+       init(_ content: GeneratedContent) throws {
+           self.content = content
+           // Allows partial parsing
+           if let props = try? content.properties() {
+               self.searchTerms = try? props["searchTerms"]?.value([SearchTerm].self)
+           } else {
+               self.searchTerms = nil
+           }
+       }
+       
+       var isComplete: Bool { content.isComplete }
+   }
+   ```
+
+### @Guide Macro
+
+#### Overview
+The `@Guide` macro is a peer macro applied to properties of `@Generable` types. It defines generation constraints for properties.
+
+#### Usage Examples and Constraints
 
 ```swift
 @Generable
-enum Status {
-    case active
-    case inactive
-    case pending(reason: String)
+struct UserProfile {
+    // String pattern constraint
+    @Guide(description: "Email address", 
+           .pattern(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/))
+    var email: String
+    
+    // Numeric range constraint
+    @Guide(description: "Age", .range(0...120))
+    var age: Int
+    
+    // Array element count constraint
+    @Guide(description: "Tags", .minimumCount(1), .maximumCount(10))
+    var tags: [String]
+    
+    // Enumeration value constraint
+    @Guide(description: "Status", .anyOf(["active", "inactive", "pending"]))
+    var status: String
 }
+```
 
-// マクロが生成するコード:
-extension Status: Generable {
-    public init(_ content: GeneratedContent) throws {
-        // 単純な列挙型として試行
-        if let stringValue = try? content.value(String.self) {
-            switch stringValue {
-            case "active": self = .active
-            case "inactive": self = .inactive
-            default: break
-            }
-        }
-        
-        // Discriminated Union として試行
-        let props = try content.properties()
-        guard let caseContent = props["case"],
-              let caseName = try? caseContent.value(String.self) else {
-            throw GenerationError.invalidValue
-        }
-        
-        switch caseName {
-        case "active": self = .active
-        case "inactive": self = .inactive
-        case "pending":
-            let valueContent = props["value"] ?? GeneratedContent("")
-            let reason = try valueContent.value(String.self)
-            self = .pending(reason: reason)
-        default:
-            throw GenerationError.invalidValue
-        }
-    }
+### Generable Protocol
+
+#### Protocol Definition
+
+```swift
+protocol Generable: ConvertibleFromGeneratedContent, 
+                   ConvertibleToGeneratedContent,
+                   InstructionsRepresentable,
+                   PromptRepresentable,
+                   SendableMetatype {
     
-    public var generatedContent: GeneratedContent {
-        switch self {
-        case .active:
-            return GeneratedContent(kind: .string("active"))
-        case .inactive:
-            return GeneratedContent(kind: .string("inactive"))
-        case .pending(let reason):
-            return GeneratedContent(
-                kind: .structure(
-                    properties: [
-                        "case": GeneratedContent(kind: .string("pending")),
-                        "value": GeneratedContent(kind: .string(reason))
-                    ],
-                    orderedKeys: ["case", "value"]
-                )
-            )
-        }
-    }
+    // Type for partially generated content (defaults to Self)
+    associatedtype PartiallyGenerated: ConvertibleFromGeneratedContent = Self
     
-    public static var generationSchema: GenerationSchema {
-        // 関連値がない場合は単純な anyOf
-        // 関連値がある場合は discriminated union
-        GenerationSchema(
-            type: Status.self,
-            description: "Status enumeration",
+    // Provides generation schema
+    static var generationSchema: GenerationSchema { get }
+    
+    // Conversion to partial generation type (default implementation provided)
+    func asPartiallyGenerated() -> PartiallyGenerated
+}
+```
+
+#### Key Features
+
+1. **Guaranteed Structured Output**
+   - Constrained Sampling prevents the model from generating malformed output
+   - Express JSON Schema-equivalent constraints in Swift's type system
+
+2. **Streaming Support**
+   - `PartiallyGenerated` type enables UI updates with incomplete data
+   - Safe parsing of partial JSON during streaming
+
+3. **Type Safety**
+   - Compile-time type checking
+   - No manual string parsing required
+
+4. **Nested Type Support**
+   - `@Generable` types can be nested within other `@Generable` types
+   - Enumerations with associated values are supported
+
+### GenerationGuide Constraint Types
+
+```swift
+struct GenerationGuide<Value> {
+    // Numeric range
+    static func range(_ range: ClosedRange<Value>) -> GenerationGuide
+    
+    // Regular expression pattern (String only)
+    static func pattern(_ regex: Regex<some Any>) -> GenerationGuide
+    
+    // Enumeration values
+    static func anyOf(_ values: [Value]) -> GenerationGuide
+    
+    // Array element count
+    static func minimumCount(_ count: Int) -> GenerationGuide
+    static func maximumCount(_ count: Int) -> GenerationGuide
+    static func count(_ count: Int) -> GenerationGuide  // min == max
+}
+```
+
+### Usage with Enumerations
+
+```swift
+@Generable
+enum TaskStatus {
+    case pending
+    case inProgress(percentComplete: Int)
+    case completed(completedAt: Date)
+    case failed(error: String)
+}
+```
+
+The macro generates a Discriminated Union pattern:
+
+```swift
+// Conversion to GeneratedContent
+var generatedContent: GeneratedContent {
+    switch self {
+    case .pending:
+        return GeneratedContent(kind: .string("pending"))
+    case .inProgress(let percent):
+        return GeneratedContent(kind: .structure(
             properties: [
-                GenerationSchema.Property(
-                    name: "case",
-                    description: "Enum case identifier",
-                    type: String.self
-                ),
-                GenerationSchema.Property(
-                    name: "value",
-                    description: "Associated value",
-                    type: String.self
-                )
-            ]
+                "case": GeneratedContent("inProgress"),
+                "percentComplete": GeneratedContent(percent)
+            ],
+            orderedKeys: ["case", "percentComplete"]
+        ))
+    // ...
+    }
+}
+```
+
+### DynamicGenerationSchema
+
+For building schemas dynamically at runtime:
+
+```swift
+let menuSchema = DynamicGenerationSchema(
+    name: "Menu",
+    properties: [
+        DynamicGenerationSchema.Property(
+            name: "dailySoup",
+            schema: DynamicGenerationSchema(
+                name: "dailySoup",
+                anyOf: ["Tomato", "Chicken Noodle", "Clam Chowder"]
+            )
         )
-    }
-}
-```
-
-### @Guide マクロの詳細
-
-@Guide マクロは peer macro として、プロパティに JSON Schema 相当の制約を付与：
-
-```swift
-// 文字列パターン
-@Guide(description: "Email address", .pattern(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/))
-var email: String
-
-// 数値範囲
-@Guide(description: "Score percentage", .range(0...100))
-var score: Int
-
-// 配列要素数
-@Guide(description: "Tag list", .minimumCount(1), .maximumCount(10))
-var tags: [String]
-
-// 列挙値
-@Guide(description: "Status", .anyOf(["draft", "published", "archived"]))
-var status: String
-```
-
-### GenerationSchema.Property の設計
-
-```swift
-public struct Property {
-    // 内部ストレージ
-    internal let name: String
-    internal let description: String?
-    internal let type: any Sendable.Type
-    internal let guides: [Any]  // GenerationGuide または Regex
-    
-    // Generable 型用
-    public init<Value: Generable>(
-        name: String,
-        description: String? = nil,
-        type: Value.Type,
-        guides: [GenerationGuide<Value>] = []
-    )
-    
-    // String 型用（正規表現付き）
-    public init<RegexOutput>(
-        name: String,
-        description: String? = nil,
-        type: String.Type,
-        guides: [Regex<RegexOutput>] = []
-    )
-    
-    // Optional 型用
-    public init<Value: Generable>(
-        name: String,
-        description: String? = nil,
-        type: Value?.Type,
-        guides: [GenerationGuide<Value>] = []
-    )
-}
-```
-
-### 型変換とデフォルト値
-
-#### 型マッピング
-
-| Swift 型 | GeneratedContent.Kind | デフォルト値 |
-|---------|---------------------|------------|
-| String | .string(_) | "" |
-| Int | .number(_) | 0 |
-| Double | .number(_) | 0.0 |
-| Float | .number(_) | 0.0 |
-| Bool | .bool(_) | false |
-| [T] | .array(_) | [] |
-| T? | .null または 該当Kind | nil |
-
-### ストリーミング対応
-
-```swift
-// ResponseStream での使用例
-let stream = session.streamResponse(
-    to: "Generate user profile",
-    generating: UserProfile.self
+    ]
 )
 
-for try await partial in stream {
-    // partial.content は UserProfile.PartiallyGenerated 型
-    if let name = partial.content.name {
-        updateNameLabel(name)  // 部分的なデータでUIを更新
-    }
-    
-    if partial.isComplete {
-        let complete = try UserProfile(partial.content.generatedContent)
-        saveToDatabase(complete)
-    }
-}
+let schema = try GenerationSchema(root: menuSchema, dependencies: [])
+let response = try await session.respond(to: prompt, schema: schema)
 ```
 
-### エラーハンドリング
+### Usage Guidelines
 
-```swift
-public enum GenerationError: Error {
-    case invalidValue                           // 無効な値
-    case missingRequiredProperty(String)        // 必須プロパティの欠如
-    case typeMismatch(expected: String, actual: String)  // 型の不一致
-    case invalidJSON(String)                     // 無効なJSON
-    case schemaViolation(String)                 // スキーマ違反
-    case partialContent                          // 部分的なコンテンツ（完全でない）
-}
-```
+1. **Keep Descriptions Concise**
+   - Long descriptions consume context size and increase latency
 
-## Transcript-Centric Design Philosophy
+2. **Required Properties**
+   - Non-Optional properties are treated as required
+   - nil is allowed during partial generation
 
-Apple Foundation ModelsはTranscriptを中心とした設計を採用しています：
-
-### Transcriptの役割
-- **Single Source of Truth**: すべての会話コンテキストを一元管理
-- **Instructions**: システム指示とToolDefinitionsを含む  
-- **Conversation History**: Prompt/Response/ToolCalls/ToolOutputの履歴
-- **Stateless Model Interface**: LanguageModelはTranscriptを受け取って処理
-
-### 責任の分離
-- **LanguageModelSession**: 
-  - Transcriptの管理（エントリの追加・保持）
-  - Instructions/ToolsをTranscript.Entryとして初期化時に設定
-  - 各respond呼び出しでPrompt/Responseエントリを追加
-- **LanguageModel**: 
-  - Transcriptを受け取って解釈（実装依存）
-  - 応答生成のみに集中
-  - コンテキスト管理はしない
-
-### Transcript.Entry の種類
-```swift
-public enum Entry {
-    case instructions(Transcript.Instructions)  // システム指示とツール定義
-    case prompt(Transcript.Prompt)              // ユーザー入力
-    case response(Transcript.Response)          // モデル応答
-    case toolCalls(Transcript.ToolCalls)        // ツール呼び出し
-    case toolOutput(Transcript.ToolOutput)      // ツール結果
-}
-```
-
-## Architecture
-
-### Core Components
-1. **SystemLanguageModel**
-   - Static `default` property
-   - `availability: AvailabilityStatus` property
-   - `isAvailable: Bool` convenience property
-
-2. **Generation System**
-   - `GenerationOptions`: Configuration with SamplingMode (greedy, random top-k, random top-p)
-   - `GenerationSchema`: Type descriptions with Property and SchemaError
-   - `GenerationGuide`: Constraints for guided generation (ranges, patterns, enums)
-   - `DynamicGenerationSchema`: Runtime schema construction
-   - `GeneratedContent`: Structured content representation
-
-3. **LanguageModelSession** (Apple Official API)
-   - Transcript-based conversation management
-   - Initializers: `init(model:tools:instructions:)`, `init(model:tools:transcript:)`  
-   - Closure-based prompts: `prompt: () throws -> Prompt`
-   - Generic responses: `Response<Content>` where `Content: Generable`
-   - Streaming: `ResponseStream<Content>` with AsyncSequence
-   - Response methods:
-     - `respond(to:options:) async throws -> Response<String>`
-     - `respond<Content>(to:generating:includeSchemaInPrompt:options:) async throws -> Response<Content>`
-     - `respond(to:schema:includeSchemaInPrompt:options:) async throws -> Response<GeneratedContent>`
-     - `streamResponse(to:options:) -> ResponseStream<String>`
-     - `streamResponse<Content>(to:generating:includeSchemaInPrompt:options:) -> ResponseStream<Content>`
-   - Transcript management: automatic entry creation and tracking
-   - `prewarm(promptPrefix:)`: Preload model resources
-
-4. **Protocols**
-   - `Generable`: Types that can be generated by the model
-   - `Tool`: Function-calling protocol with ToolDefinition in Transcript.Instructions
-   - `LanguageModel`: Transcript-based generation interface
-     - `generate(transcript:options:) async throws -> String`
-     - `stream(transcript:options:) -> AsyncStream<String>`
-     - `isAvailable: Bool`
-     - `supports(locale:) -> Bool`
-
-5. **Error Handling**
-   - `LanguageModelSession.GenerationError`: Apple-compliant error enum
-   - `LanguageModelSession.ToolCallError`: Tool execution errors
-   - `GenerationOptions`: Generation configuration
-   - `GenerationSchema`: Structured generation schemas
-
-### Directory Structure
-```
-Sources/
-├── OpenFoundationModels/           # Main module
-│   ├── Core/                      # Main API components
-│   │   ├── LanguageModelSession.swift
-│   │   ├── SystemLanguageModel.swift
-│   │   ├── Response.swift
-│   │   └── ResponseStream.swift
-│   ├── Types/                     # Type definitions
-│   ├── Tools/                     # Tool calling system
-│   ├── Extensions/                # Protocol extensions
-│   └── Errors/                    # Error handling
-├── OpenFoundationModelsCore/      # Core types and protocols
-│   ├── Protocols/                 # Core protocol definitions
-│   ├── Types/                     # Core type definitions
-│   │   ├── GenerationSchema.swift
-│   │   ├── GeneratedContent.swift
-│   │   ├── DynamicGenerationSchema.swift
-│   │   ├── Instructions.swift
-│   │   └── Prompt.swift
-│   └── Builders/                  # Result builders
-└── OpenFoundationModelsMacros/    # Macro implementations
-```
-
-### Implementation Guidelines
-- **Apple β SDK Compliance**: All APIs match Apple's official specification
-- **Swift 6.1+ Features**: isolated/sending keywords, modern concurrency
-- **Generic Type System**: Response<Content> and ResponseStream<Content>
-- **Closure-based Prompts**: `prompt: () throws -> Prompt` pattern
-- **Thread Safety**: Sendable conformance throughout
-- **Error Handling**: Apple-compliant error types
-- **Streaming Support**: AsyncSequence-based streaming
-
-### Testing Strategy
-Comprehensive testing strategy focused on Generable functionality and Apple Foundation Models compatibility.
-
-**📋 Complete Testing Documentation**: See [TESTING.md](./TESTING.md) for detailed testing strategy, structure, and implementation guidelines.
-
-#### Quick Test Commands
-```bash
-# All tests
-swift test
-
-# Priority 1: Core Generable functionality
-swift test --filter tag:generable
-
-# System components  
-swift test --filter tag:core
-swift test --filter tag:foundation
-
-# Test types
-swift test --filter tag:macros
-swift test --filter tag:integration
-swift test --filter tag:performance
-```
-
-#### Test Priorities
-1. **🎯 Generable Core** (Highest Priority): @Generable macros, guided generation, constraints
-2. **🔧 System Core**: SystemLanguageModel, LanguageModelSession, Response handling
-3. **🔗 Integration**: End-to-end workflows, streaming, tool calling
-4. **⚡ Performance**: Large schemas, concurrent generation, memory efficiency
-
-#### Test Implementation Methodology
-**🔄 Incremental Test-Driven Development**
-
-**📖 DOCUMENTATION-FIRST APPROACH:**
-**⚠️ CRITICAL**: Before implementing ANY test, you MUST read the relevant Apple documentation using the Remark tool or official Apple documentation URLs provided below.
-
-**One Test at a Time Approach:**
-1. **📚 Read Documentation FIRST**: Always start by reading Apple's official documentation for the component being tested
-2. **Write Single Test**: Implement one specific test case based on the documentation
-3. **Run & Verify**: Execute `swift test` and ensure PASS
-4. **Fix If Needed**: If test fails, fix implementation before proceeding
-5. **Next Test**: Only after success, write the next test case
-6. **Continuous Validation**: Each new test must not break existing tests
-
-**Implementation Order:**
-```bash
-# Step 1: Foundation - READ DOCS FIRST!
-# 📚 Before implementing: Read https://developer.apple.com/documentation/foundationmodels
-swift test --filter "CustomTagsTests"           # Tags definition test
-swift test                                      # Verify base setup
-
-# Step 2: Generable Core (One by one) - READ DOCS FIRST!
-# 📚 Before implementing: Read https://developer.apple.com/documentation/foundationmodels/generable
-swift test --filter "GenerableMacroTests"       # First: @Generable macro
-swift test --filter "GuideMacroTests"          # Second: @Guide macro  
-swift test --filter "GenerationSchemaTests"     # Third: Schema generation
-
-# Step 3: Core System (One by one) - READ DOCS FIRST!
-# 📚 Before implementing: Read https://developer.apple.com/documentation/foundationmodels/systemlanguagemodel
-swift test --filter "SystemLanguageModelTests" # Fourth: Model tests
-# 📚 Before implementing: Read https://developer.apple.com/documentation/foundationmodels/languagemodelsession
-swift test --filter "LanguageModelSessionTests" # Fifth: Session tests
-```
-
-**Quality Gates:**
-- ✅ **Documentation Check**: Read Apple documentation BEFORE writing any test
-- ✅ Each test file must pass individually before next implementation
-- ✅ All existing tests must continue passing when new tests added
-- ✅ No skipped or ignored tests allowed in main branch
-- ✅ Fix broken implementation immediately, don't accumulate test debt
-
-**Development Workflow:**
-1. **📚 READ APPLE DOCUMENTATION FIRST** for the component you're testing
-2. Implement smallest possible test case for specific functionality based on documentation
-3. Run `swift test --filter SpecificTest` to verify single test
-4. Run `swift test` to verify no regressions in existing tests
-5. Commit successful test + implementation before next test
-6. Repeat cycle for next test case
-
-This methodical approach ensures rock-solid test coverage and prevents accumulation of broken tests.
-
-## Key APIs (Apple Official)
-
-1. **LanguageModelSession Initializers**
-```swift
-// Apple official convenience initializers
-convenience init(
-    model: SystemLanguageModel = SystemLanguageModel.default,
-    tools: [any Tool] = [],
-    @InstructionsBuilder instructions: () throws -> Instructions
-) rethrows
-
-convenience init(
-    model: SystemLanguageModel = SystemLanguageModel.default,
-    tools: [any Tool] = [],
-    transcript: Transcript
-)
-```
-
-2. **Response Methods**
-```swift
-// String response
-func respond(
-    options: GenerationOptions = .default,
-    isolation: isolated (any Actor)? = nil,
-    prompt: () throws -> Prompt
-) async throws -> Response<String>
-
-// Generic content response
-func respond<Content: Generable>(
-    generating: Content.Type,
-    options: GenerationOptions = .default,
-    includeSchemaInPrompt: Bool = true,
-    isolation: isolated (any Actor)? = nil,
-    prompt: () throws -> Prompt
-) async throws -> Response<Content>
-```
-
-3. **Streaming Methods**
-```swift
-// String streaming
-func streamResponse(
-    options: GenerationOptions = .default,
-    prompt: () throws -> Prompt
-) rethrows -> ResponseStream<String>
-
-// Generic content streaming
-func streamResponse<Content: Generable>(
-    generating: Content.Type,
-    options: GenerationOptions = .default,
-    includeSchemaInPrompt: Bool = true,
-    prompt: () throws -> Prompt
-) rethrows -> ResponseStream<Content>
-```
-
-4. **Response Types**
-```swift
-public struct Response<Content: Sendable>: Sendable {
-    public let userPrompt: String
-    public let content: Content
-    public let duration: TimeInterval
-    
-    public struct Partial: Sendable {
-        public let content: Content
-        public let isComplete: Bool
-    }
-}
-
-public struct ResponseStream<Content: Sendable>: AsyncSequence, Sendable {
-    public typealias Element = Response<Content>.Partial
-}
-```
-
-5. **Error Handling**
-```swift
-public enum GenerationError: Error, Sendable {
-    case exceededContextWindowSize
-    case guardrailViolation
-    case toolError(ToolCallError)
-    case modelUnavailable
-    case invalidPrompt
-    case invalidSchema
-    case generationFailed
-}
-```
+3. **Performance**
+   - Deeply nested structures may increase generation time
+   - Appropriate constraints improve generation quality
 
 ## Dependencies
 - swift-syntax (for macro implementation)
 - swift-async-algorithms (for streaming)
 - Foundation (for core types)
-
-## Remark Tool Usage
-For fetching Apple documentation during development, use the Remark tool:
-
-### Installation
-```bash
-# Clone and install Remark tool
-git clone https://github.com/1amageek/Remark.git
-cd Remark
-make install
-```
-
-### Command-Line Usage
-```bash
-# Basic Apple documentation fetch
-remark https://developer.apple.com/documentation/foundationmodels/languagemodelsession
-
-# Include front matter for structured output
-remark --include-front-matter https://developer.apple.com/documentation/foundationmodels/response
-
-# Plain text output
-remark --plain-text https://developer.apple.com/documentation/foundationmodels/responsestream
-```
-
-### Key Apple Documentation URLs
-- LanguageModelSession: `https://developer.apple.com/documentation/foundationmodels/languagemodelsession`
-- Response: `https://developer.apple.com/documentation/foundationmodels/response`
-- ResponseStream: `https://developer.apple.com/documentation/foundationmodels/responsestream`
-- SystemLanguageModel: `https://developer.apple.com/documentation/foundationmodels/systemlanguagemodel`
-- GenerationOptions: `https://developer.apple.com/documentation/foundationmodels/generationoptions`
-- GenerationGuide: `https://developer.apple.com/documentation/foundationmodels/generationguide`
-- DynamicGenerationSchema: `https://developer.apple.com/documentation/foundationmodels/dynamicgenerationschema`
-- Generable: `https://developer.apple.com/documentation/foundationmodels/generable`
-- GenerationSchema: `https://developer.apple.com/documentation/foundationmodels/generationschema`
-- GeneratedContent: `https://developer.apple.com/documentation/foundationmodels/generatedcontent`
-
-### Swift Package Manager Integration
-```swift
-// Package.swift
-dependencies: [
-    .package(url: "https://github.com/1amageek/Remark.git", branch: "main")
-]
-```
-
-### Library Usage
-```swift
-import Remark
-
-let htmlContent = """<html>...</html>"""
-do {
-    let remark = try Remark(htmlContent)
-    print("Title:", remark.title)
-    print("Description:", remark.description)
-    print("Markdown:", remark.page)
-} catch {
-    print("Error:", error)
-}
-```
-
-### Features
-- HTML to Markdown conversion
-- Open Graph metadata extraction
-- Front matter generation
-- Intelligent URL and link handling
-- Command-line interface
-- Swift library integration
-
-## SendableMetatype Protocol
-
-### 概要
-SendableMetatypeは、Swift 標準ライブラリのプロトコルで、型のメタタイプが並行コンテキスト間で安全に共有できることを示します。ジェネリック型`T`が`SendableMetatype`に準拠すると、そのメタタイプ`T.Type`が`Sendable`に準拠します。
-
-### 重要な特徴
-- **目的**: メタタイプ（T.Type）をTask間で安全に共有
-- **自動準拠**: すべての具象型は暗黙的にSendableMetatypeに準拠
-- **主な用途**: ジェネリックコードでisolated conformancesの使用を防ぐ
-
-### プロトコル定義
-```swift
-protocol SendableMetatype : ~Copyable, ~Escapable
-```
-
-### 使用例
-```swift
-// 問題のあるコード（SendableMetatypeなし）
-func useFromAnotherTask<T: P>(_: T.Type) {
-    Task { @concurrent in
-        T.f() // エラー: non-Sendable type `T.Type` をキャプチャ
-    }
-}
-
-// 修正版（SendableMetatype追加）
-func useFromAnotherTask<T: P & SendableMetatype>(_: T.Type) {
-    Task { @concurrent in
-        T.f() // OK: T.Type は Sendable
-    }
-}
-```
-
-### プロトコル継承関係
-- `Sendable`プロトコルは`SendableMetatype`を継承
-- `T: Sendable`の要件がある場合、`T: SendableMetatype`も暗黙的に要求される
-
-### Foundation Models での使用
-Apple Foundation Modelsでは、以下の型がSendableMetatypeに準拠：
-- GenerationSchema
-- GenerationOptions
-- Tool（プロトコル）
-- LanguageModelFeedback およびネスト型（Sentiment, Issue, Issue.Category）
-- Transcript およびすべてのネスト型
-
-## API Implementation Status
-
-### ✅ Verified Against Apple Documentation
-- **SystemLanguageModel**: Complete with UseCase struct
-- **SystemLanguageModel.UseCase**: Verified with `general` and `contentTagging` static properties
-- **Tool Protocol**: 100% accurate with SendableMetatype conformance
-- **ToolOutput**: Verified struct with `init(_:)` method
-- **Generable Protocol**: Complete with all required conformances
-- **GenerationID**: Implemented with full Apple compliance
-- **Transcript**: Complete with all nested types
-- **Response/ResponseStream**: Generic types with Apple specifications
-- **SendableMetatype準拠**: すべての必要な型で正しく実装
-  - GenerationSchema, GenerationOptions
-  - LanguageModelFeedback.Sentiment/Issue/Category
-  - Transcript.Entry（Apple仕様通り）
-  - Tool プロトコル
-- **GenerationOptions**: Complete with SamplingMode (greedy, random top-k, random top-p)
-- **GenerationSchema**: Full implementation with Property, SchemaError, and dynamic support
-- **GenerationGuide**: All static methods for constraints (ranges, patterns, enums, arrays)
-- **DynamicGenerationSchema**: Runtime schema construction with Property type
-- **GeneratedContent**: All data access methods and protocol conformances
-
-### 🔧 Build Status
-- ✅ **Build Success**: All modules compile without errors
-- ✅ **Core API**: 100% Apple compliant structure
-- ✅ **Generate System**: Fully implemented and verified
-- ⚠️ **Minor Warnings**: Some unused parameters in DynamicGenerationSchema conversion (non-critical)
-
-## Status
-✅ **Implementation Complete**: 100% Apple Foundation Models β SDK compatibility achieved
-✅ **API Verification**: All major APIs verified against Apple documentation
-✅ **Clean Architecture**: Organized directory structure
-✅ **Thread Safety**: Full Sendable compliance
-✅ **Modern Swift**: Swift 6.1+ concurrency features

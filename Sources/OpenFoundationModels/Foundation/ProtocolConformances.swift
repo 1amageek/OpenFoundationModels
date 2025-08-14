@@ -116,24 +116,46 @@ extension Array: ConvertibleToGeneratedContent where Element: ConvertibleToGener
 extension Array: ConvertibleFromGeneratedContent where Element: ConvertibleFromGeneratedContent {
     /// Creates an instance with the content.
     public init(_ content: GeneratedContent) throws {
-        // Try to parse as JSON array
-        if let elements = try? content.elements() {
+        switch content.kind {
+        case .array(let elements):
+            // Direct conversion from Kind.array
             self = try elements.map { try Element($0) }
-        } else {
-            // Fallback: try to split by common separators
-            let text = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            if text.hasPrefix("[") && text.hasSuffix("]") {
-                // Remove brackets and split
-                let inner = String(text.dropFirst().dropLast())
-                let parts = inner.split(separator: ",").map { String($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
-                self = try parts.map { try Element(GeneratedContent($0)) }
+        case .string(let text):
+            // Backward compatibility for string parsing
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed == "[]" {
+                self = []
+            } else if trimmed.hasPrefix("[") && trimmed.hasSuffix("]") {
+                // Try JSON array parsing
+                if let data = trimmed.data(using: .utf8),
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [Any] {
+                    self = try json.map {
+                        let jsonData = try JSONSerialization.data(withJSONObject: $0)
+                        let jsonString = String(data: jsonData, encoding: .utf8) ?? ""
+                        return try Element(GeneratedContent(json: jsonString))
+                    }
+                } else {
+                    // Fallback to comma-separated parsing
+                    let inner = String(trimmed.dropFirst().dropLast())
+                    let parts = inner.split(separator: ",").map { 
+                        String($0.trimmingCharacters(in: .whitespacesAndNewlines)) 
+                    }.filter { !$0.isEmpty }
+                    self = try parts.map { try Element(GeneratedContent($0)) }
+                }
             } else {
-                // Try splitting by newlines or commas
+                // Split by commas or newlines
                 let parts = text.split(whereSeparator: { $0.isNewline || $0 == "," })
                     .map { String($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
                     .filter { !$0.isEmpty }
                 self = try parts.map { try Element(GeneratedContent($0)) }
             }
+        default:
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: [],
+                    debugDescription: "Unable to decode Array from Kind: \(content.kind)"
+                )
+            )
         }
     }
 }

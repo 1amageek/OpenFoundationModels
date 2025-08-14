@@ -20,7 +20,7 @@ extension Optional: ConvertibleToGeneratedContent where Wrapped: ConvertibleToGe
     public var generatedContent: GeneratedContent {
         switch self {
         case .none:
-            return GeneratedContent("null")
+            return GeneratedContent(kind: .null)
         case .some(let value):
             return value.generatedContent
         }
@@ -56,11 +56,13 @@ extension Optional: InstructionsRepresentable where Wrapped: ConvertibleToGenera
 extension Optional: ConvertibleFromGeneratedContent where Wrapped: ConvertibleFromGeneratedContent {
     /// Creates an instance with the content.
     public init(_ content: GeneratedContent) throws {
-        // Check if content represents null
-        let text = content.text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if text == "null" || text == "nil" || text.isEmpty {
+        switch content.kind {
+        case .null:
             self = nil
-        } else {
+        case .string(let s) where s.lowercased() == "null" || s.lowercased() == "nil" || s.isEmpty:
+            // Backward compatibility for string-based null values
+            self = nil
+        default:
             // Try to decode as wrapped type
             self = try Wrapped(content)
         }

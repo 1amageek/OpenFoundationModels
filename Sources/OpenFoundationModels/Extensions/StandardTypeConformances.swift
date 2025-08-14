@@ -20,17 +20,31 @@ extension Bool: Generable {
     
     /// Creates an instance with the content.
     public init(_ content: GeneratedContent) throws {
-        let text = content.text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        switch text {
-        case "true", "yes", "1":
-            self = true
-        case "false", "no", "0":
-            self = false
+        switch content.kind {
+        case .bool(let value):
+            self = value
+        case .number(let value):
+            self = value != 0
+        case .string(let s):
+            let text = s.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            switch text {
+            case "true", "yes", "1":
+                self = true
+            case "false", "no", "0":
+                self = false
+            default:
+                throw DecodingError.dataCorrupted(
+                    DecodingError.Context(
+                        codingPath: [],
+                        debugDescription: "Unable to decode Bool from string: \(s)"
+                    )
+                )
+            }
         default:
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: [],
-                    debugDescription: "Unable to decode Bool from: \(content.text)"
+                    debugDescription: "Unable to decode Bool from Kind: \(content.kind)"
                 )
             )
         }
@@ -59,16 +73,36 @@ extension Int: Generable {
     
     /// Creates an instance with the content.
     public init(_ content: GeneratedContent) throws {
-        let text = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let value = Int(text) else {
+        switch content.kind {
+        case .number(let value):
+            guard value.truncatingRemainder(dividingBy: 1) == 0 else {
+                throw DecodingError.dataCorrupted(
+                    DecodingError.Context(
+                        codingPath: [],
+                        debugDescription: "Cannot convert decimal number \(value) to Int"
+                    )
+                )
+            }
+            self = Int(value)
+        case .string(let s):
+            let text = s.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let value = Int(text) else {
+                throw DecodingError.dataCorrupted(
+                    DecodingError.Context(
+                        codingPath: [],
+                        debugDescription: "Unable to decode Int from string: \(s)"
+                    )
+                )
+            }
+            self = value
+        default:
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: [],
-                    debugDescription: "Unable to decode Int from: \(content.text)"
+                    debugDescription: "Unable to decode Int from Kind: \(content.kind)"
                 )
             )
         }
-        self = value
     }
     
     /// An instance that represents the generated content.
@@ -94,16 +128,28 @@ extension Float: Generable {
     
     /// Creates an instance with the content.
     public init(_ content: GeneratedContent) throws {
-        let text = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let value = Float(text) else {
+        switch content.kind {
+        case .number(let value):
+            self = Float(value)
+        case .string(let s):
+            let text = s.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let value = Float(text) else {
+                throw DecodingError.dataCorrupted(
+                    DecodingError.Context(
+                        codingPath: [],
+                        debugDescription: "Unable to decode Float from string: \(s)"
+                    )
+                )
+            }
+            self = value
+        default:
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: [],
-                    debugDescription: "Unable to decode Float from: \(content.text)"
+                    debugDescription: "Unable to decode Float from Kind: \(content.kind)"
                 )
             )
         }
-        self = value
     }
     
     /// An instance that represents the generated content.
@@ -129,16 +175,28 @@ extension Double: Generable {
     
     /// Creates an instance with the content.
     public init(_ content: GeneratedContent) throws {
-        let text = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let value = Double(text) else {
+        switch content.kind {
+        case .number(let value):
+            self = value
+        case .string(let s):
+            let text = s.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let value = Double(text) else {
+                throw DecodingError.dataCorrupted(
+                    DecodingError.Context(
+                        codingPath: [],
+                        debugDescription: "Unable to decode Double from string: \(s)"
+                    )
+                )
+            }
+            self = value
+        default:
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: [],
-                    debugDescription: "Unable to decode Double from: \(content.text)"
+                    debugDescription: "Unable to decode Double from Kind: \(content.kind)"
                 )
             )
         }
-        self = value
     }
     
     /// An instance that represents the generated content.

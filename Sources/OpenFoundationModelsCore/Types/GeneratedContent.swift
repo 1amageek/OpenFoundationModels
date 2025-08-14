@@ -159,45 +159,22 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
     }
 
     /// Reads a top-level, concrete partially generable type.
-    public func value<Value>(_ type: Value.Type) throws -> Value {
-        switch kind {
-        case .null:
-            // Check if Value is Optional and return nil
-            if String(describing: Value.self).contains("Optional") {
-                return unsafeBitCast(Optional<Any>.none, to: Value.self)
-            }
-            throw GeneratedContentError.typeMismatch(expected: String(describing: type), actual: "Null")
-        case .bool(let b):
-            if type == Bool.self { return (b as Any) as! Value }
-            throw GeneratedContentError.typeMismatch(expected: String(describing: type), actual: "Bool")
-        case .number(let d):
-            if type == Double.self { return (d as Any) as! Value }
-            if type == Int.self, d.rounded() == d { return (Int(d) as Any) as! Value }
-            throw GeneratedContentError.typeMismatch(expected: String(describing: type), actual: "Number")
-        case .string(let s):
-            if type == String.self { return (s as Any) as! Value }
-            if type == Bool.self, let b = Bool(s) { return (b as Any) as! Value }
-            if type == Int.self, let i = Int(s) { return (i as Any) as! Value }
-            if type == Double.self, let d = Double(s) { return (d as Any) as! Value }
-            if type == Float.self, let f = Float(s) { return (f as Any) as! Value }
-            throw GeneratedContentError.typeMismatch(expected: String(describing: type), actual: "String")
-        case .array:
-            throw GeneratedContentError.typeMismatch(expected: String(describing: type), actual: "Array")
-        case .structure:
-            throw GeneratedContentError.typeMismatch(expected: String(describing: type), actual: "Dictionary")
+    public func value<Value>(_ type: Value.Type = Value.self) throws -> Value where Value: ConvertibleFromGeneratedContent {
+        return try Value(self)
+    }
+
+    public func value<Value>(_ type: Value.Type = Value.self, forProperty property: String) throws -> Value where Value: ConvertibleFromGeneratedContent {
+        let props = try properties()
+        guard let c = props[property] else { 
+            throw GeneratedContentError.missingProperty(property) 
         }
+        return try Value(c)
     }
 
-    public func value<Value>(_ type: Value.Type, forProperty key: String) throws -> Value {
+    public func value<Value>(_ type: Value?.Type = Value?.self, forProperty property: String) throws -> Value? where Value: ConvertibleFromGeneratedContent {
         let props = try properties()
-        guard let c = props[key] else { throw GeneratedContentError.missingProperty(key) }
-        return try c.value(type)
-    }
-
-    public func value<Value>(_ type: Value?.Type, forProperty key: String) throws -> Value? {
-        let props = try properties()
-        guard let c = props[key] else { return nil }
-        return try c.value(Value.self)
+        guard let c = props[property] else { return nil }
+        return try Value(c)
     }
 
     // MARK: - Codable
