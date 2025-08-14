@@ -366,8 +366,14 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                     // Optional array
                     return "properties[\"\(propName)\"] = \(propName).map { GeneratedContent(elements: $0) } ?? GeneratedContent(kind: .null)"
                 } else {
-                    // Custom optional type
-                    return "properties[\"\(propName)\"] = \(propName)?.generatedContent ?? GeneratedContent(kind: .null)"
+                    // Custom optional type - use if-let to avoid ambiguity
+                    return """
+                    if let value = \(propName) {
+                                properties["\(propName)"] = value.generatedContent
+                            } else {
+                                properties["\(propName)"] = GeneratedContent(kind: .null)
+                            }
+                    """
                 }
             } else if propType.hasPrefix("[") && propType.hasSuffix("]") {
                 // Array property

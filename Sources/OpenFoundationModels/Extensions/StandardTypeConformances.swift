@@ -185,6 +185,138 @@ extension Decimal: Generable {
     // Returns self since PartiallyGenerated = Decimal (default)
 }
 
+// MARK: - UUID Generable Conformance
+
+extension UUID: Generable {
+    /// An instance of the generation schema.
+    public static var generationSchema: GenerationSchema {
+        return GenerationSchema(
+            type: UUID.self,
+            description: "A universally unique identifier in standard UUID format (8-4-4-4-12)",
+            properties: []
+        )
+    }
+    
+    /// Creates an instance with the content.
+    public init(_ content: GeneratedContent) throws {
+        let text = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // UUID文字列の検証とパース
+        guard let uuid = UUID(uuidString: text) else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: [],
+                    debugDescription: "Invalid UUID format: '\(text)'. Expected format: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+                )
+            )
+        }
+        self = uuid
+    }
+    
+    /// An instance that represents the generated content.
+    public var generatedContent: GeneratedContent {
+        return GeneratedContent(kind: .string(self.uuidString))
+    }
+    
+    // asPartiallyGenerated() uses default implementation from protocol extension
+    // Returns self since PartiallyGenerated = UUID (default)
+}
+
+// MARK: - Date Generable Conformance
+
+extension Date: Generable {
+    // Create formatters locally to avoid concurrency issues
+    private static func createISO8601Formatter(withFractionalSeconds: Bool = true) -> ISO8601DateFormatter {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = withFractionalSeconds 
+            ? [.withInternetDateTime, .withFractionalSeconds]
+            : [.withInternetDateTime]
+        return formatter
+    }
+    
+    /// An instance of the generation schema.
+    public static var generationSchema: GenerationSchema {
+        return GenerationSchema(
+            type: Date.self,
+            description: "A date and time value in ISO 8601 format (e.g., '2024-01-15T10:30:00.000Z')",
+            properties: []
+        )
+    }
+    
+    /// Creates an instance with the content.
+    public init(_ content: GeneratedContent) throws {
+        let text = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // 複数のISO8601フォーマットを試行
+        let formatterWithFractional = Self.createISO8601Formatter(withFractionalSeconds: true)
+        if let date = formatterWithFractional.date(from: text) {
+            self = date
+        } else {
+            let formatterNoFractional = Self.createISO8601Formatter(withFractionalSeconds: false)
+            if let date = formatterNoFractional.date(from: text) {
+                self = date
+            } else {
+                // Unixタイムスタンプとしても試行（数値の場合）
+                if let timestamp = Double(text) {
+                    self = Date(timeIntervalSince1970: timestamp)
+                } else {
+                    throw DecodingError.dataCorrupted(
+                        DecodingError.Context(
+                            codingPath: [],
+                            debugDescription: "Unable to decode Date from: '\(text)'. Expected ISO 8601 format or Unix timestamp."
+                        )
+                    )
+                }
+            }
+        }
+    }
+    
+    /// An instance that represents the generated content.
+    public var generatedContent: GeneratedContent {
+        let formatter = Self.createISO8601Formatter(withFractionalSeconds: true)
+        return GeneratedContent(kind: .string(formatter.string(from: self)))
+    }
+    
+    // asPartiallyGenerated() uses default implementation from protocol extension
+    // Returns self since PartiallyGenerated = Date (default)
+}
+
+// MARK: - URL Generable Conformance
+
+extension URL: Generable {
+    /// An instance of the generation schema.
+    public static var generationSchema: GenerationSchema {
+        return GenerationSchema(
+            type: URL.self,
+            description: "A uniform resource locator (URL)",
+            properties: []
+        )
+    }
+    
+    /// Creates an instance with the content.
+    public init(_ content: GeneratedContent) throws {
+        let text = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        guard let url = URL(string: text) else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: [],
+                    debugDescription: "Invalid URL format: '\(text)'"
+                )
+            )
+        }
+        self = url
+    }
+    
+    /// An instance that represents the generated content.
+    public var generatedContent: GeneratedContent {
+        return GeneratedContent(kind: .string(self.absoluteString))
+    }
+    
+    // asPartiallyGenerated() uses default implementation from protocol extension
+    // Returns self since PartiallyGenerated = URL (default)
+}
+
 // MARK: - Never Generable Conformance
 
 extension Never: Generable {
