@@ -446,17 +446,70 @@ struct SystemLanguageModel: LanguageModel {
 ### Protocol Conformance Requirements
 
 #### SendableMetatype
-Protocol indicating that a type's metatype is safe to share across concurrent contexts:
+
+##### Overview
+SendableMetatype is a Swift 6.2+ protocol that ensures a type's metatype can be safely shared across concurrent contexts without introducing data races. When a generic type `T` conforms to SendableMetatype, its metatype `T.Type` conforms to Sendable.
+
+##### Protocol Definition
 ```swift
 protocol SendableMetatype: ~Copyable, ~Escapable { }
 ```
 
-Types conforming to SendableMetatype:
-- All Tool implementations
-- GenerationSchema
-- GenerationOptions
-- LanguageModelFeedback and nested types
-- Transcript and nested types
+##### Key Features
+- **Automatic Conformance**: All concrete types implicitly conform to SendableMetatype
+- **Purpose**: Primarily used in generic code to prohibit isolated conformances
+- **Usage Context**: Required when metatypes cross concurrency boundaries
+
+##### Relationship with Sendable
+```swift
+protocol Sendable: SendableMetatype { }
+```
+- Sendable inherits from SendableMetatype
+- Any requirement `T: Sendable` implies `T: SendableMetatype`
+- This ensures metatypes of Sendable types are also Sendable
+
+##### Usage Example
+```swift
+// Problem: Capturing non-Sendable metatype
+protocol P {
+    static func f()
+}
+
+func useFromAnotherTask<T: P>(_: T.Type) {
+    Task { @concurrent in
+        T.f() // Error: non-Sendable type `T.Type` captured
+    }
+}
+
+// Solution: Add SendableMetatype requirement
+func useFromAnotherTask<T: P & SendableMetatype>(_: T.Type) {
+    Task { @concurrent in
+        T.f() // OK: T.Type is Sendable
+    }
+}
+
+// Isolated conformance (prevented by SendableMetatype)
+@MainActor
+class MyModel: @MainActor P {
+    static func f() { /* on main actor */ }
+}
+
+useFromAnotherTask(MyModel.self) // Error: cannot use isolated conformance
+```
+
+##### Foundation Models Conformances
+Types in Apple Foundation Models that conform to SendableMetatype:
+- **Generable Protocol**: Requires SendableMetatype for type safety
+- **Tool Protocol**: Inherits SendableMetatype through Sendable
+- **GenerationSchema**: Explicit conformance for concurrent usage
+- **GenerationOptions**: Ensures thread-safe configuration
+- **LanguageModelFeedback**: Including Sentiment, Issue, and Category nested types
+- **Transcript**: Including all nested types (Entry, Prompt, Response, etc.)
+
+##### Important Notes
+1. **Concrete Types**: Structs and enums automatically conform - no explicit declaration needed
+2. **Generic Constraints**: Essential when passing metatypes to async functions
+3. **Isolated Conformances**: SendableMetatype prevents main-actor-isolated or other actor-isolated protocol conformances from being used where concurrent access is needed
 
 ## Implementation Guidelines
 
@@ -674,6 +727,54 @@ struct GenerationGuide<Value> {
 
 ### Usage with Enumerations
 
+#### Simple String Enum
+
+```swift
+@Generable
+enum TaskDifficulty: String {
+    case easy = "easy"
+    case medium = "medium" 
+    case hard = "hard"
+}
+```
+
+The macro generates:
+
+```swift
+extension TaskDifficulty: Generable {
+    // TaskDifficulty itself becomes Generable.Type
+    init(_ content: GeneratedContent) throws {
+        // Parse from string or structure
+        if let string = try? content.value(String.self) {
+            guard let value = TaskDifficulty(rawValue: string) else {
+                throw DecodingError.dataCorrupted(...)
+            }
+            self = value
+        } else {
+            throw DecodingError.typeMismatch(...)
+        }
+    }
+    
+    var generatedContent: GeneratedContent {
+        GeneratedContent(kind: .string(self.rawValue))
+    }
+    
+    static var generationSchema: GenerationSchema {
+        // NOTE: Current implementation creates internal Schema struct
+        // Ideally should use: TaskDifficulty.self directly
+        struct TaskDifficultySchema: Generable { /* full implementation */ }
+        
+        return GenerationSchema(
+            type: TaskDifficultySchema.self,  // Should be TaskDifficulty.self
+            description: "Task difficulty level",
+            anyOf: ["easy", "medium", "hard"]
+        )
+    }
+}
+```
+
+#### Enum with Associated Values
+
 ```swift
 @Generable
 enum TaskStatus {
@@ -704,6 +805,140 @@ var generatedContent: GeneratedContent {
     }
 }
 ```
+
+### @Generable Macro Architecture
+
+#### Macro Functions and Design Contributions
+
+```mermaid
+graph TB
+    %% Macro
+    GM["@Generable Macro"]
+    
+    %% Generated Components
+    subgraph "Generated Components"
+        PC[Protocol Conformance]
+        IM[init(_ content:)]
+        GCP[generatedContent property]
+        GSP[generationSchema property]
+        PG[PartiallyGenerated type]
+        APG[asPartiallyGenerated()]
+        IRP[instructionsRepresentation]
+        PRP[promptRepresentation]
+    end
+    
+    %% Protocol Conformances
+    subgraph "Protocol Conformances"
+        GEN[Generable]
+        CFG[ConvertibleFromGeneratedContent]
+        CTG[ConvertibleToGeneratedContent]
+        IR[InstructionsRepresentable]
+        PR[PromptRepresentable]
+        SM[SendableMetatype]
+    end
+    
+    %% Design Contributions
+    subgraph "Design Contributions"
+        TS[Type Safety]
+        SC[Structured Generation]
+        SS[Streaming Support]
+        TC[Tool Calling]
+        CP[Concurrent Processing]
+    end
+    
+    %% Macro generates components
+    GM -->|generates| PC
+    GM -->|generates| IM
+    GM -->|generates| GCP
+    GM -->|generates| GSP
+    GM -->|generates| PG
+    GM -->|generates| APG
+    GM -->|generates| IRP
+    GM -->|generates| PRP
+    
+    %% Components enable protocols
+    PC -->|enables| GEN
+    IM -->|implements| CFG
+    GCP -->|implements| CTG
+    IRP -->|implements| IR
+    PRP -->|implements| PR
+    PC -->|automatic| SM
+    
+    %% Protocols provide design benefits
+    CFG -->|provides| TS
+    CTG -->|enables| SC
+    GEN -->|enables| SS
+    PR -->|enables| TC
+    SM -->|ensures| CP
+    
+    classDef macro fill:#f9f,stroke:#333,stroke-width:4px
+    classDef generated fill:#bbf,stroke:#333,stroke-width:2px
+    classDef protocol fill:#bfb,stroke:#333,stroke-width:2px
+    classDef design fill:#ffb,stroke:#333,stroke-width:2px
+    
+    class GM macro
+    class PC,IM,GCP,GSP,PG,APG,IRP,PRP generated
+    class GEN,CFG,CTG,IR,PR,SM protocol
+    class TS,SC,SS,TC,CP design
+```
+
+#### Important Implementation Details
+
+##### The Role of @Generable Macro
+
+The `@Generable` macro's primary function is to **make the annotated type conform to the Generable protocol**. This means:
+
+1. **The type itself becomes `Generable.Type`**: After applying `@Generable` to a struct or enum, that type can be used wherever `any Generable.Type` is required.
+
+2. **Automatic protocol conformance**: The macro generates all required protocol implementations:
+   - `ConvertibleFromGeneratedContent` via `init(_:)`
+   - `ConvertibleToGeneratedContent` via `generatedContent` property
+   - `InstructionsRepresentable` via `instructionsRepresentation`
+   - `PromptRepresentable` via `promptRepresentation`
+   - `SendableMetatype` (automatic for concrete types)
+
+##### GenerationSchema Initialization Patterns
+
+Apple's GenerationSchema has three initialization patterns, all requiring `any Generable.Type`:
+
+```swift
+// 1. For structs with properties
+init(type: any Generable.Type, description: String?, properties: [Property])
+
+// 2. For simple enums (string choices)
+init(type: any Generable.Type, description: String?, anyOf: [String])
+
+// 3. For union types
+init(type: any Generable.Type, description: String?, anyOf: [any Generable.Type])
+```
+
+##### Enum GenerationSchema Implementation (Updated)
+
+The @Generable macro for enums now generates a simplified schema using `Self.self` directly:
+
+```swift
+static var generationSchema: GenerationSchema {
+    return GenerationSchema(
+        type: Self.self,  // Direct use of enum type
+        anyOf: ["case1", "case2", ...]  // For simple enums
+    )
+}
+```
+
+**For enums with associated values:**
+```swift
+static var generationSchema: GenerationSchema {
+    return GenerationSchema(
+        type: Self.self,
+        properties: [
+            GenerationSchema.Property(name: "case", type: String.self),
+            GenerationSchema.Property(name: "value", type: String.self)
+        ]
+    )
+}
+```
+
+This implementation is simpler and more direct since the enum itself already conforms to `Generable` through the macro expansion. The previous approach using an internal Schema struct has been removed to simplify the generated code and align better with Apple Foundation Models' design principles.
 
 ### DynamicGenerationSchema
 

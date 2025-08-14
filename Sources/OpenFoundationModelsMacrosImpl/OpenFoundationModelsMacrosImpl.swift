@@ -978,17 +978,9 @@ GenerationSchema.Property(
                 // ✅ CONFIRMED: Apple generates discriminated union schema for enums with associated values
                 // Each case becomes an object with "case" and "value" properties
                 
-                // Create a dummy Generable type for the enum schema
-                struct \(enumName)Schema: Generable {
-                    public init(_ generatedContent: GeneratedContent) throws {}
-                    public var generatedContent: GeneratedContent { GeneratedContent("") }
-                    public static var generationSchema: GenerationSchema { 
-                        GenerationSchema(type: \(enumName)Schema.self, description: "Enum", properties: [])
-                    }
-                }
-                
+                // Use Self.self directly since the enum already conforms to Generable
                 return GenerationSchema(
-                    type: \(enumName)Schema.self,
+                    type: Self.self,
                     description: \(description.map { "\"\($0)\"" } ?? "\"Generated \(enumName)\""),
                     properties: [
                         \(caseProperty),
@@ -1004,19 +996,10 @@ GenerationSchema.Property(
             return DeclSyntax(stringLiteral: """
             public static var generationSchema: GenerationSchema {
                 // ✅ CONFIRMED: Apple generates generationSchema for simple enums
-                // Create schema for simple enum using type initializer with anyOf
-                
-                // Create a dummy Generable type for the enum schema
-                struct \(enumName)Schema: Generable {
-                    public init(_ generatedContent: GeneratedContent) throws {}
-                    public var generatedContent: GeneratedContent { GeneratedContent("") }
-                    public static var generationSchema: GenerationSchema { 
-                        GenerationSchema(type: \(enumName)Schema.self, description: "Enum", anyOf: [])
-                    }
-                }
+                // Use Self.self directly since the enum already conforms to Generable
                 
                 return GenerationSchema(
-                    type: \(enumName)Schema.self,
+                    type: Self.self,
                     description: \(description.map { "\"\($0)\"" } ?? "\"Generated \(enumName)\""),
                     anyOf: [\(caseNames)]
                 )
