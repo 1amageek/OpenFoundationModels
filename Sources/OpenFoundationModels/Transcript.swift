@@ -303,7 +303,8 @@ extension Transcript.Prompt: Equatable {
 
 extension Transcript.ResponseFormat: Equatable {
     public static func ==(lhs: Transcript.ResponseFormat, rhs: Transcript.ResponseFormat) -> Bool {
-        return lhs.name == rhs.name && lhs.type == rhs.type && lhs.schema == rhs.schema
+        // Can only compare name and type since GenerationSchema is not Equatable
+        return lhs.name == rhs.name && lhs.type == rhs.type
     }
 }
 
@@ -321,7 +322,8 @@ extension Transcript.ToolCall: Equatable {
 
 extension Transcript.ToolDefinition: Equatable {
     public static func ==(lhs: Transcript.ToolDefinition, rhs: Transcript.ToolDefinition) -> Bool {
-        return lhs.name == rhs.name && lhs.description == rhs.description && lhs.parameters == rhs.parameters
+        // Can only compare name and description since GenerationSchema is not Equatable
+        return lhs.name == rhs.name && lhs.description == rhs.description
     }
 }
 

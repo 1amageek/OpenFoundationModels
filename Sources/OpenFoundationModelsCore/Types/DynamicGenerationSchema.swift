@@ -2,35 +2,19 @@
 import Foundation
 
 
-public struct DynamicGenerationSchema: Sendable, Equatable {
+public struct DynamicGenerationSchema: Sendable {
     
     public let name: String
     
     public let description: String?
     
-    internal indirect enum SchemaType: Sendable, Equatable {
+    internal indirect enum SchemaType: Sendable {
         case object(properties: [Property])
         case array(of: DynamicGenerationSchema, minElements: Int?, maxElements: Int?)
         case reference(to: String)
         case anyOf([DynamicGenerationSchema])
         case generic(type: any Generable.Type, guides: [AnyGenerationGuide])
         
-        static func == (lhs: SchemaType, rhs: SchemaType) -> Bool {
-            switch (lhs, rhs) {
-            case (.object(let lhsProps), .object(let rhsProps)):
-                return lhsProps == rhsProps
-            case (.array(let lhsOf, let lhsMin, let lhsMax), .array(let rhsOf, let rhsMin, let rhsMax)):
-                return lhsOf == rhsOf && lhsMin == rhsMin && lhsMax == rhsMax
-            case (.reference(let lhsRef), .reference(let rhsRef)):
-                return lhsRef == rhsRef
-            case (.anyOf(let lhsSchemas), .anyOf(let rhsSchemas)):
-                return lhsSchemas == rhsSchemas
-            case (.generic, .generic):
-                return false
-            default:
-                return false
-            }
-        }
     }
     
     internal let schemaType: SchemaType
@@ -41,16 +25,16 @@ public struct DynamicGenerationSchema: Sendable, Equatable {
         self.schemaType = .object(properties: properties)
     }
     
-    public init(arrayOf: DynamicGenerationSchema, minimumElements: Int? = nil, maximumElements: Int? = nil) {
+    public init(arrayOf itemSchema: DynamicGenerationSchema, minimumElements: Int? = nil, maximumElements: Int? = nil) {
         self.name = "Array"
         self.description = nil
-        self.schemaType = .array(of: arrayOf, minElements: minimumElements, maxElements: maximumElements)
+        self.schemaType = .array(of: itemSchema, minElements: minimumElements, maxElements: maximumElements)
     }
     
-    public init(referenceTo: String) {
-        self.name = referenceTo
+    public init(referenceTo name: String) {
+        self.name = name
         self.description = nil
-        self.schemaType = .reference(to: referenceTo)
+        self.schemaType = .reference(to: name)
     }
     
     public init(name: String, description: String? = nil, anyOf: [DynamicGenerationSchema]) {
@@ -75,7 +59,7 @@ public struct DynamicGenerationSchema: Sendable, Equatable {
         self.schemaType = .generic(type: type, guides: anyGuides)
     }
     
-    public struct Property: Sendable, Equatable {
+    public struct Property: Sendable {
         public let name: String
         
         public let description: String?
@@ -122,7 +106,12 @@ extension DynamicGenerationSchema: Codable {
             try container.encode(to, forKey: .referenceTo)
             
         case .anyOf(let schemas):
-            if schemas.allSatisfy({ $0.schemaType == .object(properties: []) && $0.description == nil }) {
+            if schemas.allSatisfy({ schema in
+                if case .object(let properties) = schema.schemaType {
+                    return properties.isEmpty && schema.description == nil
+                }
+                return false
+            }) {
                 try container.encode("enum", forKey: .type)
                 let choices = schemas.map { $0.name }
                 try container.encode(choices, forKey: .choices)

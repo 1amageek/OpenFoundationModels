@@ -1,9 +1,9 @@
 import Foundation
 
-public struct GenerationSchema: Sendable, Equatable, CustomDebugStringConvertible {
+public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible {
     private let schemaType: SchemaType
     private let _description: String?
-    private indirect enum SchemaType: Sendable, Equatable {
+    private indirect enum SchemaType: Sendable, Codable {
         case object(properties: [GenerationSchema.Property])
         case enumeration(values: [String])
         case dynamic(root: DynamicGenerationSchema, dependencies: [DynamicGenerationSchema])
@@ -82,6 +82,14 @@ public struct GenerationSchema: Sendable, Equatable, CustomDebugStringConvertibl
     
     public init(type: any Generable.Type, description: String? = nil, properties: [GenerationSchema.Property]) {
         self.schemaType = .object(properties: properties)
+        self._description = description
+    }
+    
+    public init(type: any Generable.Type, description: String? = nil, anyOf types: [any Generable.Type]) {
+        // For union types, we store them as enumeration with type names for now
+        // This is a simplified implementation - a full implementation would need more complex handling
+        let typeNames = types.map { String(describing: $0) }
+        self.schemaType = .enumeration(values: typeNames)
         self._description = description
     }
     
@@ -523,31 +531,31 @@ internal struct AnyGenerationGuide: @unchecked Sendable, Equatable {
 
 extension GenerationSchema {
     public struct Property: Sendable {
-        public let name: String
+        internal let name: String
         
-        public let type: any Sendable.Type
+        internal let type: any Sendable.Type
         
-        public let description: String?
+        internal let description: String?
         
         internal let regexPatterns: [String]
         
         internal let guides: [AnyGenerationGuide]
         
-        public let isOptional: Bool
+        internal let isOptional: Bool
         
-        public init<Value>(name: String, description: String? = nil, type: Value.Type, guides: [GenerationGuide<Value>] = []) where Value: Generable, Value: Sendable {
+        public init<Value>(name: String, description: String? = nil, type: Value.Type, guides: [GenerationGuide<Value>] = []) where Value: Generable {
             self.name = name
             self.description = description
-            self.type = type
+            self.type = type as Any.Type as Any as! any Sendable.Type  // Force cast for type erasure
             self.regexPatterns = []
             self.guides = guides.map(AnyGenerationGuide.init)
             self.isOptional = false
         }
         
-        public init<Value>(name: String, description: String? = nil, type: Value?.Type, guides: [GenerationGuide<Value>] = []) where Value: Generable, Value: Sendable {
+        public init<Value>(name: String, description: String? = nil, type: Value?.Type, guides: [GenerationGuide<Value>] = []) where Value: Generable {
             self.name = name
             self.description = description
-            self.type = type
+            self.type = type as Any.Type as Any as! any Sendable.Type  // Force cast for type erasure
             self.regexPatterns = []
             self.guides = guides.map(AnyGenerationGuide.init)
             self.isOptional = true
@@ -597,19 +605,105 @@ extension GenerationSchema {
     }
 }
 
-extension GenerationSchema.Property: Equatable {
-    public static func ==(lhs: GenerationSchema.Property, rhs: GenerationSchema.Property) -> Bool {
-        return lhs.name == rhs.name && 
-               String(describing: lhs.type) == String(describing: rhs.type) &&
-               lhs.description == rhs.description &&
-               lhs.guides == rhs.guides &&
-               lhs.regexPatterns == rhs.regexPatterns &&
-               lhs.isOptional == rhs.isOptional
+extension GenerationSchema {
+    private enum CodingKeys: String, CodingKey {
+        case schemaType, description
+    }
+    
+    private enum SchemaTypeCodingKeys: String, CodingKey {
+        case type, properties, values, root, dependencies, items, primitiveType
+    }
+    
+    private enum SchemaTypeCase: String, Codable {
+        case object, enumeration, dynamic, array, primitive
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        
+        // Encode SchemaType inline
+        var schemaTypeContainer = container.nestedContainer(keyedBy: SchemaTypeCodingKeys.self, forKey: .schemaType)
+        switch schemaType {
+        case .object(let properties):
+            try schemaTypeContainer.encode(SchemaTypeCase.object, forKey: .type)
+            try schemaTypeContainer.encode(properties, forKey: .properties)
+        case .enumeration(let values):
+            try schemaTypeContainer.encode(SchemaTypeCase.enumeration, forKey: .type)
+            try schemaTypeContainer.encode(values, forKey: .values)
+        case .dynamic(let root, let dependencies):
+            try schemaTypeContainer.encode(SchemaTypeCase.dynamic, forKey: .type)
+            try schemaTypeContainer.encode(root, forKey: .root)
+            try schemaTypeContainer.encode(dependencies, forKey: .dependencies)
+        case .array(let items):
+            try schemaTypeContainer.encode(SchemaTypeCase.array, forKey: .type)
+            try schemaTypeContainer.encodeIfPresent(items, forKey: .items)
+        case .primitive(let type):
+            try schemaTypeContainer.encode(SchemaTypeCase.primitive, forKey: .type)
+            try schemaTypeContainer.encode(type, forKey: .primitiveType)
+        }
+        
+        try container.encodeIfPresent(_description, forKey: .description)
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        // Decode SchemaType inline
+        let schemaTypeContainer = try container.nestedContainer(keyedBy: SchemaTypeCodingKeys.self, forKey: .schemaType)
+        let type = try schemaTypeContainer.decode(SchemaTypeCase.self, forKey: .type)
+        
+        switch type {
+        case .object:
+            let properties = try schemaTypeContainer.decode([GenerationSchema.Property].self, forKey: .properties)
+            self.schemaType = .object(properties: properties)
+        case .enumeration:
+            let values = try schemaTypeContainer.decode([String].self, forKey: .values)
+            self.schemaType = .enumeration(values: values)
+        case .dynamic:
+            let root = try schemaTypeContainer.decode(DynamicGenerationSchema.self, forKey: .root)
+            let dependencies = try schemaTypeContainer.decode([DynamicGenerationSchema].self, forKey: .dependencies)
+            self.schemaType = .dynamic(root: root, dependencies: dependencies)
+        case .array:
+            let items = try schemaTypeContainer.decodeIfPresent(GenerationSchema.self, forKey: .items)
+            self.schemaType = .array(items: items)
+        case .primitive:
+            let primitiveType = try schemaTypeContainer.decode(String.self, forKey: .primitiveType)
+            self.schemaType = .primitive(type: primitiveType)
+        }
+        
+        self._description = try container.decodeIfPresent(String.self, forKey: .description)
+    }
+}
+
+extension GenerationSchema.Property: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case name, description, typeString, regexPatterns, isOptional
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(name, forKey: .name)
+        try container.encodeIfPresent(description, forKey: .description)
+        try container.encode(String(describing: type), forKey: .typeString)
+        try container.encode(regexPatterns, forKey: .regexPatterns)
+        try container.encode(isOptional, forKey: .isOptional)
+        // Note: guides are not encoded as they are type-erased
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.description = try container.decodeIfPresent(String.self, forKey: .description)
+        let _ = try container.decode(String.self, forKey: .typeString)
+        self.type = String.self // Default type as we cannot reconstruct the actual type
+        self.regexPatterns = try container.decode([String].self, forKey: .regexPatterns)
+        self.guides = [] // Guides cannot be reconstructed from encoded data
+        self.isOptional = try container.decode(Bool.self, forKey: .isOptional)
     }
 }
 
 extension GenerationSchema {
-    public enum SchemaError: Error, LocalizedError, Sendable {
+    public enum SchemaError: Error, LocalizedError {
         case duplicateProperty(schema: String, property: String, context: Context)
         
         case duplicateType(schema: String?, type: String, context: Context)
@@ -618,7 +712,7 @@ extension GenerationSchema {
         
         case undefinedReferences(schema: String?, references: [String], context: Context)
         
-        public struct Context: CustomDebugStringConvertible, Sendable {
+        public struct Context: Sendable {
             public let debugDescription: String
             
             public init(debugDescription: String) {
