@@ -144,7 +144,7 @@ public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible 
         }
     }
     
-    public func toSchemaDictionary() -> [String: Any] {
+    internal func toSchemaDictionary() -> [String: Any] {
         switch schemaType {
         case .object(let properties):
             var schema: [String: Any] = [

@@ -23,7 +23,7 @@ struct GuideMacroTests {
     
     @Test("@Guide macro compiles without errors")
     func guideMacroCompilation() throws {
-        let content = GeneratedContent("{\"name\": \"John\", \"age\": 30}")
+        let content = try GeneratedContent(json: "{\"name\": \"John\", \"age\": 30}")
         let person = try TestGuidePerson(content)
         
         let generated = person.generatedContent

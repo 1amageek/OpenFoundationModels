@@ -98,7 +98,7 @@ struct GuidedGenerationTests {
     
     @Test("Simple Generable type creation and basic properties")
     func simpleGenerableCreation() throws {
-        let content = try TestUserProfile(GeneratedContent("{}"))
+        let content = try TestUserProfile(GeneratedContent(json: "{}"))
         
         #expect(content.name == "")
         #expect(content.age == 0)
@@ -106,7 +106,7 @@ struct GuidedGenerationTests {
     
     @Test("Generable with Guide annotations")
     func generableWithGuideAnnotations() throws {
-        let person = try TestPerson(GeneratedContent("{}"))
+        let person = try TestPerson(GeneratedContent(json: "{}"))
         
         #expect(person.name == "")
         #expect(person.age == 0)
@@ -115,7 +115,7 @@ struct GuidedGenerationTests {
     
     @Test("Generable with constraint guides")
     func generableWithConstraintGuides() throws {
-        let user = try TestValidatedUser(GeneratedContent("{}"))
+        let user = try TestValidatedUser(GeneratedContent(json: "{}"))
         
         #expect(user.username == "")
         #expect(user.age == 0)
@@ -124,7 +124,7 @@ struct GuidedGenerationTests {
     
     @Test("Simple nested structures")
     func simpleNestedStructures() throws {
-        let address = try TestAddress(GeneratedContent("{}"))
+        let address = try TestAddress(GeneratedContent(json: "{}"))
         
         #expect(address.street == "")
         #expect(address.city == "")
@@ -154,14 +154,14 @@ struct GuidedGenerationTests {
         let partial = item.asPartiallyGenerated()
         #expect(partial.value == item.value)
         
-        let emptyItem = try TestItem(GeneratedContent("{}"))
+        let emptyItem = try TestItem(GeneratedContent(json: "{}"))
         let emptyPartial = emptyItem.asPartiallyGenerated()
         #expect(emptyPartial.value == nil) // Empty JSON has no value property
     }
     
     @Test("Generable with simple array properties")
     func generableWithSimpleArrayProperties() throws {
-        let list = try TestSimpleList(GeneratedContent("{}"))
+        let list = try TestSimpleList(GeneratedContent(json: "{}"))
         
         #expect(list.totalCost == 0.0)
         #expect(list.itemCount == 0)
@@ -169,8 +169,8 @@ struct GuidedGenerationTests {
     
     @Test("Multiple Generable types in same scope")
     func multipleGenerableTypesInSameScope() throws {
-        let book = try TestBook(GeneratedContent("{}"))
-        let author = try TestAuthor(GeneratedContent("{}"))
+        let book = try TestBook(GeneratedContent(json: "{}"))
+        let author = try TestAuthor(GeneratedContent(json: "{}"))
         
         #expect(book.title == "")
         #expect(book.author == "")
@@ -180,7 +180,7 @@ struct GuidedGenerationTests {
     
     @Test("Generable Sendable conformance")
     func generableSendableConformance() throws {
-        let data = try TestGuidedSafeData(GeneratedContent("{}"))
+        let data = try TestGuidedSafeData(GeneratedContent(json: "{}"))
         
         let _: any Sendable = data
         #expect(Bool(true)) // Compilation success indicates Sendable conformance

@@ -56,7 +56,7 @@ struct MacroToolTests {
         #expect(!tool.description.isEmpty)
         #expect(tool.name == "TestWeatherTool")
         
-        let content = GeneratedContent("{}")
+        let content = try GeneratedContent(json: "{}")
         
         do {
             let args = try TestWeatherToolArguments(content)
@@ -86,7 +86,7 @@ struct MacroToolTests {
         let _ = MacroTestSimpleType.self
         
         do {
-            let content = GeneratedContent("{}")
+            let content = try GeneratedContent(json: "{}")
             let _ = try MacroTestSimpleType(content)
         } catch {
             Issue.record("@Generable macro not generating init(_:) method: \(error)")

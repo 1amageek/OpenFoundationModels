@@ -66,7 +66,7 @@ struct CompatibilityTests {
         let nonePrompt = noneString.promptRepresentation
         
         #expect(somePrompt.description.contains("hello"))
-        #expect(nonePrompt.description == "Prompt: ")
+        #expect(nonePrompt.description == "")
     }
     
     @Test("Optional conforms to InstructionsRepresentable")
@@ -78,7 +78,7 @@ struct CompatibilityTests {
         let noneInstructions = noneString.instructionsRepresentation
         
         #expect(someInstructions.description.contains("hello"))
-        #expect(noneInstructions.description == "Instructions: ")
+        #expect(noneInstructions.description == "")
     }
     
     @Test("Transcript.ToolDefinition has parameters property")

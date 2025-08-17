@@ -165,23 +165,27 @@ struct GenerationSchemaJSONSchemaTests {
         #expect(originalJson?["description"] as? String == reEncodedJson?["description"] as? String)
     }
     
-    @Test("toSchemaDictionary method produces correct JSON Schema")
-    func toSchemaDictionaryMethod() throws {
-        // Test that toSchemaDictionary produces correct JSON Schema
+    @Test("GenerationSchema encodes to valid JSON Schema format")
+    func generationSchemaEncodesToValidJSONSchema() throws {
+        // Test that GenerationSchema encodes to correct JSON Schema format
         let schema = TestModel.generationSchema
-        let dict = schema.toSchemaDictionary()
+        
+        // Encode to JSON
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+        let data = try encoder.encode(schema)
+        
+        // Parse as dictionary
+        let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         
         // Verify structure
-        #expect(dict["type"] as? String == "object")
-        #expect(dict["properties"] as? [String: Any] != nil)
-        #expect(dict["required"] as? [String] != nil)
-        
-        // Verify it can be serialized to JSON
-        let jsonData = try JSONSerialization.data(withJSONObject: dict, options: .prettyPrinted)
-        let jsonString = String(data: jsonData, encoding: .utf8)
-        #expect(jsonString != nil)
+        #expect(dict?["type"] as? String == "object")
+        #expect(dict?["properties"] as? [String: Any] != nil)
+        #expect(dict?["required"] as? [String] != nil)
         
         // Verify it's valid JSON Schema format
+        let jsonString = String(data: data, encoding: .utf8)
+        #expect(jsonString != nil)
         if let jsonString = jsonString {
             #expect(jsonString.contains("\"type\""))
             #expect(jsonString.contains("\"properties\""))

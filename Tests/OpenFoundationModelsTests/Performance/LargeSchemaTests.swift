@@ -196,7 +196,7 @@ struct LargeSchemaTests {
         let schemaTime = Date().timeIntervalSince(startTime)
         
         let resetTime = Date()
-        let instance = try TestLargeUserProfile(GeneratedContent("{}"))
+        let instance = try TestLargeUserProfile(GeneratedContent(json: "{}"))
         let instanceTime = Date().timeIntervalSince(resetTime)
         
         #expect(instance.firstName == "")
@@ -216,7 +216,7 @@ struct LargeSchemaTests {
         let startTime = Date()
         
         let schema = TestComplexConstrainedType.generationSchema
-        let instance = try TestComplexConstrainedType(GeneratedContent("{}"))
+        let instance = try TestComplexConstrainedType(GeneratedContent(json: "{}"))
         
         let totalTime = Date().timeIntervalSince(startTime)
         
@@ -239,9 +239,9 @@ struct LargeSchemaTests {
         async let orderSchema = Task { TestOrderDetails.generationSchema }
         async let customerSchema = Task { TestCustomerProfile.generationSchema }
         
-        async let productInstance = Task { try TestProductCatalog(GeneratedContent("{}")) }
-        async let orderInstance = Task { try TestOrderDetails(GeneratedContent("{}")) }
-        async let customerInstance = Task { try TestCustomerProfile(GeneratedContent("{}")) }
+        async let productInstance = Task { try TestProductCatalog(GeneratedContent(json: "{}")) }
+        async let orderInstance = Task { try TestOrderDetails(GeneratedContent(json: "{}")) }
+        async let customerInstance = Task { try TestCustomerProfile(GeneratedContent(json: "{}")) }
         
         let (pSchema, oSchema, cSchema) = await (productSchema.value, orderSchema.value, customerSchema.value)
         let (pInstance, oInstance, cInstance) = try await (productInstance.value, orderInstance.value, customerInstance.value)
@@ -276,7 +276,7 @@ struct LargeSchemaTests {
         var instances: [TestRepeatedAccessType] = []
         
         for _ in 0..<100 { // Fewer instances to avoid memory issues
-            let instance = try TestRepeatedAccessType(GeneratedContent("{}"))
+            let instance = try TestRepeatedAccessType(GeneratedContent(json: "{}"))
             instances.append(instance)
         }
         
@@ -298,7 +298,7 @@ struct LargeSchemaTests {
         let startTime = Date()
         
         let schema = TestVeryLargeSchema.generationSchema
-        let instance = try TestVeryLargeSchema(GeneratedContent("{}"))
+        let instance = try TestVeryLargeSchema(GeneratedContent(json: "{}"))
         
         let totalTime = Date().timeIntervalSince(startTime)
         
@@ -322,7 +322,7 @@ struct LargeSchemaTests {
         instances.reserveCapacity(batchSize)
         
         for _ in 0..<batchSize {
-            let instance = try TestBatchTestType(GeneratedContent("{}"))
+            let instance = try TestBatchTestType(GeneratedContent(json: "{}"))
             instances.append(instance)
         }
         

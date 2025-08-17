@@ -152,21 +152,21 @@ struct ConcurrentGenerationTests {
         let results = try await withThrowingTaskGroup(of: String.self) { group in
             for _ in 0..<instancesPerType {
                 group.addTask {
-                    let instance = try TestConcurrentTypeA(GeneratedContent("{}"))
+                    let instance = try TestConcurrentTypeA(GeneratedContent(json: "{}"))
                     return "A:\(instance.name):\(instance.count)"
                 }
             }
             
             for _ in 0..<instancesPerType {
                 group.addTask {
-                    let instance = try TestConcurrentTypeB(GeneratedContent("{}"))
+                    let instance = try TestConcurrentTypeB(GeneratedContent(json: "{}"))
                     return "B:\(instance.value):\(instance.score)"
                 }
             }
             
             for _ in 0..<instancesPerType {
                 group.addTask {
-                    let instance = try TestConcurrentTypeC(GeneratedContent("{}"))
+                    let instance = try TestConcurrentTypeC(GeneratedContent(json: "{}"))
                     return "C:\(instance.id):\(instance.active)"
                 }
             }
@@ -298,7 +298,7 @@ struct ConcurrentGenerationTests {
                 for i in batchStart..<batchEnd {
                     group.addTask {
                         let schema = TestLoadTestType.generationSchema
-                        let instance = try TestLoadTestType(GeneratedContent("{}"))
+                        let instance = try TestLoadTestType(GeneratedContent(json: "{}"))
                         
                         return "op-\(i):\(schema.debugDescription):\(instance.id):\(instance.index)"
                     }
@@ -336,10 +336,10 @@ struct ConcurrentGenerationTests {
             for i in 0..<concurrentAccesses {
                 group.addTask {
                     let schema1 = TestSharedResourceType.generationSchema
-                    let instance1 = try TestSharedResourceType(GeneratedContent("{}"))
+                    let instance1 = try TestSharedResourceType(GeneratedContent(json: "{}"))
                     
                     let schema2 = TestSharedResourceType.generationSchema
-                    let _ = try TestSharedResourceType(GeneratedContent("{}"))
+                    let _ = try TestSharedResourceType(GeneratedContent(json: "{}"))
                     
                     let schemasMatch = (schema1.debugDescription == schema2.debugDescription)
                     
