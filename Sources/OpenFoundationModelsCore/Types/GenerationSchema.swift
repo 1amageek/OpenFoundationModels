@@ -81,7 +81,32 @@ public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible 
     }
     
     public init(type: any Generable.Type, description: String? = nil, properties: [GenerationSchema.Property]) {
-        self.schemaType = .object(properties: properties)
+        // Check if this is a standard primitive type with empty properties
+        if properties.isEmpty {
+            let typeName = String(describing: type)
+            if typeName == "String" {
+                self.schemaType = .primitive(type: "string")
+            } else if typeName == "Int" {
+                self.schemaType = .primitive(type: "integer")
+            } else if typeName == "Double" || typeName == "Float" {
+                self.schemaType = .primitive(type: "number")
+            } else if typeName == "Bool" {
+                self.schemaType = .primitive(type: "boolean")
+            } else if typeName == "Decimal" {
+                self.schemaType = .primitive(type: "number")
+            } else if typeName == "UUID" {
+                self.schemaType = .primitive(type: "string")
+            } else if typeName == "Date" {
+                self.schemaType = .primitive(type: "string")
+            } else if typeName == "URL" {
+                self.schemaType = .primitive(type: "string")
+            } else {
+                // Default to object for unknown types with empty properties
+                self.schemaType = .object(properties: properties)
+            }
+        } else {
+            self.schemaType = .object(properties: properties)
+        }
         self._description = description
     }
     
@@ -119,7 +144,7 @@ public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible 
         }
     }
     
-    internal func toSchemaDictionary() -> [String: Any] {
+    public func toSchemaDictionary() -> [String: Any] {
         switch schemaType {
         case .object(let properties):
             var schema: [String: Any] = [
@@ -214,7 +239,14 @@ public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible 
     }
     
     private func mapPropertyType(_ type: String) -> String {
-        switch type.lowercased() {
+        // Handle Optional types by extracting the wrapped type
+        let cleanType = type
+            .replacingOccurrences(of: "Optional<", with: "")
+            .replacingOccurrences(of: ">", with: "")
+            .replacingOccurrences(of: "?", with: "")
+            .lowercased()
+        
+        switch cleanType {
         case "string":
             return "string"
         case "int", "integer":
@@ -225,7 +257,7 @@ public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible 
             return "boolean"
         case let t where t.contains("array") || t.contains("["):
             return "array"
-        case let t where t.contains("dictionary") || t.contains("["):
+        case let t where t.contains("dictionary"):
             return "object"
         default:
             return "string"
@@ -549,7 +581,7 @@ extension GenerationSchema {
             self.type = type as Any.Type as Any as! any Sendable.Type  // Force cast for type erasure
             self.regexPatterns = []
             self.guides = guides.map(AnyGenerationGuide.init)
-            self.isOptional = false
+            self.isOptional = false  // Non-optional type
         }
         
         public init<Value>(name: String, description: String? = nil, type: Value?.Type, guides: [GenerationGuide<Value>] = []) where Value: Generable {
@@ -558,7 +590,7 @@ extension GenerationSchema {
             self.type = type as Any.Type as Any as! any Sendable.Type  // Force cast for type erasure
             self.regexPatterns = []
             self.guides = guides.map(AnyGenerationGuide.init)
-            self.isOptional = true
+            self.isOptional = true  // Optional type
         }
         
         public init<RegexOutput>(name: String, description: String? = nil, type: String.Type, guides: [Regex<RegexOutput>] = []) {
@@ -567,7 +599,7 @@ extension GenerationSchema {
             self.type = type
             self.regexPatterns = guides.map { String(describing: $0) }
             self.guides = []
-            self.isOptional = false
+            self.isOptional = false  // Non-optional String
         }
         
         public init<RegexOutput>(name: String, description: String? = nil, type: String?.Type, guides: [Regex<RegexOutput>] = []) {
@@ -576,7 +608,7 @@ extension GenerationSchema {
             self.type = type
             self.regexPatterns = guides.map { String(describing: $0) }
             self.guides = []
-            self.isOptional = true
+            self.isOptional = true  // Optional String
         }
         
         internal init(
@@ -606,81 +638,142 @@ extension GenerationSchema {
 }
 
 extension GenerationSchema {
-    private enum CodingKeys: String, CodingKey {
-        case schemaType, description
-    }
-    
-    private enum SchemaTypeCodingKeys: String, CodingKey {
-        case type, properties, values, root, dependencies, items, primitiveType
-    }
-    
-    private enum SchemaTypeCase: String, Codable {
-        case object, enumeration, dynamic, array, primitive
-    }
     
     public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
+        // Convert to JSON Schema format using toSchemaDictionary()
+        let jsonSchema = self.toSchemaDictionary()
         
-        // Encode SchemaType inline
-        var schemaTypeContainer = container.nestedContainer(keyedBy: SchemaTypeCodingKeys.self, forKey: .schemaType)
-        switch schemaType {
-        case .object(let properties):
-            try schemaTypeContainer.encode(SchemaTypeCase.object, forKey: .type)
-            try schemaTypeContainer.encode(properties, forKey: .properties)
-        case .enumeration(let values):
-            try schemaTypeContainer.encode(SchemaTypeCase.enumeration, forKey: .type)
-            try schemaTypeContainer.encode(values, forKey: .values)
-        case .dynamic:
-            // Dynamic schemas cannot be encoded as DynamicGenerationSchema is not Codable
+        // Encode as JSON data
+        let jsonData = try JSONSerialization.data(withJSONObject: jsonSchema, options: [])
+        
+        // Decode to a generic structure that can be encoded
+        let jsonObject = try JSONSerialization.jsonObject(with: jsonData, options: [])
+        
+        var container = encoder.singleValueContainer()
+        
+        // Re-encode using JSONSerialization to maintain compatibility
+        if let dict = jsonObject as? [String: Any] {
+            // Convert to encodable structure
+            let encodableDict = try convertToEncodable(dict)
+            try container.encode(encodableDict)
+        } else {
             throw EncodingError.invalidValue(
-                schemaType,
+                jsonObject,
                 EncodingError.Context(
                     codingPath: encoder.codingPath,
-                    debugDescription: "GenerationSchema with dynamic type cannot be encoded"
+                    debugDescription: "Failed to convert GenerationSchema to JSON Schema format"
                 )
             )
-        case .array(let items):
-            try schemaTypeContainer.encode(SchemaTypeCase.array, forKey: .type)
-            try schemaTypeContainer.encodeIfPresent(items, forKey: .items)
-        case .primitive(let type):
-            try schemaTypeContainer.encode(SchemaTypeCase.primitive, forKey: .type)
-            try schemaTypeContainer.encode(type, forKey: .primitiveType)
         }
-        
-        try container.encodeIfPresent(_description, forKey: .description)
     }
     
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let container = try decoder.singleValueContainer()
         
-        // Decode SchemaType inline
-        let schemaTypeContainer = try container.nestedContainer(keyedBy: SchemaTypeCodingKeys.self, forKey: .schemaType)
-        let type = try schemaTypeContainer.decode(SchemaTypeCase.self, forKey: .type)
+        // Decode as generic JSON structure
+        let jsonDict = try container.decode(AnyCodable.self)
         
-        switch type {
-        case .object:
-            let properties = try schemaTypeContainer.decode([GenerationSchema.Property].self, forKey: .properties)
-            self.schemaType = .object(properties: properties)
-        case .enumeration:
-            let values = try schemaTypeContainer.decode([String].self, forKey: .values)
-            self.schemaType = .enumeration(values: values)
-        case .dynamic:
-            // Dynamic schemas cannot be decoded as DynamicGenerationSchema is not Codable
+        guard let dict = jsonDict.value as? [String: Any] else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: decoder.codingPath,
-                    debugDescription: "GenerationSchema with dynamic type cannot be decoded"
+                    debugDescription: "Expected dictionary for GenerationSchema"
                 )
             )
-        case .array:
-            let items = try schemaTypeContainer.decodeIfPresent(GenerationSchema.self, forKey: .items)
-            self.schemaType = .array(items: items)
-        case .primitive:
-            let primitiveType = try schemaTypeContainer.decode(String.self, forKey: .primitiveType)
-            self.schemaType = .primitive(type: primitiveType)
         }
         
-        self._description = try container.decodeIfPresent(String.self, forKey: .description)
+        // Parse JSON Schema format
+        if let type = dict["type"] as? String {
+            switch type {
+            case "object":
+                self.schemaType = .object(properties: Self.parseProperties(from: dict))
+            case "string":
+                if let enumValues = dict["enum"] as? [String] {
+                    self.schemaType = .enumeration(values: enumValues)
+                } else {
+                    self.schemaType = .primitive(type: "string")
+                }
+            case "integer":
+                self.schemaType = .primitive(type: "integer")
+            case "number":
+                self.schemaType = .primitive(type: "number")
+            case "boolean":
+                self.schemaType = .primitive(type: "boolean")
+            case "array":
+                if let items = dict["items"] as? [String: Any] {
+                    // Recursively parse item schema
+                    let itemData = try JSONSerialization.data(withJSONObject: items)
+                    let itemSchema = try JSONDecoder().decode(GenerationSchema.self, from: itemData)
+                    self.schemaType = .array(items: itemSchema)
+                } else {
+                    self.schemaType = .array(items: nil)
+                }
+            default:
+                self.schemaType = .primitive(type: type)
+            }
+        } else if dict["anyOf"] != nil {
+            // Handle union types - for now treat as dynamic
+            self.schemaType = .dynamic(root: DynamicGenerationSchema(name: "Union", properties: []), dependencies: [])
+        } else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Unable to determine schema type from JSON"
+                )
+            )
+        }
+        
+        self._description = dict["description"] as? String
+    }
+    
+    // Helper method to parse properties from JSON Schema
+    private static func parseProperties(from dict: [String: Any]) -> [GenerationSchema.Property] {
+        guard let properties = dict["properties"] as? [String: [String: Any]] else {
+            return []
+        }
+        
+        let required = dict["required"] as? [String] ?? []
+        
+        return properties.compactMap { key, value in
+            let type = inferTypeFromSchema(value)
+            return GenerationSchema.Property(
+                name: key,
+                description: value["description"] as? String,
+                type: type,
+                guides: [],
+                regexPatterns: value["pattern"].flatMap { [$0 as? String].compactMap { $0 } } ?? [],
+                isOptional: !required.contains(key)
+            )
+        }.sorted { $0.name < $1.name }
+    }
+    
+    // Helper to infer type from JSON Schema
+    private static func inferTypeFromSchema(_ schema: [String: Any]) -> any Sendable.Type {
+        guard let type = schema["type"] as? String else {
+            return String.self
+        }
+        
+        switch type {
+        case "string":
+            return String.self
+        case "integer":
+            return Int.self
+        case "number":
+            return Double.self
+        case "boolean":
+            return Bool.self
+        case "array":
+            return [String].self // Default array type
+        case "object":
+            return [String: String].self // Default object type
+        default:
+            return String.self
+        }
+    }
+    
+    // Helper to convert [String: Any] to encodable format
+    private func convertToEncodable(_ dict: [String: Any]) throws -> AnyCodable {
+        return AnyCodable(dict)
     }
 }
 
@@ -708,6 +801,71 @@ extension GenerationSchema.Property: Codable {
         self.regexPatterns = try container.decode([String].self, forKey: .regexPatterns)
         self.guides = [] // Guides cannot be reconstructed from encoded data
         self.isOptional = try container.decode(Bool.self, forKey: .isOptional)
+    }
+}
+
+// MARK: - AnyCodable Helper
+
+/// A type-erased Codable value for handling [String: Any] in Codable contexts
+internal struct AnyCodable: Codable {
+    let value: Any
+    
+    init(_ value: Any) {
+        self.value = value
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        
+        if container.decodeNil() {
+            self.value = NSNull()
+        } else if let bool = try? container.decode(Bool.self) {
+            self.value = bool
+        } else if let int = try? container.decode(Int.self) {
+            self.value = int
+        } else if let double = try? container.decode(Double.self) {
+            self.value = double
+        } else if let string = try? container.decode(String.self) {
+            self.value = string
+        } else if let array = try? container.decode([AnyCodable].self) {
+            self.value = array.map { $0.value }
+        } else if let dictionary = try? container.decode([String: AnyCodable].self) {
+            self.value = dictionary.mapValues { $0.value }
+        } else {
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Unable to decode AnyCodable"
+            )
+        }
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        
+        switch value {
+        case is NSNull:
+            try container.encodeNil()
+        case let bool as Bool:
+            try container.encode(bool)
+        case let int as Int:
+            try container.encode(int)
+        case let double as Double:
+            try container.encode(double)
+        case let string as String:
+            try container.encode(string)
+        case let array as [Any]:
+            try container.encode(array.map { AnyCodable($0) })
+        case let dictionary as [String: Any]:
+            try container.encode(dictionary.mapValues { AnyCodable($0) })
+        default:
+            throw EncodingError.invalidValue(
+                value,
+                EncodingError.Context(
+                    codingPath: encoder.codingPath,
+                    debugDescription: "Unable to encode AnyCodable"
+                )
+            )
+        }
     }
 }
 

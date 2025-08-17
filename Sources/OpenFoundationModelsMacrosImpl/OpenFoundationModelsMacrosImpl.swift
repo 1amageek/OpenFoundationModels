@@ -374,19 +374,34 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             let descriptionParam = prop.guideDescription.map { "description: \"\($0)\"" } ?? "description: nil"
             
             let typeParam: String
+            let isOptional = prop.type.hasSuffix("?")
             switch prop.type {
-            case "String", "String?":
+            case "String":
                 typeParam = "String.self"
-            case "Int", "Int?":
+            case "String?":
+                typeParam = "String?.self"
+            case "Int":
                 typeParam = "Int.self"
-            case "Double", "Double?":
+            case "Int?":
+                typeParam = "Int?.self"
+            case "Double":
                 typeParam = "Double.self"
-            case "Float", "Float?":
+            case "Double?":
+                typeParam = "Double?.self"
+            case "Float":
                 typeParam = "Float.self"
-            case "Bool", "Bool?":
+            case "Float?":
+                typeParam = "Float?.self"
+            case "Bool":
                 typeParam = "Bool.self"
+            case "Bool?":
+                typeParam = "Bool?.self"
             default:
-                typeParam = "\(prop.type.replacingOccurrences(of: "?", with: "")).self"
+                if isOptional {
+                    typeParam = "\(prop.type).self"
+                } else {
+                    typeParam = "\(prop.type).self"
+                }
             }
             
             var guides: [String] = []
