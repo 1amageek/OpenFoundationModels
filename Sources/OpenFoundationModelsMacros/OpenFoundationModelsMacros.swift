@@ -1,14 +1,19 @@
 import OpenFoundationModelsCore
 
+// MARK: - @Generable Macro
+// Conforms a type to Generable protocol
 @attached(extension, conformances: Generable, names: named(init(_:)), named(generatedContent))
 @attached(member, names: arbitrary)
 public macro Generable(description: String? = nil) = #externalMacro(module: "OpenFoundationModelsMacrosImpl", type: "GenerableMacro")
+
+// MARK: - @Guide Macros
+// Allows for influencing the allowed values of properties of a generable type
 
 @attached(peer)
 public macro Guide(description: String) = #externalMacro(module: "OpenFoundationModelsMacrosImpl", type: "GuideMacro")
 
 @attached(peer)
-public macro Guide<Value>(description: String, _ guides: GenerationGuide<Value>...) = #externalMacro(module: "OpenFoundationModelsMacrosImpl", type: "GuideMacro")
+public macro Guide<T>(description: String? = nil, _ guides: GenerationGuide<T>...) = #externalMacro(module: "OpenFoundationModelsMacrosImpl", type: "GuideMacro") where T : Generable
 
 @attached(peer)
 public macro Guide<RegexOutput>(

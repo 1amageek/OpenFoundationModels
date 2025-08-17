@@ -1,37 +1,51 @@
 import Foundation
 import OpenFoundationModelsCore
 
-public struct Transcript: Sendable {
-    public private(set) var entries: [Entry] = []
+public struct Transcript: Sendable, Equatable, RandomAccessCollection {
+    internal private(set) var entries: [Entry]
     
-    public init() {
-        self.entries = []
-    }
-    
-    public init<S: Sequence<Entry>>(entries: S) {
+    public init<S: Sequence<Entry>>(entries: S = []) {
         self.entries = Array(entries)
     }
     
-    
+    // MARK: - Mutating Methods
     public mutating func append(_ entry: Entry) {
         entries.append(entry)
     }
     
-    public mutating func append(contentsOf newEntries: [Entry]) {
-        entries.append(contentsOf: newEntries)
+    // MARK: - RandomAccessCollection
+    public typealias Index = Int
+    public typealias Element = Transcript.Entry
+    public typealias Indices = Range<Transcript.Index>
+    public typealias Iterator = IndexingIterator<Transcript>
+    public typealias SubSequence = Slice<Transcript>
+    
+    public var startIndex: Int { 
+        entries.startIndex 
+    }
+    
+    public var endIndex: Int { 
+        entries.endIndex 
+    }
+    
+    public subscript(index: Transcript.Index) -> Transcript.Entry {
+        entries[index]
+    }
+    
+    // MARK: - Equatable
+    public static func ==(lhs: Transcript, rhs: Transcript) -> Bool {
+        return lhs.entries == rhs.entries
     }
 }
 
 extension Transcript {
     public enum Entry: Sendable, Identifiable, CustomStringConvertible {
+        public typealias ID = String
+        
         case instructions(Transcript.Instructions)
-        
         case prompt(Transcript.Prompt)
-        
         case response(Transcript.Response)
-        
         case toolCalls(Transcript.ToolCalls)
-        
         case toolOutput(Transcript.ToolOutput)
         
         public var id: String {
@@ -68,8 +82,9 @@ extension Transcript {
 
 extension Transcript {
     public enum Segment: Sendable, Identifiable {
-        case text(TextSegment)
+        public typealias ID = String
         
+        case text(TextSegment)
         case structure(StructuredSegment)
         
         public var id: String {
@@ -83,24 +98,25 @@ extension Transcript {
     }
     
     public struct TextSegment: Sendable, Identifiable {
-        public var id: String
+        public typealias ID = String
         
+        public var id: String
         public var content: String
         
-        public init(id: String, content: String) {
+        public init(id: String = UUID().uuidString, content: String) {
             self.id = id
             self.content = content
         }
     }
     
     public struct StructuredSegment: Sendable, Identifiable {
+        public typealias ID = String
+        
         public var id: String
-        
         public var source: String
-        
         public var content: GeneratedContent
         
-        public init(id: String, source: String, content: GeneratedContent) {
+        public init(id: String = UUID().uuidString, source: String, content: GeneratedContent) {
             self.id = id
             self.source = source
             self.content = content
@@ -110,15 +126,14 @@ extension Transcript {
 
 extension Transcript {
     public struct Prompt: Sendable, Identifiable {
+        public typealias ID = String
+        
         public var id: String
-        
         public var segments: [Transcript.Segment]
-        
         public var options: GenerationOptions
-        
         public var responseFormat: Transcript.ResponseFormat?
         
-        public init(id: String, segments: [Transcript.Segment], options: GenerationOptions, responseFormat: Transcript.ResponseFormat?) {
+        public init(id: String = UUID().uuidString, segments: [Transcript.Segment], options: GenerationOptions = GenerationOptions(), responseFormat: Transcript.ResponseFormat? = nil) {
             self.id = id
             self.segments = segments
             self.options = options
@@ -127,13 +142,13 @@ extension Transcript {
     }
     
     public struct Response: Sendable, Identifiable {
+        public typealias ID = String
+        
         public var id: String
-        
         public var assetIDs: [String]
-        
         public var segments: [Transcript.Segment]
         
-        public init(id: String, assetIDs: [String], segments: [Transcript.Segment]) {
+        public init(id: String = UUID().uuidString, assetIDs: [String], segments: [Transcript.Segment]) {
             self.id = id
             self.assetIDs = assetIDs
             self.segments = segments
@@ -141,13 +156,13 @@ extension Transcript {
     }
     
     public struct Instructions: Sendable, Identifiable {
+        public typealias ID = String
+        
         public var id: String
-        
         public var segments: [Transcript.Segment]
-        
         public var toolDefinitions: [Transcript.ToolDefinition]
         
-        public init(id: String, segments: [Transcript.Segment], toolDefinitions: [Transcript.ToolDefinition]) {
+        public init(id: String = UUID().uuidString, segments: [Transcript.Segment], toolDefinitions: [Transcript.ToolDefinition]) {
             self.id = id
             self.segments = segments
             self.toolDefinitions = toolDefinitions
@@ -155,10 +170,10 @@ extension Transcript {
     }
     
     public struct ToolCall: Sendable, Identifiable {
+        public typealias ID = String
+        
         public var id: String
-        
         public var toolName: String
-        
         public var arguments: GeneratedContent
         
         public init(id: String, toolName: String, arguments: GeneratedContent) {
@@ -169,17 +184,14 @@ extension Transcript {
     }
     
     public struct ToolCalls: Sendable, Identifiable {
-        public var id: String
+        public typealias ID = String
         
+        public var id: String
         private var calls: [ToolCall]
         
-        public init<S>(id: String, _ calls: S) where S: Sequence, S.Element == ToolCall {
+        public init<S>(id: String = UUID().uuidString, _ calls: S) where S: Sequence, S.Element == ToolCall {
             self.id = id
             self.calls = Array(calls)
-        }
-        
-        internal var toolCalls: [ToolCall] {
-            calls
         }
     }
     
@@ -204,10 +216,10 @@ extension Transcript {
     }
     
     public struct ToolOutput: Sendable, Identifiable {
+        public typealias ID = String
+        
         public var id: String
-        
         public var toolName: String
-        
         public var segments: [Transcript.Segment]
         
         public init(id: String, toolName: String, segments: [Transcript.Segment]) {
@@ -238,12 +250,6 @@ extension Transcript {
     }
 }
 
-
-extension Transcript: Equatable {
-    public static func ==(lhs: Transcript, rhs: Transcript) -> Bool {
-        return lhs.entries == rhs.entries
-    }
-}
 
 extension Transcript.Entry: Equatable {
     public static func ==(lhs: Transcript.Entry, rhs: Transcript.Entry) -> Bool {
@@ -310,7 +316,12 @@ extension Transcript.ResponseFormat: Equatable {
 
 extension Transcript.ToolCalls: Equatable {
     public static func ==(lhs: Transcript.ToolCalls, rhs: Transcript.ToolCalls) -> Bool {
-        return lhs.id == rhs.id && lhs.toolCalls == rhs.toolCalls
+        guard lhs.id == rhs.id else { return false }
+        guard lhs.calls.count == rhs.calls.count else { return false }
+        for i in 0..<lhs.calls.count {
+            if lhs.calls[i] != rhs.calls[i] { return false }
+        }
+        return true
     }
 }
 
@@ -339,7 +350,14 @@ extension Transcript.Response: Equatable {
     }
 }
 
-extension Transcript.ToolCalls: Collection, BidirectionalCollection, RandomAccessCollection {
+// MARK: - ToolCalls Collection
+extension Transcript.ToolCalls: RandomAccessCollection {
+    public typealias Element = Transcript.ToolCall
+    public typealias Index = Int
+    public typealias Indices = Range<Int>
+    public typealias Iterator = IndexingIterator<Transcript.ToolCalls>
+    public typealias SubSequence = Slice<Transcript.ToolCalls>
+    
     public var startIndex: Int { calls.startIndex }
     public var endIndex: Int { calls.endIndex }
     
@@ -356,32 +374,75 @@ extension Transcript.ToolCalls: Collection, BidirectionalCollection, RandomAcces
     }
 }
 
-extension Transcript: BidirectionalCollection, RandomAccessCollection {
-    public var startIndex: Int { 
-        entries.startIndex 
-    }
-    
-    public var endIndex: Int { 
-        entries.endIndex 
-    }
-    
-    public subscript(position: Int) -> Entry {
-        entries[position]
-    }
-    
-    public func index(after i: Int) -> Int {
-        entries.index(after: i)
-    }
-    
-    public func index(before i: Int) -> Int {
-        entries.index(before: i)
-    }
-    
-    public var count: Int {
-        entries.count
-    }
-    
-    public var isEmpty: Bool {
-        entries.isEmpty
+// MARK: - CustomStringConvertible Implementations
+extension Transcript.Segment: CustomStringConvertible {
+    public var description: String {
+        switch self {
+        case .text(let segment):
+            return segment.description
+        case .structure(let segment):
+            return segment.description
+        }
     }
 }
+
+extension Transcript.TextSegment: CustomStringConvertible {
+    public var description: String {
+        return content
+    }
+}
+
+extension Transcript.StructuredSegment: CustomStringConvertible {
+    public var description: String {
+        return "StructuredSegment(source: \(source), content: \(content.debugDescription))"
+    }
+}
+
+extension Transcript.Instructions: CustomStringConvertible {
+    public var description: String {
+        let segmentTexts = segments.map { $0.description }.joined(separator: " ")
+        let toolCount = toolDefinitions.count
+        return "Instructions: \(segmentTexts) (Tools: \(toolCount))"
+    }
+}
+
+extension Transcript.Prompt: CustomStringConvertible {
+    public var description: String {
+        let segmentTexts = segments.map { $0.description }.joined(separator: " ")
+        return "Prompt: \(segmentTexts)"
+    }
+}
+
+extension Transcript.ResponseFormat: CustomStringConvertible {
+    public var description: String {
+        return "ResponseFormat(name: \(name))"
+    }
+}
+
+extension Transcript.ToolCalls: CustomStringConvertible {
+    public var description: String {
+        let callDescriptions = calls.map { $0.description }.joined(separator: ", ")
+        return "ToolCalls: [\(callDescriptions)]"
+    }
+}
+
+extension Transcript.ToolCall: CustomStringConvertible {
+    public var description: String {
+        return "\(toolName)(\(arguments.debugDescription))"
+    }
+}
+
+extension Transcript.ToolOutput: CustomStringConvertible {
+    public var description: String {
+        let segmentTexts = segments.map { $0.description }.joined(separator: " ")
+        return "ToolOutput(\(toolName)): \(segmentTexts)"
+    }
+}
+
+extension Transcript.Response: CustomStringConvertible {
+    public var description: String {
+        let segmentTexts = segments.map { $0.description }.joined(separator: " ")
+        return "Response: \(segmentTexts)"
+    }
+}
+
