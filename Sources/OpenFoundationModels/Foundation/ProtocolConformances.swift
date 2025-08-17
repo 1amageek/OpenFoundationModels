@@ -22,8 +22,11 @@ extension String: Generable {
 // GeneratedContent already conforms to Generable in OpenFoundationModelsCore
 
 extension Array: Generable where Element: Generable {
+    
+    /// A representation of partially generated content
     public typealias PartiallyGenerated = [Element.PartiallyGenerated]
     
+    /// An instance of the generation schema.
     public static var generationSchema: GenerationSchema {
         return GenerationSchema(
             type: Array<Element>.self,
@@ -32,6 +35,7 @@ extension Array: Generable where Element: Generable {
         )
     }
     
+    // Custom implementation required because PartiallyGenerated != Self
     public func asPartiallyGenerated() -> PartiallyGenerated {
         return self.map { $0.asPartiallyGenerated() }
     }

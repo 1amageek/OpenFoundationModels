@@ -58,8 +58,4 @@ extension GenerationID: Generable {
     public var generatedContent: GeneratedContent {
         return GeneratedContent(kind: .string(value.uuidString))
     }
-    
-    public func asPartiallyGenerated() -> GenerationID {
-        return self
-    }
 }
