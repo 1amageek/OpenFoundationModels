@@ -3,7 +3,7 @@ import Foundation
 public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible {
     private let schemaType: SchemaType
     private let _description: String?
-    private indirect enum SchemaType: Sendable, Codable {
+    private indirect enum SchemaType: Sendable {
         case object(properties: [GenerationSchema.Property])
         case enumeration(values: [String])
         case dynamic(root: DynamicGenerationSchema, dependencies: [DynamicGenerationSchema])
@@ -630,10 +630,15 @@ extension GenerationSchema {
         case .enumeration(let values):
             try schemaTypeContainer.encode(SchemaTypeCase.enumeration, forKey: .type)
             try schemaTypeContainer.encode(values, forKey: .values)
-        case .dynamic(let root, let dependencies):
-            try schemaTypeContainer.encode(SchemaTypeCase.dynamic, forKey: .type)
-            try schemaTypeContainer.encode(root, forKey: .root)
-            try schemaTypeContainer.encode(dependencies, forKey: .dependencies)
+        case .dynamic:
+            // Dynamic schemas cannot be encoded as DynamicGenerationSchema is not Codable
+            throw EncodingError.invalidValue(
+                schemaType,
+                EncodingError.Context(
+                    codingPath: encoder.codingPath,
+                    debugDescription: "GenerationSchema with dynamic type cannot be encoded"
+                )
+            )
         case .array(let items):
             try schemaTypeContainer.encode(SchemaTypeCase.array, forKey: .type)
             try schemaTypeContainer.encodeIfPresent(items, forKey: .items)
@@ -660,9 +665,13 @@ extension GenerationSchema {
             let values = try schemaTypeContainer.decode([String].self, forKey: .values)
             self.schemaType = .enumeration(values: values)
         case .dynamic:
-            let root = try schemaTypeContainer.decode(DynamicGenerationSchema.self, forKey: .root)
-            let dependencies = try schemaTypeContainer.decode([DynamicGenerationSchema].self, forKey: .dependencies)
-            self.schemaType = .dynamic(root: root, dependencies: dependencies)
+            // Dynamic schemas cannot be decoded as DynamicGenerationSchema is not Codable
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "GenerationSchema with dynamic type cannot be decoded"
+                )
+            )
         case .array:
             let items = try schemaTypeContainer.decodeIfPresent(GenerationSchema.self, forKey: .items)
             self.schemaType = .array(items: items)

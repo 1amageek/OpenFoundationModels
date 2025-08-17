@@ -2,6 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+現時点で最も重要な優先度はAppleのFoundationModelsに完全に一致させることです。
+プロトコル、ジェネリクス、関数、変数、アクセスコントロール全てを一致させる必要があります。
+
 ## Project Overview
 **100% Apple Foundation Models β SDK Compatible Implementation**
 

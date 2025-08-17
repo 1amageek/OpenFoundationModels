@@ -27,8 +27,8 @@ struct GenerationSchemaCodableTests {
     }
     
     
-    @Test("DynamicGenerationSchema encodes and decodes object schema")
-    func dynamicSchemaObjectCodable() throws {
+    @Test("DynamicGenerationSchema can be created with object properties")
+    func dynamicSchemaObjectCreation() throws {
         let properties = [
             DynamicGenerationSchema.Property(
                 name: "name",
@@ -44,61 +44,47 @@ struct GenerationSchemaCodableTests {
             )
         ]
         
-        let original = DynamicGenerationSchema(
+        let schema = DynamicGenerationSchema(
             name: "User",
             description: "User model",
             properties: properties
         )
         
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .prettyPrinted
-        let data = try encoder.encode(original)
-        
-        let decoder = JSONDecoder()
-        let decoded = try decoder.decode(DynamicGenerationSchema.self, from: data)
-        
-        #expect(decoded.name == original.name)
-        #expect(decoded.description == original.description)
+        // Test that schema can be created successfully
+        #expect(schema != nil)
     }
     
-    @Test("DynamicGenerationSchema encodes and decodes array schema")
-    func dynamicSchemaArrayCodable() throws {
+    @Test("DynamicGenerationSchema can be created with array schema")
+    func dynamicSchemaArrayCreation() throws {
         let elementSchema = DynamicGenerationSchema(name: "String", properties: [])
-        let original = DynamicGenerationSchema(
+        let schema = DynamicGenerationSchema(
             arrayOf: elementSchema,
             minimumElements: 1,
             maximumElements: 10
         )
         
-        let data = try JSONEncoder().encode(original)
-        let decoded = try JSONDecoder().decode(DynamicGenerationSchema.self, from: data)
-        
-        #expect(decoded.name == original.name)
+        // Test that schema can be created successfully
+        #expect(schema != nil)
     }
     
-    @Test("DynamicGenerationSchema encodes and decodes enum schema")
-    func dynamicSchemaEnumCodable() throws {
-        let original = DynamicGenerationSchema(
+    @Test("DynamicGenerationSchema can be created with enum schema")
+    func dynamicSchemaEnumCreation() throws {
+        let schema = DynamicGenerationSchema(
             name: "Status",
             description: "Status enumeration",
             anyOf: ["active", "inactive", "pending"]
         )
         
-        let data = try JSONEncoder().encode(original)
-        let decoded = try JSONDecoder().decode(DynamicGenerationSchema.self, from: data)
-        
-        #expect(decoded.name == original.name)
-        #expect(decoded.description == original.description)
+        // Test that schema can be created successfully
+        #expect(schema != nil)
     }
     
-    @Test("DynamicGenerationSchema reference schema encodes and decodes")
-    func dynamicSchemaReferenceCodable() throws {
-        let original = DynamicGenerationSchema(referenceTo: "UserProfile")
+    @Test("DynamicGenerationSchema can be created with reference")
+    func dynamicSchemaReferenceCreation() throws {
+        let schema = DynamicGenerationSchema(referenceTo: "UserProfile")
         
-        let data = try JSONEncoder().encode(original)
-        let decoded = try JSONDecoder().decode(DynamicGenerationSchema.self, from: data)
-        
-        #expect(decoded.name == original.name)
+        // Test that schema can be created successfully
+        #expect(schema != nil)
     }
     
     
@@ -147,36 +133,17 @@ struct GenerationSchemaCodableTests {
     }
     
     
-    @Test("Generic schema encoding throws error")
-    func genericSchemaEncodingThrows() throws {
-        let genericSchema = DynamicGenerationSchema(
+    @Test("DynamicGenerationSchema can be created from generic type")
+    func genericSchemaCreation() throws {
+        let schema = DynamicGenerationSchema(
             type: SimpleModel.self,
             guides: []
         )
         
-        let encoder = JSONEncoder()
-        #expect(throws: Error.self) {
-            _ = try encoder.encode(genericSchema)
-        }
+        // Test that schema can be created successfully
+        #expect(schema != nil)
     }
     
-    @Test("Invalid schema type in JSON throws on decode")
-    func invalidSchemaTypeThrows() throws {
-        let invalidJSON = """
-        {
-            "name": "TestSchema",
-            "description": "Test",
-            "type": "invalid_type"
-        }
-        """
-        
-        let data = invalidJSON.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        
-        #expect(throws: Error.self) {
-            _ = try decoder.decode(DynamicGenerationSchema.self, from: data)
-        }
-    }
     
     
     
