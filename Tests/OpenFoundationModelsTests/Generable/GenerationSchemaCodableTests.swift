@@ -51,7 +51,9 @@ struct GenerationSchemaCodableTests {
         )
         
         // Test that schema can be created successfully
-        #expect(schema != nil)
+        // Properties are internal - just verify creation
+        let _ = schema
+        #expect(Bool(true))
     }
     
     @Test("DynamicGenerationSchema can be created with array schema")
@@ -64,7 +66,9 @@ struct GenerationSchemaCodableTests {
         )
         
         // Test that schema can be created successfully
-        #expect(schema != nil)
+        // Properties are internal - just verify creation
+        let _ = schema
+        #expect(Bool(true))
     }
     
     @Test("DynamicGenerationSchema can be created with enum schema")
@@ -76,7 +80,9 @@ struct GenerationSchemaCodableTests {
         )
         
         // Test that schema can be created successfully
-        #expect(schema != nil)
+        // Properties are internal - just verify creation
+        let _ = schema
+        #expect(Bool(true))
     }
     
     @Test("DynamicGenerationSchema can be created with reference")
@@ -84,7 +90,9 @@ struct GenerationSchemaCodableTests {
         let schema = DynamicGenerationSchema(referenceTo: "UserProfile")
         
         // Test that schema can be created successfully
-        #expect(schema != nil)
+        // Properties are internal - just verify creation
+        let _ = schema
+        #expect(Bool(true))
     }
     
     
@@ -141,7 +149,9 @@ struct GenerationSchemaCodableTests {
         )
         
         // Test that schema can be created successfully
-        #expect(schema != nil)
+        // Properties are internal - just verify creation
+        let _ = schema
+        #expect(Bool(true))
     }
     
     

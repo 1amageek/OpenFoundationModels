@@ -55,8 +55,9 @@ struct GenerationSchemaTests {
         )
         
         // Properties are internal - cannot test directly
-        // Test that property can be created successfully
-        #expect(property != nil)
+        // Just verify the property was created (all fields are internal)
+        let _ = property
+        #expect(Bool(true))
     }
     
     @Test("GenerationSchema property with pattern constraint")
@@ -70,8 +71,9 @@ struct GenerationSchemaTests {
         )
         
         // Properties are internal - cannot test directly
-        // Test that property can be created successfully
-        #expect(property != nil)
+        // Just verify the property was created (all fields are internal)
+        let _ = property
+        #expect(Bool(true))
     }
     
     @Test("GenerationSchema debug description")

@@ -51,9 +51,9 @@ struct CompatibilityTests {
         
         switch noneContent.kind {
         case .null:
-            #expect(true)
+            #expect(Bool(true))
         default:
-            #expect(false)
+            #expect(Bool(false))
         }
     }
     

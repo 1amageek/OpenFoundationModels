@@ -55,7 +55,9 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                     toolDefinitions: tools.map { Transcript.ToolDefinition(tool: $0) }
                 )
             )
-            self._transcript.append(instructionEntry)
+            var entries = _transcript.entries
+            entries.append(instructionEntry)
+            self._transcript = Transcript(entries: entries)
         }
     }
     
@@ -124,7 +126,9 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 responseFormat: nil
             )
         )
-        _transcript.append(promptEntry)
+        var entries = _transcript.entries
+        entries.append(promptEntry)
+        _transcript = Transcript(entries: entries)
         
         let content = try await model.generate(
             transcript: _transcript,
@@ -138,10 +142,12 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
             )
         )
         
-        _transcript.append(responseEntry)
+        var transcriptEntries = _transcript.entries
+        transcriptEntries.append(responseEntry)
+        _transcript = Transcript(entries: transcriptEntries)
         
-        let entries = Array(_transcript.entries.suffix(2))
-        let entriesSlice = ArraySlice(entries)
+        let recentEntries = Array(_transcript.entries.suffix(2))
+        let entriesSlice = ArraySlice(recentEntries)
         
         return Response(
             content: content,
@@ -201,7 +207,9 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 responseFormat: includeSchemaInPrompt ? Transcript.ResponseFormat(schema: schema) : nil
             )
         )
-        _transcript.append(promptEntry)
+        var entries = _transcript.entries
+        entries.append(promptEntry)
+        _transcript = Transcript(entries: entries)
         
         let text = try await model.generate(
             transcript: _transcript,
@@ -220,10 +228,12 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
             )
         )
         
-        _transcript.append(responseEntry)
+        var transcriptEntries = _transcript.entries
+        transcriptEntries.append(responseEntry)
+        _transcript = Transcript(entries: transcriptEntries)
         
-        let entries = Array(_transcript.entries.suffix(2))
-        let entriesSlice = ArraySlice(entries)
+        let recentEntries = Array(_transcript.entries.suffix(2))
+        let entriesSlice = ArraySlice(recentEntries)
         
         return Response(
             content: content,
@@ -283,7 +293,9 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 responseFormat: includeSchemaInPrompt ? Transcript.ResponseFormat(type: Content.self) : nil
             )
         )
-        _transcript.append(promptEntry)
+        var entries = _transcript.entries
+        entries.append(promptEntry)
+        _transcript = Transcript(entries: entries)
         
         let text = try await model.generate(
             transcript: _transcript,
@@ -303,10 +315,12 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
             )
         )
         
-        _transcript.append(responseEntry)
+        var transcriptEntries = _transcript.entries
+        transcriptEntries.append(responseEntry)
+        _transcript = Transcript(entries: transcriptEntries)
         
-        let entries = Array(_transcript.entries.suffix(2))
-        let entriesSlice = ArraySlice(entries)
+        let recentEntries = Array(_transcript.entries.suffix(2))
+        let entriesSlice = ArraySlice(recentEntries)
         
         return Response(
             content: content,
@@ -345,7 +359,9 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 responseFormat: nil
             )
         )
-        _transcript.append(promptEntry)
+        var entries = _transcript.entries
+        entries.append(promptEntry)
+        _transcript = Transcript(entries: entries)
         
         let stream = AsyncThrowingStream<ResponseStream<String>.Snapshot, Error> { continuation in
             Task {
@@ -375,7 +391,9 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                             segments: [.text(Transcript.TextSegment(id: UUID().uuidString, content: accumulatedContent))]
                         )
                     )
-                    _transcript.append(responseEntry)
+                    var transcriptEntries = _transcript.entries
+        transcriptEntries.append(responseEntry)
+        _transcript = Transcript(entries: transcriptEntries)
                 }
                 
                 continuation.finish()
@@ -435,7 +453,9 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                         responseFormat: includeSchemaInPrompt ? Transcript.ResponseFormat(schema: schema) : nil
                     )
                 )
-                _transcript.append(promptEntry)
+                var entries = _transcript.entries
+        entries.append(promptEntry)
+        _transcript = Transcript(entries: entries)
                 
                 let stringStream = model.stream(
                     transcript: _transcript,
@@ -465,7 +485,9 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                             ))]
                         )
                     )
-                    _transcript.append(responseEntry)
+                    var transcriptEntries = _transcript.entries
+        transcriptEntries.append(responseEntry)
+        _transcript = Transcript(entries: transcriptEntries)
                 }
                 
                 continuation.finish()
@@ -527,7 +549,9 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                         responseFormat: includeSchemaInPrompt ? Transcript.ResponseFormat(type: Content.self) : nil
                     )
                 )
-                _transcript.append(promptEntry)
+                var entries = _transcript.entries
+        entries.append(promptEntry)
+        _transcript = Transcript(entries: entries)
                 
                 let stringStream = model.stream(
                     transcript: _transcript,

@@ -154,7 +154,9 @@ struct GenerationSchemaJSONSchemaTests {
         let decodedSchema = try decoder.decode(GenerationSchema.self, from: data)
         
         // Verify the decoded schema maintains the structure
-        #expect(decodedSchema != nil)
+        // Type is internal - just verify it was decoded
+        let _ = decodedSchema
+        #expect(Bool(true))
         
         // Re-encode and compare JSON
         let reEncodedData = try encoder.encode(decodedSchema)

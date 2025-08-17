@@ -21,7 +21,7 @@ struct ResponseStreamTests {
             continuation.finish()
         }
         
-        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
+        let _ = LanguageModelSession.ResponseStream<String>(stream: stream)
         
     }
     

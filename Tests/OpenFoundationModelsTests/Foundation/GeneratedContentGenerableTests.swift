@@ -9,7 +9,9 @@ func testGeneratedContentConformsToGenerable() throws {
     
     // Test that GeneratedContent has generationSchema
     let schema = GeneratedContent.generationSchema
-    #expect(schema != nil)
+    // Schema is non-optional, just verify it exists
+    let _ = schema
+    #expect(Bool(true))
     
     // Test init(_ content:) with throws
     let newContent = try GeneratedContent(content)

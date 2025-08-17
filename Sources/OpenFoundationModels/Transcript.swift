@@ -8,11 +8,6 @@ public struct Transcript: Sendable, Equatable, RandomAccessCollection {
         self.entries = Array(entries)
     }
     
-    // MARK: - Mutating Methods
-    public mutating func append(_ entry: Entry) {
-        entries.append(entry)
-    }
-    
     // MARK: - RandomAccessCollection
     public typealias Index = Int
     public typealias Element = Transcript.Entry
