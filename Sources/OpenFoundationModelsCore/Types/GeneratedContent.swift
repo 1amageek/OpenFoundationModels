@@ -74,8 +74,8 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
         self.storage.generationID = id
     }
 
-    public init<C: Collection>(elements: C, id: GenerationID? = nil) where C.Element: ConvertibleToGeneratedContent {
-        let arr = elements.map { $0.generatedContent }
+    public init<S: Sequence>(elements: S, id: GenerationID? = nil) where S.Element: ConvertibleToGeneratedContent {
+        let arr = Array(elements).map { $0.generatedContent }
         self.storage = Storage(root: .array(arr.map { $0.asJSONValue() }), partialRaw: nil, isComplete: true, generationID: id)
     }
 
@@ -86,11 +86,17 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
         self.storage = Storage(root: .object(dict, orderedKeys: ordered), partialRaw: nil, isComplete: true, generationID: id)
     }
 
-    public init<S: Sequence>(properties: S, id: GenerationID? = nil, uniquingKeysWith combine: (any ConvertibleToGeneratedContent, any ConvertibleToGeneratedContent) throws -> any ConvertibleToGeneratedContent) rethrows where S.Element == (String, any ConvertibleToGeneratedContent) {
+    public init<S>(properties: S, id: GenerationID? = nil, uniquingKeysWith combine: (GeneratedContent, GeneratedContent) throws -> some ConvertibleToGeneratedContent) rethrows where S : Sequence, S.Element == (String, any ConvertibleToGeneratedContent) {
         var map: [String: GeneratedContent] = [:]
         var ordered: [String] = []
         for (k, v) in properties {
-            if let exist = map[k] { map[k] = try combine(exist, v).generatedContent } else { map[k] = v.generatedContent; ordered.append(k) }
+            let vContent = v.generatedContent
+            if let exist = map[k] { 
+                map[k] = try combine(exist, vContent).generatedContent 
+            } else { 
+                map[k] = vContent
+                ordered.append(k) 
+            }
         }
         self.storage = Storage(root: .object(map.mapValues { $0.asJSONValue() }, orderedKeys: ordered), partialRaw: nil, isComplete: true, generationID: id)
     }
@@ -596,8 +602,18 @@ public enum GeneratedContentError: Error, Sendable {
 }
 
 
-extension GeneratedContent: ConvertibleFromGeneratedContent {
+extension GeneratedContent: ConvertibleFromGeneratedContent, Generable {
     public init(_ content: GeneratedContent) throws { self = content }
+    
+    public static var generationSchema: GenerationSchema {
+        // GeneratedContent is a dynamic type that can represent any JSON structure
+        // Therefore, we return a schema that represents this flexibility
+        return GenerationSchema(
+            type: GeneratedContent.self,
+            description: "A type that represents structured, generated content",
+            properties: []
+        )
+    }
 }
 
 public extension GeneratedContent {

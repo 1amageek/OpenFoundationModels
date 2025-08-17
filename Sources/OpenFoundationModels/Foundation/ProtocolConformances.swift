@@ -19,15 +19,7 @@ extension String: Generable {
     }
 }
 
-extension GeneratedContent: Generable {
-    public static var generationSchema: GenerationSchema {
-        return GenerationSchema(
-            type: GeneratedContent.self,
-            description: "Generated content with flexible structure",
-            properties: []
-        )
-    }
-}
+// GeneratedContent already conforms to Generable in OpenFoundationModelsCore
 
 extension Array: Generable where Element: Generable {
     public typealias PartiallyGenerated = [Element.PartiallyGenerated]
