@@ -1,26 +1,11 @@
-// InstructionsTests.swift
-// OpenFoundationModelsTests
-//
-// ✅ APPLE OFFICIAL: Tests for Apple Foundation Models Instructions system
 
 import Foundation
 import Testing
 @testable import OpenFoundationModels
 
-/// Tests for Instructions and InstructionsBuilder
-/// 
-/// **Focus:** Validates Instructions structure and InstructionsBuilder functionality
-/// according to Apple's Foundation Models specification.
-///
-/// **Apple Foundation Models Documentation:**
-/// Instructions provide context and guidance to language models for generating responses.
-/// InstructionsBuilder enables result builder syntax for composing instructions.
-///
-/// **Reference:** https://developer.apple.com/documentation/foundationmodels/instructions
 @Suite("Instructions Tests", .tags(.foundation))
 struct InstructionsTests {
     
-    // MARK: - Basic Instructions Tests
     
     @Test("Instructions creation with string")
     func instructionsStringCreation() {
@@ -46,7 +31,6 @@ struct InstructionsTests {
         #expect(instructions.description == text)
     }
     
-    // MARK: - InstructionsRepresentable Tests
     
     @Test("String conforms to InstructionsRepresentable")
     func stringInstructionsRepresentable() {
@@ -64,7 +48,6 @@ struct InstructionsTests {
         #expect(instructions.description == "Generated instructions")
     }
     
-    // MARK: - InstructionsBuilder Tests
     
     @Test("InstructionsBuilder with single component")
     func instructionsBuilderSingle() {
@@ -196,17 +179,14 @@ struct InstructionsTests {
         #expect(instructions.description == component)
     }
     
-    // MARK: - Instructions @InstructionsBuilder Initializer Tests
     
     @Test("Instructions creation with @InstructionsBuilder initializer")
     func instructionsBuilderInitializer() {
-        // Test simple builder
         let instructions1 = Instructions {
             "You are a helpful assistant."
         }
         #expect(instructions1.description == "You are a helpful assistant.")
         
-        // Test builder with multiple components
         let instructions2 = Instructions {
             "You are a code review assistant."
             "Focus on code quality and best practices."
@@ -340,7 +320,6 @@ struct InstructionsTests {
     
     @Test("Instructions builder matching Apple's example")
     func instructionsBuilderAppleExample() {
-        // Recreate Apple's documentation example
         let instructions = Instructions {
             "Suggest related topics. Keep them concise (three to seven words) and"
             "make sure they build naturally from the person's topic."
@@ -382,7 +361,6 @@ struct InstructionsTests {
         #expect(instructions.description.contains("Be concise"))
     }
     
-    // MARK: - Complex InstructionsBuilder Scenarios
     
     @Test("InstructionsBuilder with conditionals and optionals")
     func instructionsBuilderComplexScenario() {
@@ -432,7 +410,6 @@ struct InstructionsTests {
         #expect(instructions.description == expected)
     }
     
-    // MARK: - Edge Cases and Error Handling
     
     @Test("Instructions with very long text")
     func instructionsLongText() {
@@ -464,7 +441,6 @@ struct InstructionsTests {
         #expect(instructions.description.contains("العربية"))
     }
     
-    // MARK: - Performance Tests
     
     @Test("Instructions creation performance", .timeLimit(.minutes(1)))
     func instructionsCreationPerformance() {

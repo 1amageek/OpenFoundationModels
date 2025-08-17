@@ -2,11 +2,9 @@ import Testing
 import Foundation
 @testable import OpenFoundationModels
 
-// MARK: - Test Types (defined at top level to avoid local type macro restrictions)
 
 @Generable
 struct TestLargeUserProfile {
-    // Basic information (10 properties)
     @Guide(description: "First name") let firstName: String
     @Guide(description: "Last name") let lastName: String
     @Guide(description: "Email address") let email: String
@@ -18,7 +16,6 @@ struct TestLargeUserProfile {
     @Guide(description: "Company") let company: String
     @Guide(description: "Job title") let jobTitle: String
     
-    // Address information (10 properties)
     @Guide(description: "Street address") let streetAddress: String
     @Guide(description: "City") let city: String
     @Guide(description: "State") let state: String
@@ -30,7 +27,6 @@ struct TestLargeUserProfile {
     @Guide(description: "Landmark") let landmark: String
     @Guide(description: "Region") let region: String
     
-    // Preferences (10 properties)
     @Guide(description: "Language preference") let language: String
     @Guide(description: "Currency") let currency: String
     @Guide(description: "Timezone") let timezone: String
@@ -45,7 +41,7 @@ struct TestLargeUserProfile {
 
 @Generable
 struct TestComplexConstrainedType {
-    @Guide(description: "Username", .pattern("[a-zA-Z0-9_]{3,20}"))
+    @Guide(description: "Username", .pattern(/[a-zA-Z0-9_]{3,20}/))
     let username: String
     
     @Guide(description: "Age", .range(18...100))
@@ -54,16 +50,16 @@ struct TestComplexConstrainedType {
     @Guide(description: "Score", .range(0.0...100.0))
     let score: Double
     
-    @Guide(description: "Role", .enumeration(["admin", "moderator", "user", "guest", "premium"]))
+    @Guide(description: "Role", .anyOf(["admin", "moderator", "user", "guest", "premium"]))
     let role: String
     
-    @Guide(description: "Email", .pattern("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"))
+    @Guide(description: "Email", .pattern(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/))
     let email: String
     
     @Guide(description: "Priority", .range(1...10))
     let priority: Int
     
-    @Guide(description: "Category", .enumeration(["tech", "business", "education", "health", "entertainment"]))
+    @Guide(description: "Category", .anyOf(["tech", "business", "education", "health", "entertainment"]))
     let category: String
     
     @Guide(description: "Rating", .range(1.0...5.0))
@@ -129,7 +125,6 @@ struct TestRepeatedAccessType {
 
 @Generable
 struct TestVeryLargeSchema {
-    // 50 properties to test macro scalability
     @Guide(description: "Property 1") let prop1: String
     @Guide(description: "Property 2") let prop2: String
     @Guide(description: "Property 3") let prop3: String
@@ -190,46 +185,28 @@ struct TestBatchTestType {
     @Guide(description: "Active") let active: Bool
 }
 
-/// Tests for large-scale schema generation and performance
-/// 
-/// **Focus:** Validates performance characteristics when generating large schemas
-/// with many properties, complex nesting, and extensive constraints to ensure
-/// the system scales appropriately according to Apple's Foundation Models specification.
-///
-/// **Apple Foundation Models Documentation:**
-/// Large schema tests ensure that @Generable macro expansion and GenerationSchema
-/// creation remain performant and memory-efficient with realistic production workloads.
-///
-/// **Reference:** https://developer.apple.com/documentation/foundationmodels/generationschema
 @Suite("Large Schema Tests", .tags(.performance, .schema, .generable))
 struct LargeSchemaTests {
     
     @Test("Large schema with many simple properties", .timeLimit(.minutes(1)))
     func largeSchemaWithManySimpleProperties() throws {
-        // Test macro performance with many properties
         let startTime = Date()
         
-        // Test schema generation performance
         let schema = TestLargeUserProfile.generationSchema
         let schemaTime = Date().timeIntervalSince(startTime)
         
-        // Test instance creation performance
         let resetTime = Date()
         let instance = try TestLargeUserProfile(GeneratedContent("{}"))
         let instanceTime = Date().timeIntervalSince(resetTime)
         
-        // Verify basic functionality
         #expect(instance.firstName == "")
         #expect(instance.email == "")
         #expect(instance.city == "")
         #expect(instance.language == "")
         
-        // Verify schema properties
-        // Schema type is internal, just verify schema was created
         let debugString = schema.debugDescription
         #expect(debugString.contains("GenerationSchema"))
         
-        // Performance assertions (generous limits for CI environments)
         #expect(schemaTime < 1.0) // Schema generation should be fast
         #expect(instanceTime < 0.1) // Instance creation should be very fast
     }
@@ -238,24 +215,19 @@ struct LargeSchemaTests {
     func schemaGenerationWithComplexConstraints() throws {
         let startTime = Date()
         
-        // Test constraint processing performance
         let schema = TestComplexConstrainedType.generationSchema
         let instance = try TestComplexConstrainedType(GeneratedContent("{}"))
         
         let totalTime = Date().timeIntervalSince(startTime)
         
-        // Verify functionality
         #expect(instance.username == "")
         #expect(instance.age == 0)
         #expect(instance.score == 0.0)
         #expect(instance.role == "")
         
-        // Verify schema
-        // Schema type is internal, just verify schema was created
         let debugString = schema.debugDescription
         #expect(debugString.contains("GenerationSchema"))
         
-        // Performance check
         #expect(totalTime < 0.5) // Complex constraints should still be fast
     }
     
@@ -263,7 +235,6 @@ struct LargeSchemaTests {
     func multipleLargeSchemasInParallel() async throws {
         let startTime = Date()
         
-        // Test parallel schema and instance creation
         async let productSchema = Task { TestProductCatalog.generationSchema }
         async let orderSchema = Task { TestOrderDetails.generationSchema }
         async let customerSchema = Task { TestCustomerProfile.generationSchema }
@@ -272,24 +243,19 @@ struct LargeSchemaTests {
         async let orderInstance = Task { try TestOrderDetails(GeneratedContent("{}")) }
         async let customerInstance = Task { try TestCustomerProfile(GeneratedContent("{}")) }
         
-        // Await all results
         let (pSchema, oSchema, cSchema) = await (productSchema.value, orderSchema.value, customerSchema.value)
         let (pInstance, oInstance, cInstance) = try await (productInstance.value, orderInstance.value, customerInstance.value)
         
         let totalTime = Date().timeIntervalSince(startTime)
         
-        // Verify all schemas are valid
-        // Schema types are internal, just verify schemas were created
         #expect(pSchema.debugDescription.contains("GenerationSchema"))
         #expect(oSchema.debugDescription.contains("GenerationSchema"))
         #expect(cSchema.debugDescription.contains("GenerationSchema"))
         
-        // Verify all instances are created
         #expect(pInstance.productId == "")
         #expect(oInstance.orderId == "")
         #expect(cInstance.customerId == "")
         
-        // Performance check - parallel should be faster than sequential
         #expect(totalTime < 2.0)
     }
     
@@ -298,17 +264,14 @@ struct LargeSchemaTests {
         let iterations = 1000
         let startTime = Date()
         
-        // Test repeated schema access
         for _ in 0..<iterations {
             let schema = TestRepeatedAccessType.generationSchema
-            // Schema type is internal, just verify schema was created
         let debugString = schema.debugDescription
         #expect(debugString.contains("GenerationSchema"))
         }
         
         let schemaAccessTime = Date().timeIntervalSince(startTime)
         
-        // Test repeated instance creation
         let instanceStartTime = Date()
         var instances: [TestRepeatedAccessType] = []
         
@@ -319,15 +282,12 @@ struct LargeSchemaTests {
         
         let instanceCreationTime = Date().timeIntervalSince(instanceStartTime)
         
-        // Verify results
         #expect(instances.count == 100)
         #expect(instances.first?.field1 == "")
         
-        // Performance expectations
         #expect(schemaAccessTime < 1.0) // 1000 schema accesses should be fast
         #expect(instanceCreationTime < 0.5) // 100 instance creations should be fast
         
-        // Memory efficiency - verify instances are independent
         for instance in instances {
             #expect(instance.field1 == "")
         }
@@ -335,8 +295,6 @@ struct LargeSchemaTests {
     
     @Test("Large schema compilation performance", .timeLimit(.minutes(2)))
     func largeSchemaCompilationPerformance() throws {
-        // Test that large schemas compile in reasonable time
-        // If this compiles and runs, the macro handled the large schema successfully
         let startTime = Date()
         
         let schema = TestVeryLargeSchema.generationSchema
@@ -344,8 +302,6 @@ struct LargeSchemaTests {
         
         let totalTime = Date().timeIntervalSince(startTime)
         
-        // Basic verification
-        // Schema type is internal, just verify schema was created
         let debugString = schema.debugDescription
         #expect(debugString.contains("GenerationSchema"))
         #expect(instance.prop1 == "")
@@ -354,7 +310,6 @@ struct LargeSchemaTests {
         #expect(instance.prop31 == false)
         #expect(instance.prop50 == "")
         
-        // Performance check
         #expect(totalTime < 2.0) // Large schema should still be reasonably fast
     }
     
@@ -363,7 +318,6 @@ struct LargeSchemaTests {
         let batchSize = 500
         let startTime = Date()
         
-        // Test batch instance creation
         var instances: [TestBatchTestType] = []
         instances.reserveCapacity(batchSize)
         
@@ -374,7 +328,6 @@ struct LargeSchemaTests {
         
         let creationTime = Date().timeIntervalSince(startTime)
         
-        // Test batch property access
         let accessStartTime = Date()
         var totalLength = 0
         
@@ -384,11 +337,9 @@ struct LargeSchemaTests {
         
         let accessTime = Date().timeIntervalSince(accessStartTime)
         
-        // Verify results
         #expect(instances.count == batchSize)
         #expect(totalLength == 0) // All strings are empty defaults
         
-        // Performance expectations
         #expect(creationTime < 1.0) // 500 instances should create quickly
         #expect(accessTime < 0.1) // Property access should be very fast
     }

@@ -1,15 +1,7 @@
-// StandardTypeConformances.swift
-// OpenFoundationModels
-//
-// ✅ APPLE OFFICIAL: Standard type conformances to Generable
-
 import Foundation
 import OpenFoundationModelsCore
 
-// MARK: - Bool Generable Conformance
-
 extension Bool: Generable {
-    /// An instance of the generation schema.
     public static var generationSchema: GenerationSchema {
         return GenerationSchema(
             type: Bool.self,
@@ -18,7 +10,6 @@ extension Bool: Generable {
         )
     }
     
-    /// Creates an instance with the content.
     public init(_ content: GeneratedContent) throws {
         switch content.kind {
         case .bool(let value):
@@ -50,19 +41,13 @@ extension Bool: Generable {
         }
     }
     
-    /// An instance that represents the generated content.
     public var generatedContent: GeneratedContent {
         return GeneratedContent(kind: .bool(self))
     }
     
-    // asPartiallyGenerated() uses default implementation from protocol extension
-    // Returns self since PartiallyGenerated = Bool (default)
 }
 
-// MARK: - Int Generable Conformance
-
 extension Int: Generable {
-    /// An instance of the generation schema.
     public static var generationSchema: GenerationSchema {
         return GenerationSchema(
             type: Int.self,
@@ -71,7 +56,6 @@ extension Int: Generable {
         )
     }
     
-    /// Creates an instance with the content.
     public init(_ content: GeneratedContent) throws {
         switch content.kind {
         case .number(let value):
@@ -105,19 +89,12 @@ extension Int: Generable {
         }
     }
     
-    /// An instance that represents the generated content.
     public var generatedContent: GeneratedContent {
         return GeneratedContent(kind: .number(Double(self)))
     }
-    
-    // asPartiallyGenerated() uses default implementation from protocol extension
-    // Returns self since PartiallyGenerated = Int (default)
 }
 
-// MARK: - Float Generable Conformance
-
 extension Float: Generable {
-    /// An instance of the generation schema.
     public static var generationSchema: GenerationSchema {
         return GenerationSchema(
             type: Float.self,
@@ -126,7 +103,6 @@ extension Float: Generable {
         )
     }
     
-    /// Creates an instance with the content.
     public init(_ content: GeneratedContent) throws {
         switch content.kind {
         case .number(let value):
@@ -152,19 +128,13 @@ extension Float: Generable {
         }
     }
     
-    /// An instance that represents the generated content.
     public var generatedContent: GeneratedContent {
         return GeneratedContent(kind: .number(Double(self)))
     }
     
-    // asPartiallyGenerated() uses default implementation from protocol extension
-    // Returns self since PartiallyGenerated = Float (default)
 }
 
-// MARK: - Double Generable Conformance
-
 extension Double: Generable {
-    /// An instance of the generation schema.
     public static var generationSchema: GenerationSchema {
         return GenerationSchema(
             type: Double.self,
@@ -173,7 +143,6 @@ extension Double: Generable {
         )
     }
     
-    /// Creates an instance with the content.
     public init(_ content: GeneratedContent) throws {
         switch content.kind {
         case .number(let value):
@@ -199,19 +168,13 @@ extension Double: Generable {
         }
     }
     
-    /// An instance that represents the generated content.
     public var generatedContent: GeneratedContent {
         return GeneratedContent(kind: .number(self))
     }
     
-    // asPartiallyGenerated() uses default implementation from protocol extension
-    // Returns self since PartiallyGenerated = Double (default)
 }
 
-// MARK: - Decimal Generable Conformance
-
 extension Decimal: Generable {
-    /// An instance of the generation schema.
     public static var generationSchema: GenerationSchema {
         return GenerationSchema(
             type: Decimal.self,
@@ -220,33 +183,38 @@ extension Decimal: Generable {
         )
     }
     
-    /// Creates an instance with the content.
     public init(_ content: GeneratedContent) throws {
-        let text = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let value = Decimal(string: text) else {
+        switch content.kind {
+        case .number(let value):
+            self = Decimal(value)
+        case .string(let text):
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let value = Decimal(string: trimmed) else {
+                throw DecodingError.dataCorrupted(
+                    DecodingError.Context(
+                        codingPath: [],
+                        debugDescription: "Unable to decode Decimal from: \(text)"
+                    )
+                )
+            }
+            self = value
+        default:
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: [],
-                    debugDescription: "Unable to decode Decimal from: \(content.text)"
+                    debugDescription: "Unable to decode Decimal from Kind: \(content.kind)"
                 )
             )
         }
-        self = value
     }
     
-    /// An instance that represents the generated content.
     public var generatedContent: GeneratedContent {
-        return GeneratedContent(String(describing: self))
+        return GeneratedContent(kind: .number(NSDecimalNumber(decimal: self).doubleValue))
     }
     
-    // asPartiallyGenerated() uses default implementation from protocol extension
-    // Returns self since PartiallyGenerated = Decimal (default)
 }
 
-// MARK: - UUID Generable Conformance
-
 extension UUID: Generable {
-    /// An instance of the generation schema.
     public static var generationSchema: GenerationSchema {
         return GenerationSchema(
             type: UUID.self,
@@ -255,11 +223,9 @@ extension UUID: Generable {
         )
     }
     
-    /// Creates an instance with the content.
     public init(_ content: GeneratedContent) throws {
         let text = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // UUID文字列の検証とパース
         guard let uuid = UUID(uuidString: text) else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
@@ -271,19 +237,13 @@ extension UUID: Generable {
         self = uuid
     }
     
-    /// An instance that represents the generated content.
     public var generatedContent: GeneratedContent {
         return GeneratedContent(kind: .string(self.uuidString))
     }
     
-    // asPartiallyGenerated() uses default implementation from protocol extension
-    // Returns self since PartiallyGenerated = UUID (default)
 }
 
-// MARK: - Date Generable Conformance
-
 extension Date: Generable {
-    // Create formatters locally to avoid concurrency issues
     private static func createISO8601Formatter(withFractionalSeconds: Bool = true) -> ISO8601DateFormatter {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = withFractionalSeconds 
@@ -292,7 +252,6 @@ extension Date: Generable {
         return formatter
     }
     
-    /// An instance of the generation schema.
     public static var generationSchema: GenerationSchema {
         return GenerationSchema(
             type: Date.self,
@@ -301,11 +260,9 @@ extension Date: Generable {
         )
     }
     
-    /// Creates an instance with the content.
     public init(_ content: GeneratedContent) throws {
         let text = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // 複数のISO8601フォーマットを試行
         let formatterWithFractional = Self.createISO8601Formatter(withFractionalSeconds: true)
         if let date = formatterWithFractional.date(from: text) {
             self = date
@@ -314,7 +271,6 @@ extension Date: Generable {
             if let date = formatterNoFractional.date(from: text) {
                 self = date
             } else {
-                // Unixタイムスタンプとしても試行（数値の場合）
                 if let timestamp = Double(text) {
                     self = Date(timeIntervalSince1970: timestamp)
                 } else {
@@ -329,20 +285,14 @@ extension Date: Generable {
         }
     }
     
-    /// An instance that represents the generated content.
     public var generatedContent: GeneratedContent {
         let formatter = Self.createISO8601Formatter(withFractionalSeconds: true)
         return GeneratedContent(kind: .string(formatter.string(from: self)))
     }
     
-    // asPartiallyGenerated() uses default implementation from protocol extension
-    // Returns self since PartiallyGenerated = Date (default)
 }
 
-// MARK: - URL Generable Conformance
-
 extension URL: Generable {
-    /// An instance of the generation schema.
     public static var generationSchema: GenerationSchema {
         return GenerationSchema(
             type: URL.self,
@@ -351,7 +301,6 @@ extension URL: Generable {
         )
     }
     
-    /// Creates an instance with the content.
     public init(_ content: GeneratedContent) throws {
         let text = content.text.trimmingCharacters(in: .whitespacesAndNewlines)
         
@@ -366,19 +315,13 @@ extension URL: Generable {
         self = url
     }
     
-    /// An instance that represents the generated content.
     public var generatedContent: GeneratedContent {
         return GeneratedContent(kind: .string(self.absoluteString))
     }
     
-    // asPartiallyGenerated() uses default implementation from protocol extension
-    // Returns self since PartiallyGenerated = URL (default)
 }
 
-// MARK: - Never Generable Conformance
-
 extension Never: Generable {
-    /// An instance of the generation schema.
     public static var generationSchema: GenerationSchema {
         return GenerationSchema(
             type: Never.self,
@@ -387,7 +330,6 @@ extension Never: Generable {
         )
     }
     
-    /// Creates an instance with the content.
     public init(_ content: GeneratedContent) throws {
         throw DecodingError.dataCorrupted(
             DecodingError.Context(
@@ -397,12 +339,8 @@ extension Never: Generable {
         )
     }
     
-    /// An instance that represents the generated content.
     public var generatedContent: GeneratedContent {
-        // This will never be called since Never has no instances
         fatalError("Never has no instances")
     }
     
-    // asPartiallyGenerated() uses default implementation from protocol extension
-    // But will never be called since Never has no instances
 }

@@ -2,20 +2,7 @@ import Testing
 import Foundation
 @testable import OpenFoundationModels
 
-/// Tests for concurrent generation operations under load
-/// 
-/// **Focus:** Validates system behavior when multiple generation operations
-/// run concurrently, testing thread safety, resource contention, and
-/// performance characteristics according to Apple's Foundation Models specification.
-///
-/// **Apple Foundation Models Documentation:**
-/// Concurrent generation tests ensure that multiple language model sessions
-/// can operate simultaneously without conflicts, maintaining thread safety
-/// and acceptable performance under load.
-///
-/// **Reference:** https://developer.apple.com/documentation/foundationmodels/languagemodelsession
 
-// MARK: - Test Types (moved from local scope to top level)
 
 @Generable
 struct TestSchemaType1 {
@@ -75,7 +62,6 @@ struct ConcurrentGenerationTests {
         let streamCount = 10
         let itemsPerStream = 5
         
-        // Create multiple concurrent streams
         let streams = (0..<streamCount).map { streamIndex in
             AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
                 Task {
@@ -96,7 +82,6 @@ struct ConcurrentGenerationTests {
         
         let startTime = Date()
         
-        // Process all streams concurrently
         let results = try await withThrowingTaskGroup(of: (Int, String).self) { group in
             for (index, stream) in responseStreams.enumerated() {
                 group.addTask {
@@ -114,16 +99,13 @@ struct ConcurrentGenerationTests {
         
         let totalTime = Date().timeIntervalSince(startTime)
         
-        // Verify all streams completed
         #expect(results.count == streamCount)
         
-        // Verify each stream produced the expected final content
         for (index, result) in results.enumerated() {
             let expectedFinalContent = "stream-\(index)-item-\(itemsPerStream - 1)"
             #expect(result.contains(expectedFinalContent))
         }
         
-        // Performance check - concurrent should be reasonably fast
         #expect(totalTime < 5.0)
     }
     
@@ -132,7 +114,6 @@ struct ConcurrentGenerationTests {
         let concurrencyLevel = 20
         let startTime = Date()
         
-        // Generate schemas concurrently
         let results = try await withThrowingTaskGroup(of: (String, String).self) { group in
             for i in 0..<concurrencyLevel {
                 group.addTask {
@@ -140,7 +121,6 @@ struct ConcurrentGenerationTests {
                     let schema2 = TestSchemaType2.generationSchema
                     let schema3 = TestSchemaType3.generationSchema
                     
-                    // Schema type is internal, use debugDescription instead
                     return ("task-\(i)", "\(schema1.debugDescription)-\(schema2.debugDescription)-\(schema3.debugDescription)")
                 }
             }
@@ -154,17 +134,13 @@ struct ConcurrentGenerationTests {
         
         let totalTime = Date().timeIntervalSince(startTime)
         
-        // Verify all tasks completed
         #expect(results.count == concurrencyLevel)
         
-        // Verify all schemas were generated correctly
         for (taskId, schemaTypes) in results {
             #expect(taskId.hasPrefix("task-"))
-            // With debugDescription, the format includes more details
             #expect(schemaTypes.contains("GenerationSchema"))
         }
         
-        // Performance check
         #expect(totalTime < 2.0)
     }
     
@@ -173,9 +149,7 @@ struct ConcurrentGenerationTests {
         let instancesPerType = 50
         let startTime = Date()
         
-        // Create instances concurrently
         let results = try await withThrowingTaskGroup(of: String.self) { group in
-            // Type A instances
             for _ in 0..<instancesPerType {
                 group.addTask {
                     let instance = try TestConcurrentTypeA(GeneratedContent("{}"))
@@ -183,7 +157,6 @@ struct ConcurrentGenerationTests {
                 }
             }
             
-            // Type B instances
             for _ in 0..<instancesPerType {
                 group.addTask {
                     let instance = try TestConcurrentTypeB(GeneratedContent("{}"))
@@ -191,7 +164,6 @@ struct ConcurrentGenerationTests {
                 }
             }
             
-            // Type C instances
             for _ in 0..<instancesPerType {
                 group.addTask {
                     let instance = try TestConcurrentTypeC(GeneratedContent("{}"))
@@ -208,10 +180,8 @@ struct ConcurrentGenerationTests {
         
         let totalTime = Date().timeIntervalSince(startTime)
         
-        // Verify all instances were created
         #expect(results.count == instancesPerType * 3)
         
-        // Count instances by type
         let typeACounts = results.filter { $0.hasPrefix("A:") }.count
         let typeBCounts = results.filter { $0.hasPrefix("B:") }.count
         let typeCCounts = results.filter { $0.hasPrefix("C:") }.count
@@ -220,7 +190,6 @@ struct ConcurrentGenerationTests {
         #expect(typeBCounts == instancesPerType)
         #expect(typeCCounts == instancesPerType)
         
-        // Verify default values
         for result in results {
             if result.hasPrefix("A:") {
                 #expect(result == "A::0") // Empty string and 0
@@ -231,7 +200,6 @@ struct ConcurrentGenerationTests {
             }
         }
         
-        // Performance check
         #expect(totalTime < 1.0)
     }
     
@@ -240,7 +208,6 @@ struct ConcurrentGenerationTests {
         let successStreamCount = 5
         let errorStreamCount = 3
         
-        // Create successful streams
         let successStreams = (0..<successStreamCount).map { index in
             AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
                 let content = "success-\(index)"
@@ -253,7 +220,6 @@ struct ConcurrentGenerationTests {
             }
         }
         
-        // Create error streams
         let errorStreams = (0..<errorStreamCount).map { index in
             AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
                 let content = "partial-\(index)"
@@ -274,7 +240,6 @@ struct ConcurrentGenerationTests {
         
         let startTime = Date()
         
-        // Process streams concurrently with error handling
         let results = try await withThrowingTaskGroup(of: Result<String, Error>.self) { group in
             for (index, stream) in responseStreams.enumerated() {
                 group.addTask {
@@ -296,10 +261,8 @@ struct ConcurrentGenerationTests {
         
         let totalTime = Date().timeIntervalSince(startTime)
         
-        // Verify all streams were processed
         #expect(results.count == successStreamCount + errorStreamCount)
         
-        // Count successes and failures
         let successes = results.compactMap { result -> String? in
             if case .success(let value) = result { return value }
             return nil
@@ -313,12 +276,10 @@ struct ConcurrentGenerationTests {
         #expect(successes.count == successStreamCount)
         #expect(failures.count == errorStreamCount)
         
-        // Verify error types
         for error in failures {
             #expect(error is GenerationError)
         }
         
-        // Performance check
         #expect(totalTime < 2.0)
     }
     
@@ -328,7 +289,6 @@ struct ConcurrentGenerationTests {
         let batchSize = 20
         let startTime = Date()
         
-        // Process operations in batches to avoid overwhelming the system
         var allResults: [String] = []
         
         for batchStart in stride(from: 0, to: totalOperations, by: batchSize) {
@@ -337,11 +297,9 @@ struct ConcurrentGenerationTests {
             let batchResults = try await withThrowingTaskGroup(of: String.self) { group in
                 for i in batchStart..<batchEnd {
                     group.addTask {
-                        // Mix of operations: schema access and instance creation
                         let schema = TestLoadTestType.generationSchema
                         let instance = try TestLoadTestType(GeneratedContent("{}"))
                         
-                        // Schema type is internal, use debugDescription instead
                         return "op-\(i):\(schema.debugDescription):\(instance.id):\(instance.index)"
                     }
                 }
@@ -358,19 +316,14 @@ struct ConcurrentGenerationTests {
         
         let totalTime = Date().timeIntervalSince(startTime)
         
-        // Verify all operations completed
         #expect(allResults.count == totalOperations)
         
-        // Verify operation results
         for (_, result) in allResults.enumerated() {
             let parts = result.components(separatedBy: ":")
-            // With debugDescription, format changed
             #expect(parts.count >= 3)
-            // Just verify result contains expected components
             #expect(result.contains("GenerationSchema"))
         }
         
-        // Performance check - should handle high load efficiently
         #expect(totalTime < 10.0)
     }
     
@@ -379,19 +332,15 @@ struct ConcurrentGenerationTests {
         let concurrentAccesses = 100
         let startTime = Date()
         
-        // Test concurrent access to the same schema and type
         let results = try await withThrowingTaskGroup(of: (Int, String, String).self) { group in
             for i in 0..<concurrentAccesses {
                 group.addTask {
-                    // Multiple operations on the same type to test resource contention
                     let schema1 = TestSharedResourceType.generationSchema
                     let instance1 = try TestSharedResourceType(GeneratedContent("{}"))
                     
                     let schema2 = TestSharedResourceType.generationSchema
                     let _ = try TestSharedResourceType(GeneratedContent("{}"))
                     
-                    // Verify schemas are consistent
-                    // Schema type is internal, compare debugDescriptions instead
                     let schemasMatch = (schema1.debugDescription == schema2.debugDescription)
                     
                     return (i, instance1.resourceId, schemasMatch ? "consistent" : "inconsistent")
@@ -407,16 +356,13 @@ struct ConcurrentGenerationTests {
         
         let totalTime = Date().timeIntervalSince(startTime)
         
-        // Verify all operations completed
         #expect(results.count == concurrentAccesses)
         
-        // Verify consistency under contention
         for (_, resourceId, consistency) in results {
             #expect(resourceId == "") // Default empty string
             #expect(consistency == "consistent") // Schemas should be consistent
         }
         
-        // Performance check
         #expect(totalTime < 3.0)
     }
 }

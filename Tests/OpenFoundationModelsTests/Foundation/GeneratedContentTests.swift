@@ -1,26 +1,11 @@
-// GeneratedContentTests.swift
-// OpenFoundationModelsTests
-//
-// ✅ APPLE OFFICIAL: Tests for Apple Foundation Models GeneratedContent system
 
 import Foundation
 import Testing
 @testable import OpenFoundationModels
 
-/// Tests for GeneratedContent structure and functionality
-/// 
-/// **Focus:** Validates GeneratedContent creation, manipulation, and protocol conformance
-/// according to Apple's Foundation Models specification.
-///
-/// **Apple Foundation Models Documentation:**
-/// GeneratedContent represents the output from language model responses.
-/// It serves as the bridge between raw model output and structured Swift types.
-///
-/// **Reference:** https://developer.apple.com/documentation/foundationmodels/generatedcontent
 @Suite("Generated Content Tests", .tags(.foundation))
 struct GeneratedContentTests {
     
-    // MARK: - Basic GeneratedContent Tests
     
     @Test("GeneratedContent creation with string")
     func generatedContentStringCreation() {
@@ -49,7 +34,6 @@ struct GeneratedContentTests {
         #expect(content.text == text)
     }
     
-    // MARK: - JSON Content Tests
     
     @Test("GeneratedContent with JSON string")
     func generatedContentJSON() throws {
@@ -63,7 +47,6 @@ struct GeneratedContentTests {
         
         let content = try GeneratedContent(json: jsonString)
         
-        // JSON parsing converts to structured data, not raw string
         let properties = try content.properties()
         #expect(properties["name"]?.text == "John Doe")
         #expect(properties["age"]?.text == "30")
@@ -127,15 +110,12 @@ struct GeneratedContentTests {
         #expect(settingsProperties?["notifications"]?.text == "true")
     }
     
-    // MARK: - Protocol Conformance Tests
     
     @Test("GeneratedContent Generable conformance")
     func generatedContentGenerableConformance() {
         let _ = GeneratedContent("Test content")
         
-        // Should conform to Generable protocol
         let schema = GeneratedContent.generationSchema
-        // Schema type and description are internal, just verify schema was created
         let debugString = schema.debugDescription
         #expect(debugString.contains("GenerationSchema"))
     }
@@ -144,7 +124,6 @@ struct GeneratedContentTests {
     func generatedContentConvertibleFrom() throws {
         let originalContent = GeneratedContent("Original content")
         
-        // Should be able to convert from itself
         let convertedContent = try GeneratedContent(originalContent)
         
         #expect(convertedContent.text == originalContent.text)
@@ -155,7 +134,6 @@ struct GeneratedContentTests {
     func generatedContentConvertibleTo() {
         let content = GeneratedContent("Content to convert")
         
-        // Should convert to itself
         let converted = content.generatedContent
         
         #expect(converted.text == content.text)
@@ -174,13 +152,10 @@ struct GeneratedContentTests {
     func generatedContentPartiallyGenerated() {
         let content = GeneratedContent("Partial content")
         
-        // GeneratedContent.PartiallyGenerated = GeneratedContent (default)
-        // Only asPartiallyGenerated() is available (from protocol extension)
         let asPartial = content.asPartiallyGenerated()
         #expect(asPartial.text == content.text)
     }
     
-    // MARK: - Content Manipulation Tests
     
     @Test("GeneratedContent with multiline content")
     func generatedContentMultiline() {
@@ -223,7 +198,6 @@ struct GeneratedContentTests {
         #expect(content.text.contains("中文"))
     }
     
-    // MARK: - Edge Cases and Validation
     
     @Test("GeneratedContent with very long content")
     func generatedContentLongContent() {
@@ -254,7 +228,6 @@ struct GeneratedContentTests {
         #expect(content.text.contains("\u{0000}"))
     }
     
-    // MARK: - Complex Data Tests
     
     @Test("GeneratedContent representing complex objects")
     func generatedContentComplexObjects() {
@@ -295,13 +268,11 @@ struct GeneratedContentTests {
         
         let content = GeneratedContent(complexObject)
         
-        // Test that the content was parsed correctly and contains expected elements
         #expect(content.text.contains("Alice"))
         #expect(content.text.contains("Bob"))
         #expect(content.text.contains("notifications"))
         #expect(content.text.contains("metadata"))
         
-        // Verify JSON structure is preserved (though formatting may differ)
         #expect(content.text.contains("users"))
         #expect(content.text.contains("preferences"))
         #expect(content.text.contains("theme"))
@@ -322,7 +293,6 @@ struct GeneratedContentTests {
         }
         
         extension User: Codable {
-            // Auto-synthesized conformance
         }
         """
         
@@ -334,7 +304,6 @@ struct GeneratedContentTests {
         #expect(content.text.contains("extension User: Codable"))
     }
     
-    // MARK: - Performance Tests
     
     @Test("GeneratedContent creation performance", .timeLimit(.minutes(1)))
     func generatedContentCreationPerformance() {
@@ -355,21 +324,17 @@ struct GeneratedContentTests {
         let elements = try content.elements()
         #expect(elements.count == 1000)
         
-        // Check first element
         let firstElement = try elements[0].properties()
         #expect(firstElement["key1"]?.text == "value1")
     }
     
-    // MARK: - Integration Tests
     
     @Test("GeneratedContent Sendable conformance")
     func generatedContentSendableConformance() {
         let content = GeneratedContent("Sendable test")
         
-        // Should conform to Sendable
         let _ = content as Sendable
         
-        // Should be safe to use across concurrency boundaries
         Task {
             let asyncContent = content
             #expect(asyncContent.text == "Sendable test")

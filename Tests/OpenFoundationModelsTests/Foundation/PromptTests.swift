@@ -1,26 +1,11 @@
-// PromptTests.swift
-// OpenFoundationModelsTests
-//
-// ✅ APPLE OFFICIAL: Tests for Apple Foundation Models Prompt system
 
 import Foundation
 import Testing
 @testable import OpenFoundationModels
 
-/// Tests for Prompt structure and functionality
-/// 
-/// **Focus:** Validates Prompt structure and PromptRepresentable protocol
-/// according to Apple's Foundation Models specification.
-///
-/// **Apple Foundation Models Documentation:**
-/// Prompts represent user input and queries to language models.
-/// They serve as the primary interface for requesting model responses.
-///
-/// **Reference:** https://developer.apple.com/documentation/foundationmodels/prompt
 @Suite("Prompt Tests", .tags(.foundation))
 struct PromptTests {
     
-    // MARK: - Basic Prompt Tests
     
     @Test("Prompt creation with string")
     func promptStringCreation() {
@@ -46,7 +31,6 @@ struct PromptTests {
         #expect(prompt.description == text)
     }
     
-    // MARK: - PromptRepresentable Tests
     
     @Test("String conforms to PromptRepresentable")
     func stringPromptRepresentable() {
@@ -100,7 +84,6 @@ struct PromptTests {
         #expect(prompt.description.contains("Tokyo, Japan"))
     }
     
-    // MARK: - Prompt Content Validation
     
     @Test("Prompt with special formatting")
     func promptSpecialFormatting() {
@@ -150,7 +133,6 @@ struct PromptTests {
         #expect(prompt.description.contains("## Output Requirements"))
     }
     
-    // MARK: - International Content Tests
     
     @Test("Prompt with international characters")
     func promptInternationalCharacters() {
@@ -202,7 +184,6 @@ struct PromptTests {
         #expect(prompt.description.contains("π"))
     }
     
-    // MARK: - Edge Cases and Validation
     
     @Test("Prompt with very long content")
     func promptLongContent() {
@@ -258,7 +239,6 @@ struct PromptTests {
         #expect(prompt.description.contains("\\u0041"))
     }
     
-    // MARK: - Performance Tests
     
     @Test("Prompt creation performance", .timeLimit(.minutes(1)))
     func promptCreationPerformance() {
@@ -281,17 +261,14 @@ struct PromptTests {
         #expect(prompt.description.components(separatedBy: "\n").count == 1000)
     }
     
-    // MARK: - PromptBuilder Tests
     
     @Test("Prompt creation with @PromptBuilder initializer")
     func promptBuilderInitializer() {
-        // Test simple builder
         let prompt1 = Prompt {
             "Hello, world!"
         }
         #expect(prompt1.description == "Hello, world!")
         
-        // Test builder with multiple components
         let prompt2 = Prompt {
             "Line 1"
             "Line 2"
@@ -318,7 +295,6 @@ struct PromptTests {
         #expect(prompt.description.contains("What is Swift?"))
         #expect(prompt.description.contains("Your response MUST rhyme!"))
         
-        // Test with false condition
         let shouldBeVerbose = false
         let prompt2 = Prompt {
             "Explain quantum physics"
@@ -461,7 +437,6 @@ struct PromptTests {
         #expect(prompt.description.contains("Format as markdown"))
     }
     
-    // MARK: - Functional Tests
     
     @Test("Prompt for code generation")
     func promptCodeGeneration() {

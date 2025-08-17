@@ -1,28 +1,15 @@
-// PartialJSONParsingTests.swift
-// OpenFoundationModelsTests
-//
-// Comprehensive tests for partial JSON parsing functionality
-// Based on PARTIAL_JSON_PARSING_SPEC.md
 
 import Foundation
 import Testing
 @testable import OpenFoundationModels
 
-/// Tests for partial JSON parsing functionality
-/// 
-/// **Focus:** Validates the ability to parse incomplete JSON during streaming,
-/// extracting available properties while tracking completeness status.
-///
-/// **Reference:** PARTIAL_JSON_PARSING_SPEC.md
 @Suite("Partial JSON Parsing Tests", .tags(.foundation, .streaming))
 struct PartialJSONParsingTests {
     
-    // Helper function to ensure we use the correct initializer
     private func parseJSON(_ json: String) throws -> GeneratedContent {
         return try GeneratedContent(json: json)
     }
     
-    // MARK: - Section 1: Basic Partial JSON Tests
     
     @Test("Empty object parsing")
     func emptyObjectParsing() throws {
@@ -41,12 +28,9 @@ struct PartialJSONParsingTests {
         
         #expect(content.isComplete == false)
         
-        // Should handle partial JSON gracefully
         do {
             _ = try content.properties()
         } catch {
-            // Expected to fail or return empty
-            // Error is already non-nil in catch block
         }
     }
     
@@ -57,7 +41,6 @@ struct PartialJSONParsingTests {
         
         #expect(content.isComplete == false)
         
-        // No complete properties should be extracted
         if let properties = try? content.properties() {
             #expect(properties.isEmpty || properties["name"] == nil)
         }
@@ -70,7 +53,6 @@ struct PartialJSONParsingTests {
         
         #expect(content.isComplete == false)
         
-        // No complete properties should be extracted
         if let properties = try? content.properties() {
             #expect(properties["name"] == nil)
         }
@@ -83,9 +65,7 @@ struct PartialJSONParsingTests {
         
         #expect(content.isComplete == false)
         
-        // Partial value might be extracted depending on implementation
         if let properties = try? content.properties() {
-            // Implementation may choose to extract "Al" or skip incomplete values
             let name = properties["name"]
             if name != nil {
                 #expect(name?.text == "Al")
@@ -100,7 +80,6 @@ struct PartialJSONParsingTests {
         
         #expect(content.isComplete == false)
         
-        // Property should be extractable even without closing brace
         if let properties = try? content.properties() {
             #expect(properties["name"]?.text == "Alice")
         }
@@ -116,7 +95,6 @@ struct PartialJSONParsingTests {
         #expect(properties["name"]?.text == "Alice")
     }
     
-    // MARK: - Section 2: Multiple Properties Tests
     
     @Test("Two properties - second key only")
     func twoPropertiesSecondKeyOnly() throws {
@@ -153,7 +131,6 @@ struct PartialJSONParsingTests {
         
         if let properties = try? content.properties() {
             #expect(properties["name"]?.text == "Alice")
-            // Partial number might be extracted
             if let age = properties["age"] {
                 #expect(age.text == "2")
             }
@@ -184,7 +161,6 @@ struct PartialJSONParsingTests {
         #expect(properties["age"]?.text == "25")
     }
     
-    // MARK: - Section 3: Value Types Tests
     
     @Test("String value parsing")
     func stringValueParsing() throws {
@@ -271,9 +247,7 @@ struct PartialJSONParsingTests {
             if let properties = try? content.properties() {
                 if hasNull {
                     #expect(properties["value"] != nil)
-                    // Check if it's null type
                     if case .null = properties["value"]?.kind {
-                        // Success - it's null
                     } else {
                         Issue.record("Expected null kind")
                     }
@@ -284,7 +258,6 @@ struct PartialJSONParsingTests {
         }
     }
     
-    // MARK: - Section 4: Nested Structure Tests
     
     @Test("Nested object - incomplete")
     func nestedObjectIncomplete() throws {
@@ -300,9 +273,7 @@ struct PartialJSONParsingTests {
             let content = try parseJSON(json)
             #expect(content.isComplete == false)
             
-            // Nested incomplete objects might not be extracted
             if let properties = try? content.properties() {
-                // Implementation may choose to skip incomplete nested objects
                 _ = properties["user"]
             }
         }
@@ -317,7 +288,6 @@ struct PartialJSONParsingTests {
         
         if let properties = try? content.properties(),
            let user = properties["user"] {
-            // Nested object should be extractable
             if let userProps = try? user.properties() {
                 #expect(userProps["name"]?.text == "Bob")
             }
@@ -350,7 +320,6 @@ struct PartialJSONParsingTests {
         #expect(c?["d"]?.text == "deep")
     }
     
-    // MARK: - Section 5: Array Tests
     
     @Test("Array - incomplete")
     func arrayIncomplete() throws {
@@ -409,13 +378,11 @@ struct PartialJSONParsingTests {
         #expect(mixed?[0].text == "1")
         #expect(mixed?[1].text == "text")
         #expect(mixed?[2].text == "true")
-        // mixed[3] should be null
         if let nested = try? mixed?[4].properties() {
             #expect(nested["nested"]?.text == "value")
         }
     }
     
-    // MARK: - Section 6: Escape Sequence Tests
     
     @Test("Escaped quotes in strings")
     func escapedQuotesInStrings() throws {
@@ -468,7 +435,6 @@ struct PartialJSONParsingTests {
         #expect(properties["emoji"]?.text == "Hello 👋 世界")
     }
     
-    // MARK: - Section 7: Edge Cases
     
     @Test("Empty string values")
     func emptyStringValues() throws {
@@ -522,13 +488,10 @@ struct PartialJSONParsingTests {
         let content = try parseJSON(json)
         #expect(content.isComplete == true)
         
-        // Navigate through all levels
         var current: GeneratedContent? = content
         for i in 1...10 {
             current = try current?.properties()["a\(i)"]
         }
-        // After navigating through a1 to a10, we have {"value": "value"}
-        // Need to access the "value" property
         let finalValue = try current?.properties()["value"]
         #expect(finalValue?.text == "value")
     }
@@ -547,7 +510,6 @@ struct PartialJSONParsingTests {
         #expect(numbers?[99].text == "100")
     }
     
-    // MARK: - Section 8: Streaming Simulation Tests
     
     @Test("Progressive JSON building simulation")
     func progressiveJSONBuildingSimulation() throws {
@@ -579,7 +541,6 @@ struct PartialJSONParsingTests {
     
     @Test("Real-world LLM streaming pattern")
     func realWorldLLMStreamingPattern() throws {
-        // Simulating token-by-token streaming from an LLM
         let tokens = [
             "{\"",
             "{\"response",
@@ -650,20 +611,16 @@ struct PartialJSONParsingTests {
             let content = try parseJSON(json)
             let isComplete = content.isComplete
             
-            // Only the last stage should be complete
             #expect(isComplete == (index == stages.count - 1))
             
-            // Try to extract whatever is available
             if let properties = try? content.properties(),
                let user = properties["user"],
                let userProps = try? user.properties() {
                 
-                // After stage 6, we should have user.id
                 if index >= 6 {
                     #expect(userProps["id"]?.text == "u123")
                 }
                 
-                // After stage 14, we should have user.profile.name
                 if index >= 14 {
                     if let profile = userProps["profile"],
                        let profileProps = try? profile.properties() {

@@ -2,22 +2,11 @@ import Testing
 import Foundation
 @testable import OpenFoundationModels
 
-/// Tests for ResponseStream functionality
-/// 
-/// **Focus:** Validates ResponseStream AsyncSequence behavior, streaming mechanics,
-/// partial response handling, and collect() functionality according to Apple's specification.
-///
-/// **Apple Foundation Models Documentation:**
-/// ResponseStream provides streaming access to generated content as it becomes
-/// available from the language model, conforming to AsyncSequence protocol.
-///
-/// **Reference:** https://developer.apple.com/documentation/foundationmodels/responsestream
 @Suite("ResponseStream Tests", .tags(.core, .streaming))
 struct ResponseStreamTests {
     
     @Test("ResponseStream creation and basic properties")
     func responseStreamCreation() {
-        // Create a simple stream with string content
         let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
             let snapshot1 = LanguageModelSession.ResponseStream<String>.Snapshot(
                 content: "Hello",
@@ -34,13 +23,10 @@ struct ResponseStreamTests {
         
         let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
-        // Verify the stream is created successfully
-        // ResponseStream doesn't have a last property - it's just an AsyncSequence
     }
     
     @Test("ResponseStream AsyncSequence iteration with String content")
     func responseStreamStringIteration() async throws {
-        // Create a stream that yields partial string responses
         let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
             let snapshot1 = LanguageModelSession.ResponseStream<String>.Snapshot(
                 content: "Hello",
@@ -58,21 +44,17 @@ struct ResponseStreamTests {
         let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         var collectedPartials: [String] = []
         
-        // Test AsyncSequence iteration
         for try await snapshot in responseStream {
             collectedPartials.append(snapshot.content)
         }
         
-        // Verify we collected the expected partial responses
         #expect(collectedPartials.count == 2)
-        // Partials are now String
         #expect(collectedPartials[0] == "Hello")
         #expect(collectedPartials[1] == "Hello, world!")
     }
     
     @Test("ResponseStream with String Generable content")
     func responseStreamStringGenerableIteration() async throws {
-        // String already conforms to Generable, so we can test with it
         let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
             let snapshot1 = LanguageModelSession.ResponseStream<String>.Snapshot(
                 content: "partial content",
@@ -91,13 +73,10 @@ struct ResponseStreamTests {
         var partialCount = 0
         var lastContent = ""
         
-        // Test iteration with String Generable content
         for try await snapshot in responseStream {
             partialCount += 1
-            // snapshot contains the content and rawContent
             lastContent = snapshot.content
             
-            // For String, check if we've reached the expected final content
             if snapshot.content == "complete content" {
                 break
             }
@@ -109,7 +88,6 @@ struct ResponseStreamTests {
     
     @Test("ResponseStream collect() method")
     func responseStreamCollect() async throws {
-        // Use String content for collect() testing
         let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
             let snapshot1 = LanguageModelSession.ResponseStream<String>.Snapshot(
                 content: "partial",
@@ -126,10 +104,8 @@ struct ResponseStreamTests {
         
         let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
-        // Test the collect() method
         let finalResponse = try await responseStream.collect()
         
-        // Verify the final response contains the complete content
         #expect(finalResponse.content == "final content")
         #expect(finalResponse.transcriptEntries.isEmpty) // No transcript entries in mock
     }
@@ -147,7 +123,6 @@ struct ResponseStreamTests {
         
         let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
-        // For String type, collect() returns the last value since String has no concept of "complete"
         let response = try await responseStream.collect()
         #expect(response.content == "partial")
     }
@@ -175,14 +150,12 @@ struct ResponseStreamTests {
         
         let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
-        // Collect all partials manually since collectPartials() doesn't exist
         var allPartials: [String] = []
         for try await snapshot in responseStream {
             allPartials.append(snapshot.content)
         }
         
         #expect(allPartials.count == 3)
-        // Partials are now String
         #expect(allPartials[0] == "first")
         #expect(allPartials[1] == "second")
         #expect(allPartials[2] == "final")
@@ -205,10 +178,8 @@ struct ResponseStreamTests {
         
         let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
-        // Test error propagation through AsyncSequence
         await #expect(throws: LanguageModelSession.GenerationError.self) {
             for try await _ in responseStream {
-                // Should throw before completing iteration
             }
         }
     }
@@ -236,7 +207,6 @@ struct ResponseStreamTests {
         
         let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
-        // Create an iterator and verify it works
         var iterator = responseStream.makeAsyncIterator()
         
         let first = try await iterator.next()
@@ -244,7 +214,6 @@ struct ResponseStreamTests {
         let third = try await iterator.next()
         let fourth = try await iterator.next()
         
-        // Snapshots contain content and rawContent
         #expect(first?.content == "one")
         #expect(second?.content == "two")
         #expect(third?.content == "three")
@@ -259,7 +228,6 @@ struct ResponseStreamTests {
         
         let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
-        // This test verifies Sendable conformance compiles
         let _: any Sendable = responseStream
         #expect(Bool(true)) // Compilation success
     }

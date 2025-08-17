@@ -1,25 +1,9 @@
-// GeneratedContent.swift (complete zero-based implementation)
-// OpenFoundationModels — Partial JSON parsing with Apple Foundation Models-compatible surface
-//
-// This file provides a full, copy‑pasteable implementation of GeneratedContent that:
-//  - Preserves the public API surface (Kind, init(json:), isComplete, etc.)
-//  - Adds robust, streaming-safe partial JSON extraction starting from Stage 1
-//  - Uses a single internal representation (JSONValue) to avoid double-management bugs
-//
-// NOTE:
-// - If your project already defines `GenerationID`, keep yours and remove the typealias below.
-// - This file references protocols like ConvertibleToGeneratedContent / ConvertibleFromGeneratedContent
-//   that are expected to exist in your project per Apple FM docs.
 
 import Foundation
 
-// MARK: - Optional shim (remove if you already define this)
-// GenerationID is already defined in GenerationID.swift
 
-// MARK: - GeneratedContent
 
-public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertible, Codable {
-    // MARK: Public API — matches Apple FM surface (+ partial case for streaming)
+public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertible, Codable, ConvertibleToGeneratedContent {
     public enum Kind: Sendable, Equatable {
         case null
         case bool(Bool)
@@ -29,17 +13,15 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
         case structure(properties: [String: GeneratedContent], orderedKeys: [String])
     }
 
-    // MARK: Storage
     private struct Storage: Sendable, Equatable {
-        var root: JSONValue?                // present when fully parsed
-        var partialRaw: String?             // raw partial JSON text when not complete
+        var root: JSONValue?
+        var partialRaw: String?
         var isComplete: Bool
         var generationID: GenerationID?
     }
 
     private var storage: Storage
 
-    // MARK: Public properties
     public var id: GenerationID? { storage.generationID }
 
     public var kind: Kind {
@@ -48,17 +30,14 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
             let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
             if t.hasPrefix("{") {
                 let obj = PartialJSON.extractObject(t)
-                // Always return structure, even if empty (for partial JSON)
                 return .structure(properties: obj.properties, orderedKeys: obj.orderedKeys)
             } else if t.hasPrefix("[") {
                 let arr = PartialJSON.extractArray(t)
-                // Always return array, even if empty (for partial JSON)
                 return .array(arr.elements)
             } else {
                 if let scalar = PartialJSON.extractTopLevelScalar(t) {
                     return mapJSONValueToKind(scalar)
                 }
-                // For unparseable partial JSON, return empty string
                 return .string("")
             }
         }
@@ -67,7 +46,6 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
 
     public var isComplete: Bool { storage.isComplete }
 
-    /// JSON string representation. For partial input, returns the raw partial string verbatim.
     public var jsonString: String {
         if let raw = storage.partialRaw { return raw }
         do { return try toJSONString() } catch { return stringValue }
@@ -88,7 +66,6 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
         }
     }
 
-    // MARK: - Public initializers (Apple-compatible)
 
     public init(_ value: some ConvertibleToGeneratedContent) { self = value.generatedContent }
 
@@ -122,43 +99,49 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
         self.storage = Storage(root: Self.mapKindToJSONValue(kind), partialRaw: nil, isComplete: true, generationID: id)
     }
 
-    /// Apple Official: init(json:) throws
-    /// Fully valid JSON → parsed. Otherwise → partial (raw stored) with streaming-safe extraction available.
     public init(json: String) throws {
         let t = json.trimmingCharacters(in: .whitespacesAndNewlines)
-        if t.isEmpty { self.storage = Storage(root: .null, partialRaw: nil, isComplete: true, generationID: nil); return }
-        if let obj = try? JSONSerialization.jsonObject(with: Data(t.utf8)) {
+        if t.isEmpty { 
+            self.storage = Storage(root: .null, partialRaw: nil, isComplete: true, generationID: nil)
+            return 
+        }
+        
+        guard let data = t.data(using: .utf8) else {
+            throw GeneratedContentError.invalidJSON("Invalid UTF-8 encoding")
+        }
+        
+        do {
+            let obj = try JSONSerialization.jsonObject(with: data)
             let root = try Self.decodeJSONObject(obj)
             self.storage = Storage(root: root, partialRaw: nil, isComplete: true, generationID: nil)
-            return
+        } catch {
+            throw GeneratedContentError.invalidJSON("Invalid JSON: \(error.localizedDescription)")
         }
-        // Not fully parseable — keep raw, expose safe prefix via properties()/elements()/kind
-        self.storage = Storage(root: nil, partialRaw: json, isComplete: false, generationID: nil)
     }
 
-    // MARK: - Data access (Apple semantics + partial support)
 
-    /// Reads the properties of a top level object. For partial JSON, returns the subset of properties whose values are safely determined.
     public func properties() throws -> [String: GeneratedContent] {
+        guard storage.isComplete else {
+            throw GeneratedContentError.partialContent
+        }
         switch kind {
         case .structure(let props, _): return props
         default:
-            // Apple spec: Return empty dictionary instead of throwing for non-structure types
-            return [:]
+            throw GeneratedContentError.dictionaryExpected
         }
     }
 
-    /// Reads a top level array of content. For partial JSON, returns only the safely determined leading elements.
     public func elements() throws -> [GeneratedContent] {
+        guard storage.isComplete else {
+            throw GeneratedContentError.partialContent
+        }
         switch kind {
         case .array(let arr): return arr
         default:
-            // Apple spec: Return empty array instead of throwing for non-array types
-            return []
+            throw GeneratedContentError.arrayExpected
         }
     }
 
-    /// Reads a top-level, concrete partially generable type.
     public func value<Value>(_ type: Value.Type = Value.self) throws -> Value where Value: ConvertibleFromGeneratedContent {
         return try Value(self)
     }
@@ -177,7 +160,6 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
         return try Value(c)
     }
 
-    // MARK: - Codable
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -188,7 +170,6 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
         } else if let d = try? container.decode(Double.self) {
             self.storage = Storage(root: .number(d), partialRaw: nil, isComplete: true, generationID: nil)
         } else if let s = try? container.decode(String.self) {
-            // Heuristic: detect partial JSON markers
             let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
             if t.hasPrefix("{") || t.hasPrefix("[") { self.storage = Storage(root: nil, partialRaw: s, isComplete: false, generationID: nil) }
             else { self.storage = Storage(root: .string(s), partialRaw: nil, isComplete: true, generationID: nil) }
@@ -214,14 +195,12 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
         }
     }
 
-    // MARK: - Helpers
 
     internal var stringValue: String {
         switch kind {
         case .null: return "null"
         case .bool(let b): return b ? "true" : "false"
         case .number(let d): 
-            // Display integers without decimal point
             if d.truncatingRemainder(dividingBy: 1) == 0 && d >= Double(Int.min) && d <= Double(Int.max) {
                 return String(Int(d))
             } else {
@@ -238,7 +217,7 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
             switch v {
             case .null: return NSNull()
             case .bool(let b): return b
-            case .number(let d): return d
+            case .number(let d): return NSNumber(value: d)
             case .string(let s): return s
             case .array(let arr): return arr.map { toAny($0) }
             case .object(let dict, _):
@@ -253,7 +232,6 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
     }
 }
 
-// MARK: - Internal single representation
 
 fileprivate enum JSONValue: Sendable, Equatable {
     case null
@@ -267,7 +245,7 @@ fileprivate enum JSONValue: Sendable, Equatable {
 extension GeneratedContent {
     fileprivate func asJSONValue() -> JSONValue {
         if let root = storage.root { return root }
-        switch kind { // use computed kind for partial snapshot
+        switch kind {
         case .null: return .null
         case .bool(let b): return .bool(b)
         case .number(let d): return .number(d)
@@ -305,19 +283,13 @@ extension GeneratedContent {
     }
 }
 
-// MARK: - Full JSON decode
 
 extension GeneratedContent {
     fileprivate static func decodeJSONObject(_ obj: Any) throws -> JSONValue {
         if obj is NSNull { return .null }
-        // NSNumber can represent both booleans and numbers
-        // Check for NSNumber first and determine if it's a boolean
         if let n = obj as? NSNumber {
-            // Check if this NSNumber is actually a boolean
-            // Compare the objCType to determine the actual type
             let objCType = String(cString: n.objCType)
             if objCType == "c" || objCType == "B" {
-                // "c" is for BOOL, "B" is for bool
                 return .bool(n.boolValue)
             } else {
                 return .number(n.doubleValue)
@@ -335,7 +307,6 @@ extension GeneratedContent {
     }
 }
 
-// MARK: - Partial JSON extractor
 
 fileprivate enum PartialJSON {
     struct ObjectResult { let properties: [String: GeneratedContent]; let orderedKeys: [String]; let complete: Bool }
@@ -367,7 +338,6 @@ fileprivate enum PartialJSON {
                 skipWS(json, &i)
                 if peek(json, i) == "," { bump(&i, in: json); continue parseMembers }
                 if peek(json, i) == "}" { complete = true; bump(&i, in: json); break parseMembers }
-                // otherwise: partial tail
                 break parseMembers
             } else {
                 break parseMembers
@@ -394,7 +364,6 @@ fileprivate enum PartialJSON {
                 skipWS(json, &i)
                 if peek(json, i) == "," { bump(&i, in: json); continue parseElems }
                 if peek(json, i) == "]" { complete = true; bump(&i, in: json); break parseElems }
-                // otherwise partial tail
                 break parseElems
             } else {
                 break parseElems
@@ -409,7 +378,6 @@ fileprivate enum PartialJSON {
         return nil
     }
 
-    // MARK: - Scanners
 
     private static func scanValue(_ s: String, _ i: inout String.Index) -> GeneratedContent? {
         skipWS(s, &i)
@@ -431,10 +399,8 @@ fileprivate enum PartialJSON {
             if scanLiteral(s, &i, "null") { return GeneratedContent(kind: .null) }
             return nil
         case "{":
-            // Extract nested object safely
             let start = i
             let obj = extractObject(String(s[start...]))
-            // advance i respecting strings/escapes
             i = advanceOverBalancedObject(s, from: start)
             return GeneratedContent(kind: .structure(properties: obj.properties, orderedKeys: obj.orderedKeys))
         case "[":
@@ -447,7 +413,6 @@ fileprivate enum PartialJSON {
         }
     }
 
-    // String scanner with escape + unicode handling; allowPartial trims to safe prefix
     private static func scanString(_ s: String, _ i: inout String.Index, allowPartial: Bool) -> String? {
         guard peek(s, i) == "\"" else { return nil }
         bump(&i, in: s) // opening quote
@@ -474,8 +439,7 @@ fileprivate enum PartialJSON {
                         let h = s[i]; bump(&i, in: s); hex.append(h)
                     }
                     guard let scalar = UInt32(hex, radix: 16) else { return allowPartial ? out : nil }
-                    if (0xD800...0xDBFF).contains(scalar) { // high surrogate, expect low surrogate
-                        // need \uXXXX next
+                    if (0xD800...0xDBFF).contains(scalar) {
                         let save = i
                         guard i < s.endIndex, s[i] == "\\" else { return allowPartial ? out : nil }
                         bump(&i, in: s)
@@ -506,34 +470,26 @@ fileprivate enum PartialJSON {
         return allowPartial ? out : nil
     }
 
-    // Number scanner that returns the numeric value and the index consumed to a safe prefix
     private static func scanNumberWithSafePrefix(_ s: String, _ start: String.Index) -> (Double, String.Index)? {
         var i = start
         let begin = i
-        // sign
         if peek(s, i) == "-" { bump(&i, in: s) }
-        // int
         guard let d0 = peek(s, i), d0.isDigit else { return nil }
         if d0 == "0" { bump(&i, in: s) } else { while let d = peek(s, i), d.isDigit { bump(&i, in: s) } }
-        // record last valid
         var lastValid = i
-        // frac
         if peek(s, i) == "." {
             let dot = i; bump(&i, in: s)
             guard let d = peek(s, i), d.isDigit else {
-                // rollback to before dot — integer is valid
                 if let val = Double(String(s[begin..<dot])) { return (val, dot) }
                 return nil
             }
             while let d = peek(s, i), d.isDigit { bump(&i, in: s) }
             lastValid = i
         }
-        // exp
         if let e = peek(s, i), e == "e" || e == "E" {
             let epos = i; bump(&i, in: s)
             if let sign = peek(s, i), sign == "+" || sign == "-" { bump(&i, in: s) }
             guard let d = peek(s, i), d.isDigit else {
-                // rollback to lastValid (after fraction if any)
                 if lastValid > begin, let val = Double(String(s[begin..<lastValid])) { return (val, lastValid) }
                 if let val = Double(String(s[begin..<epos])) { return (val, epos) }
                 return nil
@@ -552,14 +508,11 @@ fileprivate enum PartialJSON {
         i = j; return true
     }
 
-    // MARK: - Cursor helpers
 
     private static func peek(_ s: String, _ i: String.Index) -> Character? { i < s.endIndex ? s[i] : nil }
     private static func bump(_ i: inout String.Index, in s: String) { i = s.index(after: i) }
     private static func skipWS(_ s: String, _ i: inout String.Index) { while let c = peek(s, i), c.isJSONWhitespace { bump(&i, in: s) } }
 
-    // Advance over a possibly unbalanced object/array, respecting strings/escapes,
-    // returning the index at closing bracket or end-of-string if partial.
     private static func advanceOverBalancedObject(_ s: String, from: String.Index) -> String.Index {
         var i = from
         var depth = 0
@@ -609,10 +562,8 @@ fileprivate enum PartialJSON {
     }
 }
 
-// MARK: - Completeness check (utility if needed externally)
 
 extension GeneratedContent {
-    /// Fast completeness check for raw JSON text.
     internal static func isJSONComplete(_ json: String) -> Bool {
         var stack: [Character] = []
         var inString = false
@@ -633,7 +584,6 @@ extension GeneratedContent {
     }
 }
 
-// MARK: - Errors
 
 public enum GeneratedContentError: Error, Sendable {
     case invalidSchema
@@ -645,17 +595,15 @@ public enum GeneratedContentError: Error, Sendable {
     case partialContent
 }
 
-// MARK: - Protocol conformances
 
 extension GeneratedContent: ConvertibleFromGeneratedContent {
     public init(_ content: GeneratedContent) throws { self = content }
 }
 
-extension GeneratedContent: ConvertibleToGeneratedContent {
-    public var text: String { stringValue }
+public extension GeneratedContent {
+    var text: String { stringValue }
 }
 
-// MARK: - Character helpers
 
 fileprivate extension Character {
     var isDigit: Bool { ("0"..."9").contains(self) }

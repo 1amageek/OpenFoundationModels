@@ -1,11 +1,6 @@
-// ProtocolExtensions.swift
-// OpenFoundationModelsCore
-//
-// ✅ APPLE OFFICIAL: Protocol conformances
 
 import Foundation
 
-// MARK: - String Conformances
 
 extension String: InstructionsRepresentable {
     public var instructionsRepresentation: Instructions {
@@ -18,8 +13,6 @@ extension String: PromptRepresentable {
         return Prompt(self)
     }
 }
-
-// MARK: - Array Conformances
 
 extension Array: InstructionsRepresentable where Element: InstructionsRepresentable {
     public var instructionsRepresentation: Instructions {
@@ -37,8 +30,6 @@ extension Array: PromptRepresentable where Element: PromptRepresentable {
     }
 }
 
-// MARK: - GeneratedContent Conformances
-
 extension GeneratedContent {
     public var instructionsRepresentation: Instructions {
         return Instructions(self.text)
@@ -48,8 +39,6 @@ extension GeneratedContent {
         return Prompt(self.text)
     }
 }
-
-// MARK: - GenerationID Conformances
 
 extension GenerationID {
     public var instructionsRepresentation: Instructions {

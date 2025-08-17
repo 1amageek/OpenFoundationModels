@@ -1,5 +1,3 @@
-// SimplePartialJSONTest.swift
-// Minimal test case to debug the issue
 
 import Foundation
 import Testing
@@ -13,7 +11,6 @@ struct SimplePartialJSONTest {
         let json = #"{"name": "Al"#
         print("Input JSON: \(json)")
         
-        // Use the throwing JSON initializer
         let content: GeneratedContent
         do {
             content = try GeneratedContent(json: json)

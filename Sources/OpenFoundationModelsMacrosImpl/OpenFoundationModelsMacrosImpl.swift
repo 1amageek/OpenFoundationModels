@@ -1,20 +1,9 @@
-// OpenFoundationModelsMacrosImpl.swift
-// OpenFoundationModels
-//
-// ✅ CONFIRMED: Based on Apple Foundation Models API specification
-
 import SwiftCompilerPlugin
 import SwiftSyntax
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
 import Foundation
 
-/// Implementation of the @Generable macro
-/// 
-/// ✅ CONFIRMED: From Apple Developer Documentation
-/// - Generates Generable protocol conformance
-/// - Creates init(_:) initializer (NOT generationSchema)
-/// - Creates generatedContent property (NOT PartiallyGenerated)
 public struct GenerableMacro: MemberMacro, ExtensionMacro {
     
     public static func expansion(
@@ -24,25 +13,19 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         in context: some MacroExpansionContext
     ) throws -> [DeclSyntax] {
         
-        // Check if it's a struct or enum
         if let structDecl = declaration.as(StructDeclSyntax.self) {
             let structName = structDecl.name.text
             let description = extractDescription(from: node)
             
-            // Get all properties with @Guide annotations
             let properties = extractGuidedProperties(from: structDecl)
             
-            // Generate the required members for struct
             return [
                 generateRawContentProperty(),  // Add property to store original GeneratedContent
                 generateInitFromGeneratedContent(structName: structName, properties: properties),
                 generateGeneratedContentProperty(structName: structName, description: description, properties: properties),
-                // Removed generateFromGeneratedContentMethod and generateToGeneratedContentMethod
-                // as they are not needed with the new protocol design
                 generateGenerationSchemaProperty(structName: structName, description: description, properties: properties),
                 generatePartiallyGeneratedStruct(structName: structName, properties: properties),
                 generateAsPartiallyGeneratedMethod(structName: structName),
-                // Need to generate these properties as they don't have default implementations
                 generateInstructionsRepresentationProperty(),
                 generatePromptRepresentationProperty()
             ]
@@ -50,18 +33,13 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             let enumName = enumDecl.name.text
             let description = extractDescription(from: node)
             
-            // Get all enum cases
             let cases = extractEnumCases(from: enumDecl)
             
-            // Generate the required members for enum
             return [
                 generateEnumInitFromGeneratedContent(enumName: enumName, cases: cases),
                 generateEnumGeneratedContentProperty(enumName: enumName, description: description, cases: cases),
-                // Removed generateEnumFromGeneratedContentMethod and generateToGeneratedContentMethod
-                // as they are not needed with the new protocol design
                 generateEnumGenerationSchemaProperty(enumName: enumName, description: description, cases: cases),
                 generateAsPartiallyGeneratedMethodForEnum(enumName: enumName),
-                // Need to generate these properties as they don't have default implementations
                 generateInstructionsRepresentationProperty(),
                 generatePromptRepresentationProperty()
             ]
@@ -70,7 +48,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         }
     }
     
-    // MARK: - ExtensionMacro Implementation
     
     public static func expansion(
         of node: AttributeSyntax,
@@ -79,7 +56,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         conformingTo protocols: [TypeSyntax],
         in context: some MacroExpansionContext
     ) throws -> [ExtensionDeclSyntax] {
-        // Create extension with Generable conformance
         let extensionDecl = ExtensionDeclSyntax(
             extendedType: type,
             inheritanceClause: InheritanceClauseSyntax(
@@ -98,7 +74,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
     }
     
     
-    // MARK: - Helper Methods
     
     private static func extractDescription(from node: AttributeSyntax) -> String? {
         guard let arguments = node.arguments?.as(LabeledExprListSyntax.self),
@@ -121,7 +96,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                 let propertyName = identifier.identifier.text
                 let propertyType = binding.typeAnnotation?.type.description ?? "String"
                 
-                // Look for @Guide attributes
                 let guideInfo = extractGuideInfo(from: varDecl.attributes)
                 
                 properties.append(PropertyInfo(
@@ -141,7 +115,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         for attribute in attributes {
             if let attr = attribute.as(AttributeSyntax.self),
                attr.attributeName.description == "Guide" {
-                // Extract Guide parameters
                 if let arguments = attr.arguments?.as(LabeledExprListSyntax.self),
                    let descArg = arguments.first,
                    let stringLiteral = descArg.expression.as(StringLiteralExprSyntax.self) {
@@ -150,19 +123,15 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                     var guides: [String] = []
                     var pattern: String? = nil
                     
-                    // Extract additional guides if present
                     for arg in Array(arguments.dropFirst()) {
                         let argText = arg.expression.description
                         
-                        // Check if this is a .pattern(...) constraint
                         if argText.contains(".pattern(") {
-                            // Extract the pattern string from .pattern("regex")
                             let patternRegex = #/\.pattern\(\"([^\"]*)\"\)/#
                             if let match = argText.firstMatch(of: patternRegex) {
                                 pattern = String(match.1)
                             }
                         } else if argText.contains("pattern(") {
-                            // Handle pattern("regex") format
                             let patternRegex = #/pattern\(\"([^\"]*)\"\)/#
                             if let match = argText.firstMatch(of: patternRegex) {
                                 pattern = String(match.1)
@@ -179,21 +148,17 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         return (nil, [], nil)
     }
     
-    /// Get default value for a type
     private static func getDefaultValue(for type: String) -> String {
         let trimmedType = type.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // Check for Optional types (ends with ?)
         if trimmedType.hasSuffix("?") {
             return "nil"
         }
         
-        // Check for Array types (starts with [ and ends with ])
         if trimmedType.hasPrefix("[") && trimmedType.hasSuffix("]") {
             return "[]"
         }
         
-        // Handle basic types
         switch trimmedType {
         case "String":
             return "\"\""
@@ -204,12 +169,10 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         case "Bool":
             return "false"
         default:
-            // For custom types, return nil (will need proper handling in generatePropertyExtraction)
             return "nil"
         }
     }
     
-    /// Generate property assignment from JSON
     private static func generatePropertyAssignment(for property: PropertyInfo) -> String {
         let propertyName = property.name
         let propertyType = property.type.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -231,27 +194,21 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         }
     }
     
-    /// Generate property to store original GeneratedContent
     private static func generateRawContentProperty() -> DeclSyntax {
         return DeclSyntax(stringLiteral: """
         private let _rawGeneratedContent: GeneratedContent
         """)
     }
     
-    /// Generate init(_:) initializer according to Apple specs
     private static func generateInitFromGeneratedContent(structName: String, properties: [PropertyInfo]) -> DeclSyntax {
-        // Generate property extraction code
         let propertyExtractions = properties.map { prop in
             generatePropertyExtraction(propertyName: prop.name, propertyType: prop.type)
         }.joined(separator: "\n            ")
         
         return DeclSyntax(stringLiteral: """
         public init(_ generatedContent: GeneratedContent) throws {
-            // ✅ CONFIRMED: Apple generates init(_:) initializer
-            // Store the original GeneratedContent
             self._rawGeneratedContent = generatedContent
             
-            // Extract properties from GeneratedContent
             let properties = try generatedContent.properties()
             
             \(propertyExtractions)
@@ -259,7 +216,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         """)
     }
     
-    /// Generate property extraction from GeneratedContent properties for partial types
     private static func generatePartialPropertyExtraction(propertyName: String, propertyType: String) -> String {
         switch propertyType {
         case "String", "String?":
@@ -273,7 +229,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         case "Bool", "Bool?":
             return "self.\(propertyName) = try? properties[\"\(propertyName)\"]?.value(Bool.self)"
         default:
-            // For complex types, try to initialize if possible
             return """
             if let value = properties[\"\(propertyName)\"] {
                 self.\(propertyName) = try? \(propertyType)(value)
@@ -284,7 +239,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         }
     }
     
-    /// Generate property extraction from GeneratedContent properties
     private static func generatePropertyExtraction(propertyName: String, propertyType: String) -> String {
         switch propertyType {
         case "String":
@@ -308,13 +262,10 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             self.\(propertyName) = try properties["\(propertyName)"]?.value(Bool.self) ?? false
             """
         default:
-            // For complex types, try to use their init(_:) if they conform to ConvertibleFromGeneratedContent
-            // Check if the type is optional or an array
             let isOptional = propertyType.hasSuffix("?")
             let isArray = propertyType.hasPrefix("[") && propertyType.hasSuffix("]")
             
             if isOptional {
-                // For optional types, can safely use nil
                 return """
                 if let value = properties["\(propertyName)"] {
                     self.\(propertyName) = try \(propertyType.replacingOccurrences(of: "?", with: ""))(value)
@@ -323,7 +274,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                 }
                 """
             } else if isArray {
-                // For array types, use empty array as default
                 return """
                 if let value = properties["\(propertyName)"] {
                     self.\(propertyName) = try \(propertyType)(value)
@@ -332,15 +282,10 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                 }
                 """
             } else {
-                // For non-optional custom types, we need to handle carefully
-                // In PartiallyGenerated context, everything is optional, so this shouldn't happen
-                // But for normal init, we might want to throw an error or use a default constructor
                 return """
                 if let value = properties["\(propertyName)"] {
                     self.\(propertyName) = try \(propertyType)(value)
                 } else {
-                    // For non-optional custom types, attempt default initialization
-                    // This will fail at compile time if no default init exists
                     self.\(propertyName) = try \(propertyType)(GeneratedContent("{}"))
                 }
                 """
@@ -348,25 +293,20 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         }
     }
     
-    /// Generate generatedContent property according to Apple specs
     private static func generateGeneratedContentProperty(structName: String, description: String?, properties: [PropertyInfo]) -> DeclSyntax {
-        // Generate property conversion code for each property
         let propertyConversions = properties.map { prop in
             let propName = prop.name
             let propType = prop.type
             
             if propType.hasSuffix("?") {
-                // Optional property
                 let baseType = String(propType.dropLast()) // Remove "?"
                 if baseType == "String" {
                     return "properties[\"\(propName)\"] = \(propName).map { GeneratedContent($0) } ?? GeneratedContent(kind: .null)"
-                } else if baseType == "Int" || baseType == "Double" || baseType == "Float" || baseType == "Bool" {
-                    return "properties[\"\(propName)\"] = \(propName).map { GeneratedContent(String($0)) } ?? GeneratedContent(kind: .null)"
+                } else if baseType == "Int" || baseType == "Double" || baseType == "Float" || baseType == "Bool" || baseType == "Decimal" {
+                    return "properties[\"\(propName)\"] = \(propName).map { $0.generatedContent } ?? GeneratedContent(kind: .null)"
                 } else if baseType.hasPrefix("[") && baseType.hasSuffix("]") {
-                    // Optional array
                     return "properties[\"\(propName)\"] = \(propName).map { GeneratedContent(elements: $0) } ?? GeneratedContent(kind: .null)"
                 } else {
-                    // Custom optional type - use if-let to avoid ambiguity
                     return """
                     if let value = \(propName) {
                                 properties["\(propName)"] = value.generatedContent
@@ -376,25 +316,21 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                     """
                 }
             } else if propType.hasPrefix("[") && propType.hasSuffix("]") {
-                // Array property
                 let elementType = String(propType.dropFirst().dropLast())
                 if elementType == "String" {
                     return "properties[\"\(propName)\"] = GeneratedContent(elements: \(propName))"
-                } else if elementType == "Int" || elementType == "Double" || elementType == "Bool" || elementType == "Float" {
-                    return "properties[\"\(propName)\"] = GeneratedContent(elements: \(propName).map { String($0) })"
+                } else if elementType == "Int" || elementType == "Double" || elementType == "Bool" || elementType == "Float" || elementType == "Decimal" {
+                    return "properties[\"\(propName)\"] = GeneratedContent(elements: \(propName))"
                 } else {
-                    // Custom type array
                     return "properties[\"\(propName)\"] = GeneratedContent(elements: \(propName))"
                 }
             } else {
-                // Required non-array property
                 switch propType {
                 case "String":
                     return "properties[\"\(propName)\"] = GeneratedContent(\(propName))"
-                case "Int", "Double", "Float", "Bool":
-                    return "properties[\"\(propName)\"] = GeneratedContent(String(\(propName)))"
+                case "Int", "Double", "Float", "Bool", "Decimal":
+                    return "properties[\"\(propName)\"] = \(propName).generatedContent"
                 default:
-                    // Custom type
                     return "properties[\"\(propName)\"] = \(propName).generatedContent"
                 }
             }
@@ -404,8 +340,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         
         return DeclSyntax(stringLiteral: """
         public var generatedContent: GeneratedContent {
-            // ✅ CONFIRMED: Apple generates generatedContent property
-            // Build GeneratedContent from current property values
             var properties: [String: GeneratedContent] = [:]
             \(propertyConversions)
             
@@ -419,17 +353,14 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         """)
     }
     
-    /// Generate from(generatedContent:) static method
     private static func generateFromGeneratedContentMethod(structName: String) -> DeclSyntax {
         return DeclSyntax(stringLiteral: """
         public static func from(generatedContent: GeneratedContent) throws -> \(structName) {
-            // For now, just create with init - proper parsing will be implemented later
             return try \(structName)(generatedContent)
         }
         """)
     }
     
-    /// Generate toGeneratedContent() instance method
     private static func generateToGeneratedContentMethod() -> DeclSyntax {
         return DeclSyntax(stringLiteral: """
         public func toGeneratedContent() -> GeneratedContent {
@@ -438,13 +369,10 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         """)
     }
     
-    /// Generate generationSchema static property
     private static func generateGenerationSchemaProperty(structName: String, description: String?, properties: [PropertyInfo]) -> DeclSyntax {
-        // Generate property definitions for the schema
         let propertyDefinitions = properties.map { prop in
             let descriptionParam = prop.guideDescription.map { "description: \"\($0)\"" } ?? "description: nil"
             
-            // Map Swift types to correct type parameter
             let typeParam: String
             switch prop.type {
             case "String", "String?":
@@ -458,11 +386,9 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             case "Bool", "Bool?":
                 typeParam = "Bool.self"
             default:
-                // For other types, assume they are Generable
                 typeParam = "\(prop.type.replacingOccurrences(of: "?", with: "")).self"
             }
             
-            // Build guides array
             var guides: [String] = []
             if let pattern = prop.pattern {
                 guides.append("try! Regex(\"\(pattern)\")")
@@ -496,51 +422,36 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         """)
     }
     
-    /// Generate asPartiallyGenerated method for structs
     private static func generateAsPartiallyGeneratedMethod(structName: String) -> DeclSyntax {
         return DeclSyntax(stringLiteral: """
         public func asPartiallyGenerated() -> PartiallyGenerated {
-            // Convert this instance to its PartiallyGenerated representation
-            // Use the raw generated content to preserve the original JSON structure
             return try! PartiallyGenerated(self._rawGeneratedContent)
         }
         """)
     }
     
-    /// Generate asPartiallyGenerated method for enums
     private static func generateAsPartiallyGeneratedMethodForEnum(enumName: String) -> DeclSyntax {
         return DeclSyntax(stringLiteral: """
         public func asPartiallyGenerated() -> PartiallyGenerated {
-            // For enums, convert to generatedContent and then to PartiallyGenerated
-            // Enums don't store raw content, so we use the generated representation
             return try! PartiallyGenerated(self.generatedContent)
         }
         """)
     }
     
-    /// Generate PartiallyGenerated nested struct according to Apple specs
     private static func generatePartiallyGeneratedStruct(structName: String, properties: [PropertyInfo]) -> DeclSyntax {
-        // Generate optional properties for partial representation
-        // Avoid double optionals by checking if the type is already optional
         let optionalProperties = properties.map { prop in
             let propertyType = prop.type
-            // Check if the type already ends with ?
             if propertyType.hasSuffix("?") {
-                // Already optional, don't add another ?
                 return "public let \(prop.name): \(propertyType)"
             } else {
-                // Make it optional
                 return "public let \(prop.name): \(propertyType)?"
             }
         }.joined(separator: "\n        ")
         
-        // Generate property extraction from GeneratedContent
         let propertyExtractions = properties.map { prop in
             generatePartialPropertyExtraction(propertyName: prop.name, propertyType: prop.type)
         }.joined(separator: "\n            ")
         
-        // Generate required properties check for isComplete
-        // Only non-optional properties are required
         let requiredProperties = properties.filter { !$0.type.hasSuffix("?") }
         let requiredPropertiesCheck: String
         if requiredProperties.isEmpty {
@@ -551,36 +462,26 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         }
         
         return DeclSyntax(stringLiteral: """
-        /// Partially generated representation for streaming
-        /// ✅ APPLE SPEC: Nested type for streaming support
         public struct PartiallyGenerated: Sendable, ConvertibleFromGeneratedContent, PartiallyGeneratedProtocol {
-            // Optional properties from original struct
             \(optionalProperties)
             
-            // Track completion state
             public let isComplete: Bool
             
-            // Store the raw content
             private let rawContent: GeneratedContent
             
-            /// ConvertibleFromGeneratedContent conformance
             public init(_ generatedContent: GeneratedContent) throws {
                 self.rawContent = generatedContent
                 
-                // Try to extract properties, allowing partial parsing
                 if let properties = try? generatedContent.properties() {
                     \(propertyExtractions)
                     
-                    // Check if JSON is syntactically complete AND all required properties are present
                     self.isComplete = generatedContent.isComplete && \(requiredPropertiesCheck)
                 } else {
-                    // If we can't parse as structure, initialize all as nil
                     \(properties.map { "self.\($0.name) = nil" }.joined(separator: "\n                    "))
                     self.isComplete = false
                 }
             }
             
-            /// ConvertibleToGeneratedContent conformance
             public var generatedContent: GeneratedContent {
                 return rawContent
             }
@@ -588,7 +489,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         """)
     }
     
-    /// Generate instructionsRepresentation property
     private static func generateInstructionsRepresentationProperty() -> DeclSyntax {
         return DeclSyntax(stringLiteral: """
         public var instructionsRepresentation: Instructions {
@@ -597,7 +497,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         """)
     }
     
-    /// Generate promptRepresentation property
     private static func generatePromptRepresentationProperty() -> DeclSyntax {
         return DeclSyntax(stringLiteral: """
         public var promptRepresentation: Prompt {
@@ -606,9 +505,7 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         """)
     }
     
-    // MARK: - Enum Support Methods
     
-    /// Extract enum cases from enum declaration
     private static func extractEnumCases(from enumDecl: EnumDeclSyntax) -> [EnumCaseInfo] {
         var cases: [EnumCaseInfo] = []
         
@@ -618,7 +515,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                     let caseName = element.name.text
                     var associatedValues: [(label: String?, type: String)] = []
                     
-                    // Extract associated values if present
                     if let parameterClause = element.parameterClause {
                         for parameter in parameterClause.parameters {
                             let label = parameter.firstName?.text
@@ -627,7 +523,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                         }
                     }
                     
-                    // Look for @Guide attributes (if supported on enum cases)
                     let guideDescription: String? = nil // Enum cases don't typically have @Guide
                     
                     cases.append(EnumCaseInfo(
@@ -642,33 +537,26 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         return cases
     }
     
-    /// Generate init(_:) for enums
     private static func generateEnumInitFromGeneratedContent(enumName: String, cases: [EnumCaseInfo]) -> DeclSyntax {
         let hasAnyAssociatedValues = cases.contains { $0.hasAssociatedValues }
         
         if hasAnyAssociatedValues {
-            // Mixed enum with associated values - use discriminated union approach
             let switchCases = cases.map { enumCase in
                 if enumCase.associatedValues.isEmpty {
-                    // Simple case
                     return """
                     case "\(enumCase.name)":
                         self = .\(enumCase.name)
                     """
                 } else if enumCase.isSingleUnlabeledValue {
-                    // Single unlabeled associated value: case text(String)
                     let valueType = enumCase.associatedValues[0].type
                     return generateSingleValueCase(caseName: enumCase.name, valueType: valueType)
                 } else {
-                    // Multiple or labeled associated values: case video(url: String, duration: Int)
                     return generateMultipleValueCase(caseName: enumCase.name, associatedValues: enumCase.associatedValues)
                 }
             }.joined(separator: "\n                ")
             
             return DeclSyntax(stringLiteral: """
             public init(_ generatedContent: GeneratedContent) throws {
-                // ✅ CONFIRMED: Apple generates init(_:) initializer for enums with associated values
-                // Parse discriminated union: {"case": "caseName", "value": associatedData}
                 
                 do {
                     let properties = try generatedContent.properties()
@@ -689,7 +577,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                         )
                     }
                 } catch {
-                    // Fallback: try simple string parsing for backward compatibility
                     let value = generatedContent.text.trimmingCharacters(in: .whitespacesAndNewlines)
                     switch value {
                     \(cases.filter { !$0.hasAssociatedValues }.map { "case \"\($0.name)\": self = .\($0.name)" }.joined(separator: "\n                    "))
@@ -702,15 +589,12 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             }
             """)
         } else {
-            // Simple enum cases only (existing logic)
             let switchCases = cases.map { enumCase in
                 "case \"\(enumCase.name)\": self = .\(enumCase.name)"
             }.joined(separator: "\n            ")
             
             return DeclSyntax(stringLiteral: """
             public init(_ generatedContent: GeneratedContent) throws {
-                // ✅ CONFIRMED: Apple generates init(_:) initializer for simple enums
-                // Parse enum case from GeneratedContent string value
                 let value = generatedContent.text.trimmingCharacters(in: .whitespacesAndNewlines)
                 
                 switch value {
@@ -725,7 +609,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         }
     }
     
-    /// Generate switch case for single unlabeled associated value
     private static func generateSingleValueCase(caseName: String, valueType: String) -> String {
         switch valueType {
         case "String":
@@ -769,7 +652,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                 }
             """
         default:
-            // For custom types that conform to ConvertibleFromGeneratedContent
             return """
             case "\(caseName)":
                 if let valueContent = valueContent {
@@ -784,7 +666,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         }
     }
     
-    /// Generate switch case for multiple or labeled associated values
     private static func generateMultipleValueCase(caseName: String, associatedValues: [(label: String?, type: String)]) -> String {
         let valueExtractions = associatedValues.enumerated().map { index, assocValue in
             let label = assocValue.label ?? "param\(index)"
@@ -827,15 +708,12 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         """
     }
     
-    /// Generate generatedContent property for enums
     private static func generateEnumGeneratedContentProperty(enumName: String, description: String?, cases: [EnumCaseInfo]) -> DeclSyntax {
         let hasAnyAssociatedValues = cases.contains { $0.hasAssociatedValues }
         
         if hasAnyAssociatedValues {
-            // Mixed enum with associated values - generate discriminated union
             let switchCases = cases.map { enumCase in
                 if enumCase.associatedValues.isEmpty {
-                    // Simple case
                     return """
                     case .\(enumCase.name):
                         return GeneratedContent(properties: [
@@ -844,7 +722,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                         ])
                     """
                 } else if enumCase.isSingleUnlabeledValue {
-                    // Single unlabeled associated value - store value directly
                     return """
                     case .\\(enumCase.name)(let value):
                         return GeneratedContent(properties: [
@@ -853,30 +730,24 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                         ])
                     """
                 } else {
-                    // Multiple or labeled associated values
                     return generateMultipleValueSerialization(caseName: enumCase.name, associatedValues: enumCase.associatedValues)
                 }
             }.joined(separator: "\n            ")
             
             return DeclSyntax(stringLiteral: """
             public var generatedContent: GeneratedContent {
-                // ✅ CONFIRMED: Apple generates generatedContent property for enums with associated values
-                // Convert enum case to discriminated union: {"case": "caseName", "value": associatedData}
                 switch self {
                 \(switchCases)
                 }
             }
             """)
         } else {
-            // Simple enum cases only (existing logic)
             let switchCases = cases.map { enumCase in
                 "case .\(enumCase.name): return GeneratedContent(\"\(enumCase.name)\")"
             }.joined(separator: "\n            ")
             
             return DeclSyntax(stringLiteral: """
             public var generatedContent: GeneratedContent {
-                // ✅ CONFIRMED: Apple generates generatedContent property for simple enums
-                // Convert enum case to GeneratedContent string representation
                 switch self {
                 \(switchCases)
                 }
@@ -885,7 +756,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         }
     }
     
-    /// Generate serialization for single unlabeled associated value
     private static func generateSingleValueSerialization(caseName: String, valueType: String) -> String {
         switch valueType {
         case "String", "Int", "Double", "Bool":
@@ -897,7 +767,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                 ])
             """
         default:
-            // For custom types that conform to ConvertibleToGeneratedContent
             return """
             case .\(caseName)(let value):
                 return GeneratedContent(properties: [
@@ -908,7 +777,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         }
     }
     
-    /// Generate serialization for multiple or labeled associated values
     private static func generateMultipleValueSerialization(caseName: String, associatedValues: [(label: String?, type: String)]) -> String {
         let parameterList = associatedValues.enumerated().map { index, assocValue in
             let label = assocValue.label ?? "param\(index)"
@@ -938,7 +806,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         """
     }
     
-    /// Generate from(generatedContent:) static method for enums
     private static func generateEnumFromGeneratedContentMethod(enumName: String) -> DeclSyntax {
         return DeclSyntax(stringLiteral: """
         public static func from(generatedContent: GeneratedContent) throws -> \(enumName) {
@@ -947,15 +814,11 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         """)
     }
     
-    /// Generate generationSchema for enums
     private static func generateEnumGenerationSchemaProperty(enumName: String, description: String?, cases: [EnumCaseInfo]) -> DeclSyntax {
         let hasAnyAssociatedValues = cases.contains { $0.hasAssociatedValues }
         
         if hasAnyAssociatedValues {
-            // Mixed enum with both simple and associated value cases
-            // Use object type with discriminated union approach
             
-            // Create properties for discriminated union
             let caseProperty = """
 GenerationSchema.Property(
                         name: "case",
@@ -975,10 +838,7 @@ GenerationSchema.Property(
             
             return DeclSyntax(stringLiteral: """
             public static var generationSchema: GenerationSchema {
-                // ✅ CONFIRMED: Apple generates discriminated union schema for enums with associated values
-                // Each case becomes an object with "case" and "value" properties
                 
-                // Use Self.self directly since the enum already conforms to Generable
                 return GenerationSchema(
                     type: Self.self,
                     description: \(description.map { "\"\($0)\"" } ?? "\"Generated \(enumName)\""),
@@ -990,13 +850,10 @@ GenerationSchema.Property(
             }
             """)
         } else {
-            // Simple enum cases only - use type initializer with anyOf
             let caseNames = cases.map { "\"\($0.name)\"" }.joined(separator: ", ")
             
             return DeclSyntax(stringLiteral: """
             public static var generationSchema: GenerationSchema {
-                // ✅ CONFIRMED: Apple generates generationSchema for simple enums
-                // Use Self.self directly since the enum already conforms to Generable
                 
                 return GenerationSchema(
                     type: Self.self,
@@ -1011,11 +868,6 @@ GenerationSchema.Property(
     
 }
 
-/// Implementation of the @Guide macro
-/// 
-/// ✅ CONFIRMED: From Apple Developer Documentation
-/// - @attached(peer) - attaches to properties
-/// - Provides generation guidance for properties
 public struct GuideMacro: PeerMacro {
     
     public static func expansion(
@@ -1023,13 +875,10 @@ public struct GuideMacro: PeerMacro {
         providingPeersOf declaration: some DeclSyntaxProtocol,
         in context: some MacroExpansionContext
     ) throws -> [DeclSyntax] {
-        // @Guide is metadata-only - no code generation needed
-        // The GenerableMacro reads these attributes to generate schema
         return []
     }
 }
 
-// MARK: - Supporting Types
 
 struct PropertyInfo {
     let name: String
@@ -1044,7 +893,6 @@ struct EnumCaseInfo {
     let associatedValues: [(label: String?, type: String)]
     let guideDescription: String?
     
-    // Associated values support helpers
     var hasAssociatedValues: Bool { 
         !associatedValues.isEmpty 
     }
@@ -1075,7 +923,6 @@ enum MacroError: Error, CustomStringConvertible {
     }
 }
 
-// MARK: - Compiler Plugin
 
 @main
 struct OpenFoundationModelsMacrosPlugin: CompilerPlugin {

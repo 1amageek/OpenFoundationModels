@@ -2,24 +2,11 @@ import Testing
 import Foundation
 @testable import OpenFoundationModels
 
-/// Tests for streaming integration workflows
-/// 
-/// **Focus:** Validates full streaming pipeline validation including ResponseStream,
-/// partial response handling, error propagation, and complete workflows that integrate
-/// multiple components according to Apple's Foundation Models specification.
-///
-/// **Apple Foundation Models Documentation:**
-/// Streaming integration tests validate the complete pipeline from initiation through
-/// progressive partial updates to final completion, ensuring robust error handling
-/// and proper resource management throughout the streaming lifecycle.
-///
-/// **Reference:** https://developer.apple.com/documentation/foundationmodels/responsestream
 @Suite("Streaming Integration Tests", .tags(.streaming, .integration, .core))
 struct StreamingIntegrationTests {
     
     @Test("Complete streaming lifecycle with String content")
     func completeStreamingLifecycleString() async throws {
-        // Test complete streaming workflow with String content
         let expectedValues = ["Hello", "Hello, world", "Hello, world!"]
         var valueIndex = 0
         
@@ -36,7 +23,6 @@ struct StreamingIntegrationTests {
         
         let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
-        // Test iteration through complete lifecycle
         for try await snapshot in responseStream {
             #expect(snapshot.content == expectedValues[valueIndex])
             valueIndex += 1
@@ -74,22 +60,18 @@ struct StreamingIntegrationTests {
         let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         var receivedValues: [String] = []
         
-        // Test early termination when isComplete is reached
         for try await snapshot in responseStream {
             receivedValues.append(snapshot.content)
-            // For String streaming, we need a different completion strategy
             if snapshot.content == "complete" {
                 break
             }
         }
         
-        // Should have stopped at "complete", not processed "after complete"
         #expect(receivedValues == ["partial1", "partial2", "complete"])
     }
     
     @Test("Concurrent streaming operations")
     func concurrentStreamingOperations() async throws {
-        // Test multiple concurrent streaming operations
         func createStringStream(identifier: String, count: Int) -> LanguageModelSession.ResponseStream<String> {
             let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
                 for i in 0..<count {
@@ -107,7 +89,6 @@ struct StreamingIntegrationTests {
         let stream1 = createStringStream(identifier: "A", count: 3)
         let stream2 = createStringStream(identifier: "B", count: 2)
         
-        // Test concurrent collection
         async let result1 = stream1.collect()
         async let result2 = stream2.collect()
         
@@ -140,7 +121,6 @@ struct StreamingIntegrationTests {
         let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         var successfulPartials: [String] = []
         
-        // Test error propagation preserves successful partials
         do {
             for try await snapshot in responseStream {
                 successfulPartials.append(snapshot.content)
@@ -149,7 +129,6 @@ struct StreamingIntegrationTests {
         } catch let error as GenerationError {
             #expect(successfulPartials == ["success1", "success2"])
             if case .rateLimited = error {
-                // Expected error type
             } else {
                 #expect(Bool(false), "Wrong error type")
             }
@@ -158,17 +137,14 @@ struct StreamingIntegrationTests {
     
     @Test("Streaming with timeout behavior simulation")
     func streamingWithTimeoutBehaviorSimulation() async throws {
-        // Simulate timeout scenario with delayed streaming
         let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
             Task {
-                // Immediate first partial
                 let snapshot1 = LanguageModelSession.ResponseStream<String>.Snapshot(
                     content: "immediate",
                     rawContent: GeneratedContent("immediate")
                 )
                 continuation.yield(snapshot1)
                 
-                // Simulated delay
                 try await Task.sleep(nanoseconds: 10_000_000) // 10ms
                 let snapshot2 = LanguageModelSession.ResponseStream<String>.Snapshot(
                     content: "delayed",
@@ -176,7 +152,6 @@ struct StreamingIntegrationTests {
                 )
                 continuation.yield(snapshot2)
                 
-                // Final completion
                 let snapshot3 = LanguageModelSession.ResponseStream<String>.Snapshot(
                     content: "final",
                     rawContent: GeneratedContent("final")
@@ -194,7 +169,6 @@ struct StreamingIntegrationTests {
         for try await snapshot in responseStream {
             timestamps.append(Date())
             contents.append(snapshot.content)
-            // Check for final content
             if snapshot.content == "final" {
                 break
             }
@@ -203,7 +177,6 @@ struct StreamingIntegrationTests {
         #expect(contents == ["immediate", "delayed", "final"])
         #expect(timestamps.count == 3)
         
-        // Verify timing (immediate should be much faster than delayed)
         let immediateTime = timestamps[0].timeIntervalSince(startTime)
         let delayedTime = timestamps[1].timeIntervalSince(startTime)
         #expect(delayedTime > immediateTime)
@@ -231,7 +204,6 @@ struct StreamingIntegrationTests {
         
         let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
-        // Collect all partials manually 
         var allPartials: [String] = []
         for try await snapshot in responseStream {
             allPartials.append(snapshot.content)
@@ -267,7 +239,6 @@ struct StreamingIntegrationTests {
         
         let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
-        // Test that empty content is handled correctly
         let finalResponse = try await responseStream.collect()
         #expect(finalResponse.content == "") // Last complete value was empty
     }
@@ -295,14 +266,12 @@ struct StreamingIntegrationTests {
         
         let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
-        // Test multiple iterators (though they'll share the same underlying stream)
         var iterator1 = responseStream.makeAsyncIterator()
         var iterator2 = responseStream.makeAsyncIterator()
         
         let first1 = try await iterator1.next()
         let first2 = try await iterator2.next()
         
-        // Both should get the first element (or subsequent elements)
         #expect(first1 != nil)
         #expect(first2 != nil)
     }
@@ -320,7 +289,6 @@ struct StreamingIntegrationTests {
         
         let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
-        // Test Sendable conformance in Task context
         let result = await withTaskGroup(of: String.self) { group in
             group.addTask {
                 do {
