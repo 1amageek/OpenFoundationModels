@@ -1,9 +1,26 @@
 import Foundation
 import OpenFoundationModelsCore
 
+// MARK: - Optional PartiallyGenerated
+
 extension Optional where Wrapped: Generable {
     public typealias PartiallyGenerated = Wrapped.PartiallyGenerated
 }
+
+// MARK: - ConvertibleFromGeneratedContent
+
+extension Optional: ConvertibleFromGeneratedContent where Wrapped: ConvertibleFromGeneratedContent {
+    public init(_ content: GeneratedContent) throws {
+        switch content.kind {
+        case .null:
+            self = .none
+        default:
+            self = .some(try Wrapped(content))
+        }
+    }
+}
+
+// MARK: - ConvertibleToGeneratedContent
 
 extension Optional: ConvertibleToGeneratedContent where Wrapped: ConvertibleToGeneratedContent {
     public var generatedContent: GeneratedContent {
@@ -16,6 +33,8 @@ extension Optional: ConvertibleToGeneratedContent where Wrapped: ConvertibleToGe
     }
 }
 
+// MARK: - PromptRepresentable
+
 extension Optional: PromptRepresentable where Wrapped: ConvertibleToGeneratedContent {
     public var promptRepresentation: Prompt {
         switch self {
@@ -26,6 +45,8 @@ extension Optional: PromptRepresentable where Wrapped: ConvertibleToGeneratedCon
         }
     }
 }
+
+// MARK: - InstructionsRepresentable
 
 extension Optional: InstructionsRepresentable where Wrapped: ConvertibleToGeneratedContent {
     public var instructionsRepresentation: Instructions {
