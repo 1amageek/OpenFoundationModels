@@ -118,6 +118,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         _isResponding = true
         defer { _isResponding = false }
         
+        // Add prompt to transcript
         let promptEntry = Transcript.Entry.prompt(
             Transcript.Prompt(
                 id: UUID().uuidString,
@@ -130,30 +131,48 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         entries.append(promptEntry)
         _transcript = Transcript(entries: entries)
         
-        let content = try await model.generate(
+        // Get response from model (model handles tool execution if needed)
+        let entry = try await model.generate(
             transcript: _transcript,
             options: options
         )
-        let responseEntry = Transcript.Entry.response(
-            Transcript.Response(
-                id: UUID().uuidString,
-                assetIDs: [],
-                segments: [.text(Transcript.TextSegment(id: UUID().uuidString, content: content))]
-            )
-        )
         
+        // Add entry to transcript
         var transcriptEntries = _transcript.entries
-        transcriptEntries.append(responseEntry)
+        transcriptEntries.append(entry)
         _transcript = Transcript(entries: transcriptEntries)
         
-        let recentEntries = Array(_transcript.entries.suffix(2))
-        let entriesSlice = ArraySlice(recentEntries)
-        
-        return Response(
-            content: content,
-            rawContent: GeneratedContent(content),
-            transcriptEntries: entriesSlice
-        )
+        // Extract content based on entry type
+        switch entry {
+        case .response(let response):
+            // Extract text content from response
+            let content = response.segments.compactMap { segment -> String? in
+                switch segment {
+                case .text(let textSegment):
+                    return textSegment.content
+                case .structure(let structuredSegment):
+                    return structuredSegment.content.text
+                }
+            }.joined()
+            
+            let recentEntries = Array(_transcript.entries.suffix(2))
+            let entriesSlice = ArraySlice(recentEntries)
+            
+            return Response(
+                content: content,
+                rawContent: GeneratedContent(content),
+                transcriptEntries: entriesSlice
+            )
+            
+        default:
+            // Model returned non-response entry (toolCalls, etc.)
+            // This shouldn't happen as model should handle tool execution internally
+            throw GenerationError.decodingFailure(
+                GenerationError.Context(
+                    debugDescription: "Model returned non-response entry: \(entry). Model should handle tool execution internally."
+                )
+            )
+        }
     }
     
     
@@ -199,6 +218,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         _isResponding = true
         defer { _isResponding = false }
         
+        // Add prompt to transcript
         let promptEntry = Transcript.Entry.prompt(
             Transcript.Prompt(
                 id: UUID().uuidString,
@@ -211,35 +231,56 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         entries.append(promptEntry)
         _transcript = Transcript(entries: entries)
         
-        let text = try await model.generate(
+        // Get response from model
+        let entry = try await model.generate(
             transcript: _transcript,
             options: options
         )
-        let content = GeneratedContent(text)
-        let responseEntry = Transcript.Entry.response(
-            Transcript.Response(
-                id: UUID().uuidString,
-                assetIDs: [],
-                segments: [.structure(Transcript.StructuredSegment(
-                    id: UUID().uuidString,
-                    source: "model",
-                    content: content
-                ))]
-            )
-        )
         
+        // Add entry to transcript
         var transcriptEntries = _transcript.entries
-        transcriptEntries.append(responseEntry)
+        transcriptEntries.append(entry)
         _transcript = Transcript(entries: transcriptEntries)
         
-        let recentEntries = Array(_transcript.entries.suffix(2))
-        let entriesSlice = ArraySlice(recentEntries)
-        
-        return Response(
-            content: content,
-            rawContent: content,
-            transcriptEntries: entriesSlice
-        )
+        // Extract content based on entry type
+        switch entry {
+        case .response(let response):
+            // Extract structured content from response
+            var content: GeneratedContent?
+            for segment in response.segments {
+                if case .structure(let structuredSegment) = segment {
+                    content = structuredSegment.content
+                    break
+                } else if case .text(let textSegment) = segment {
+                    // Try to parse text as JSON
+                    content = try? GeneratedContent(json: textSegment.content)
+                }
+            }
+            
+            guard let finalContent = content else {
+                throw GenerationError.decodingFailure(
+                    GenerationError.Context(
+                        debugDescription: "Failed to extract structured content from response"
+                    )
+                )
+            }
+            
+            let recentEntries = Array(_transcript.entries.suffix(2))
+            let entriesSlice = ArraySlice(recentEntries)
+            
+            return Response(
+                content: finalContent,
+                rawContent: finalContent,
+                transcriptEntries: entriesSlice
+            )
+            
+        default:
+            throw GenerationError.decodingFailure(
+                GenerationError.Context(
+                    debugDescription: "Model returned non-response entry: \(entry). Model should handle tool execution internally."
+                )
+            )
+        }
     }
     
     
@@ -285,6 +326,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         _isResponding = true
         defer { _isResponding = false }
         
+        // Add prompt to transcript
         let promptEntry = Transcript.Entry.prompt(
             Transcript.Prompt(
                 id: UUID().uuidString,
@@ -297,36 +339,58 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         entries.append(promptEntry)
         _transcript = Transcript(entries: entries)
         
-        let text = try await model.generate(
+        // Get response from model
+        let entry = try await model.generate(
             transcript: _transcript,
             options: options
         )
-        let generatedContent = GeneratedContent(text)
-        let content = try Content(generatedContent)
-        let responseEntry = Transcript.Entry.response(
-            Transcript.Response(
-                id: UUID().uuidString,
-                assetIDs: [],
-                segments: [.structure(Transcript.StructuredSegment(
-                    id: UUID().uuidString,
-                    source: "model",
-                    content: generatedContent
-                ))]
-            )
-        )
         
+        // Add entry to transcript
         var transcriptEntries = _transcript.entries
-        transcriptEntries.append(responseEntry)
+        transcriptEntries.append(entry)
         _transcript = Transcript(entries: transcriptEntries)
         
-        let recentEntries = Array(_transcript.entries.suffix(2))
-        let entriesSlice = ArraySlice(recentEntries)
-        
-        return Response(
-            content: content,
-            rawContent: generatedContent,
-            transcriptEntries: entriesSlice
-        )
+        // Extract content based on entry type
+        switch entry {
+        case .response(let response):
+            // Extract structured content from response
+            var generatedContent: GeneratedContent?
+            for segment in response.segments {
+                if case .structure(let structuredSegment) = segment {
+                    generatedContent = structuredSegment.content
+                    break
+                } else if case .text(let textSegment) = segment {
+                    // Try to parse text as JSON
+                    generatedContent = try? GeneratedContent(json: textSegment.content)
+                }
+            }
+            
+            guard let finalContent = generatedContent else {
+                throw GenerationError.decodingFailure(
+                    GenerationError.Context(
+                        debugDescription: "Failed to extract structured content from response"
+                    )
+                )
+            }
+            
+            let content = try Content(finalContent)
+            
+            let recentEntries = Array(_transcript.entries.suffix(2))
+            let entriesSlice = ArraySlice(recentEntries)
+            
+            return Response(
+                content: content,
+                rawContent: finalContent,
+                transcriptEntries: entriesSlice
+            )
+            
+        default:
+            throw GenerationError.decodingFailure(
+                GenerationError.Context(
+                    debugDescription: "Model returned non-response entry: \(entry). Model should handle tool execution internally."
+                )
+            )
+        }
     }
     
     
@@ -368,32 +432,45 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 _isResponding = true
                 defer { _isResponding = false }
                 
-                let stringStream = model.stream(
+                let entryStream = model.stream(
                     transcript: _transcript,
                     options: options
                 )
                 var accumulatedContent = ""
+                var finalEntry: Transcript.Entry?
                 
-                for await chunk in stringStream {
-                    accumulatedContent += chunk
-                    let snapshot = ResponseStream<String>.Snapshot(
-                        content: accumulatedContent,
-                        rawContent: GeneratedContent(accumulatedContent)
-                    )
-                    continuation.yield(snapshot)
+                for await entry in entryStream {
+                    // Handle streaming entries
+                    switch entry {
+                    case .response(let response):
+                        // Extract text from response segments
+                        for segment in response.segments {
+                            switch segment {
+                            case .text(let textSegment):
+                                accumulatedContent += textSegment.content
+                            case .structure(let structuredSegment):
+                                accumulatedContent += structuredSegment.content.text
+                            }
+                        }
+                        
+                        let snapshot = ResponseStream<String>.Snapshot(
+                            content: accumulatedContent,
+                            rawContent: GeneratedContent(accumulatedContent)
+                        )
+                        continuation.yield(snapshot)
+                        finalEntry = entry
+                        
+                    default:
+                        // For non-response entries during streaming, store but don't yield
+                        finalEntry = entry
+                    }
                 }
                 
-                if !accumulatedContent.isEmpty {
-                    let responseEntry = Transcript.Entry.response(
-                        Transcript.Response(
-                            id: UUID().uuidString,
-                            assetIDs: [],
-                            segments: [.text(Transcript.TextSegment(id: UUID().uuidString, content: accumulatedContent))]
-                        )
-                    )
+                // Add final entry to transcript
+                if let finalEntry = finalEntry {
                     var transcriptEntries = _transcript.entries
-        transcriptEntries.append(responseEntry)
-        _transcript = Transcript(entries: transcriptEntries)
+                    transcriptEntries.append(finalEntry)
+                    _transcript = Transcript(entries: transcriptEntries)
                 }
                 
                 continuation.finish()
@@ -457,37 +534,48 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         entries.append(promptEntry)
         _transcript = Transcript(entries: entries)
                 
-                let stringStream = model.stream(
+                let entryStream = model.stream(
                     transcript: _transcript,
                     options: options
                 )
-                var accumulatedText = ""
+                var accumulatedContent: GeneratedContent?
+                var finalEntry: Transcript.Entry?
                 
-                for await chunk in stringStream {
-                    accumulatedText += chunk
-                    let partialContent = GeneratedContent(accumulatedText)
-                    let snapshot = ResponseStream<GeneratedContent>.Snapshot(
-                        content: partialContent,
-                        rawContent: partialContent
-                    )
-                    continuation.yield(snapshot)
+                for await entry in entryStream {
+                    switch entry {
+                    case .response(let response):
+                        // Extract structured content from response
+                        for segment in response.segments {
+                            if case .structure(let structuredSegment) = segment {
+                                accumulatedContent = structuredSegment.content
+                            } else if case .text(let textSegment) = segment {
+                                // Try to parse as JSON or use as is
+                                accumulatedContent = try? GeneratedContent(json: textSegment.content)
+                                if accumulatedContent == nil {
+                                    accumulatedContent = GeneratedContent(textSegment.content)
+                                }
+                            }
+                        }
+                        
+                        if let content = accumulatedContent {
+                            let snapshot = ResponseStream<GeneratedContent>.Snapshot(
+                                content: content,
+                                rawContent: content
+                            )
+                            continuation.yield(snapshot)
+                        }
+                        finalEntry = entry
+                        
+                    default:
+                        finalEntry = entry
+                    }
                 }
                 
-                if !accumulatedText.isEmpty {
-                    let responseEntry = Transcript.Entry.response(
-                        Transcript.Response(
-                            id: UUID().uuidString,
-                            assetIDs: [],
-                            segments: [.structure(Transcript.StructuredSegment(
-                                id: UUID().uuidString,
-                                source: "model",
-                                content: GeneratedContent(accumulatedText)
-                            ))]
-                        )
-                    )
+                // Add final entry to transcript
+                if let finalEntry = finalEntry {
                     var transcriptEntries = _transcript.entries
-        transcriptEntries.append(responseEntry)
-        _transcript = Transcript(entries: transcriptEntries)
+                    transcriptEntries.append(finalEntry)
+                    _transcript = Transcript(entries: transcriptEntries)
                 }
                 
                 continuation.finish()
@@ -553,33 +641,61 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         entries.append(promptEntry)
         _transcript = Transcript(entries: entries)
                 
-                let stringStream = model.stream(
+                let entryStream = model.stream(
                     transcript: _transcript,
                     options: options
                 )
-                var accumulatedText = ""
+                var accumulatedContent: GeneratedContent?
+                var finalEntry: Transcript.Entry?
                 
-                for await chunk in stringStream {
-                    accumulatedText += chunk
-                    let generatedContent = GeneratedContent(accumulatedText)
-                    
-                    if let partialData = try? PartialContent(generatedContent) {
-                        if PartialContent.self == Content.self {
-                            let snapshot = ResponseStream<Content>.Snapshot(
-                                content: partialData as! Content,
-                                rawContent: generatedContent
-                            )
-                            continuation.yield(snapshot)
-                        } else {
-                            if let convertedContent = try? Content(generatedContent) {
-                                let snapshot = ResponseStream<Content>.Snapshot(
-                                    content: convertedContent,
-                                    rawContent: generatedContent
-                                )
-                                continuation.yield(snapshot)
+                for await entry in entryStream {
+                    switch entry {
+                    case .response(let response):
+                        // Extract structured content from response
+                        for segment in response.segments {
+                            if case .structure(let structuredSegment) = segment {
+                                accumulatedContent = structuredSegment.content
+                            } else if case .text(let textSegment) = segment {
+                                // Try to parse as JSON
+                                accumulatedContent = try? GeneratedContent(json: textSegment.content)
+                                if accumulatedContent == nil {
+                                    accumulatedContent = GeneratedContent(textSegment.content)
+                                }
                             }
                         }
+                        
+                        if let generatedContent = accumulatedContent {
+                            // Try to parse as PartialContent first
+                            if let partialData = try? PartialContent(generatedContent) {
+                                if PartialContent.self == Content.self {
+                                    let snapshot = ResponseStream<Content>.Snapshot(
+                                        content: partialData as! Content,
+                                        rawContent: generatedContent
+                                    )
+                                    continuation.yield(snapshot)
+                                } else {
+                                    if let convertedContent = try? Content(generatedContent) {
+                                        let snapshot = ResponseStream<Content>.Snapshot(
+                                            content: convertedContent,
+                                            rawContent: generatedContent
+                                        )
+                                        continuation.yield(snapshot)
+                                    }
+                                }
+                            }
+                        }
+                        finalEntry = entry
+                        
+                    default:
+                        finalEntry = entry
                     }
+                }
+                
+                // Add final entry to transcript
+                if let finalEntry = finalEntry {
+                    var transcriptEntries = _transcript.entries
+                    transcriptEntries.append(finalEntry)
+                    _transcript = Transcript(entries: transcriptEntries)
                 }
                 
                 continuation.finish()
