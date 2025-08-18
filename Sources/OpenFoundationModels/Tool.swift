@@ -2,9 +2,9 @@ import Foundation
 import OpenFoundationModelsCore
 
 public protocol Tool<Arguments, Output>: Sendable {
-    associatedtype Output: PromptRepresentable & Sendable
+    associatedtype Output: PromptRepresentable
     
-    associatedtype Arguments: ConvertibleFromGeneratedContent & Sendable
+    associatedtype Arguments: ConvertibleFromGeneratedContent
     
     var name: String { get }
     
@@ -30,18 +30,5 @@ extension Tool {
 extension Tool where Self.Arguments: Generable {
     public var parameters: GenerationSchema {
         return Arguments.generationSchema
-    }
-}
-
-extension Tool {
-    public var parameters: GenerationSchema {
-        if let generableType = Arguments.self as? any Generable.Type {
-            return generableType.generationSchema
-        }
-        return GenerationSchema(
-            type: GeneratedContent.self,
-            description: "Tool arguments for \(name)",
-            properties: []
-        )
     }
 }

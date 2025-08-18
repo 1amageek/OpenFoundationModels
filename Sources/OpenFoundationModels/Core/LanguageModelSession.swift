@@ -131,47 +131,52 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         entries.append(promptEntry)
         _transcript = Transcript(entries: entries)
         
-        // Get response from model (model handles tool execution if needed)
-        let entry = try await model.generate(
-            transcript: _transcript,
-            options: options
-        )
-        
-        // Add entry to transcript
-        var transcriptEntries = _transcript.entries
-        transcriptEntries.append(entry)
-        _transcript = Transcript(entries: transcriptEntries)
-        
-        // Extract content based on entry type
-        switch entry {
-        case .response(let response):
-            // Extract text content from response
-            let content = response.segments.compactMap { segment -> String? in
-                switch segment {
-                case .text(let textSegment):
-                    return textSegment.content
-                case .structure(let structuredSegment):
-                    return structuredSegment.content.text
-                }
-            }.joined()
-            
-            let recentEntries = Array(_transcript.entries.suffix(2))
-            let entriesSlice = ArraySlice(recentEntries)
-            
-            return Response(
-                content: content,
-                rawContent: GeneratedContent(content),
-                transcriptEntries: entriesSlice
+        // Tool execution loop - continue until we get a response entry
+        while true {
+            // Get entry from model
+            let entry = try await model.generate(
+                transcript: _transcript,
+                options: options
             )
             
-        default:
-            // Model returned non-response entry (toolCalls, etc.)
-            // This shouldn't happen as model should handle tool execution internally
-            throw GenerationError.decodingFailure(
-                GenerationError.Context(
-                    debugDescription: "Model returned non-response entry: \(entry). Model should handle tool execution internally."
+            // Add entry to transcript
+            var transcriptEntries = _transcript.entries
+            transcriptEntries.append(entry)
+            _transcript = Transcript(entries: transcriptEntries)
+            
+            switch entry {
+            case .toolCalls(let toolCalls):
+                // Execute tools and continue loop
+                try await executeAllToolCalls(toolCalls)
+                continue
+                
+            case .response(let response):
+                // Final response - extract content and return
+                let content = response.segments.compactMap { segment -> String? in
+                    switch segment {
+                    case .text(let textSegment):
+                        return textSegment.content
+                    case .structure(let structuredSegment):
+                        return structuredSegment.content.text
+                    }
+                }.joined()
+                
+                let recentEntries = Array(_transcript.entries.suffix(2))
+                let entriesSlice = ArraySlice(recentEntries)
+                
+                return Response(
+                    content: content,
+                    rawContent: GeneratedContent(content),
+                    transcriptEntries: entriesSlice
                 )
-            )
+                
+            default:
+                throw GenerationError.unexpectedEntryType(
+                    GenerationError.Context(
+                        debugDescription: "Unexpected entry type: \(entry)"
+                    )
+                )
+            }
         }
     }
     
@@ -231,55 +236,62 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         entries.append(promptEntry)
         _transcript = Transcript(entries: entries)
         
-        // Get response from model
-        let entry = try await model.generate(
-            transcript: _transcript,
-            options: options
-        )
-        
-        // Add entry to transcript
-        var transcriptEntries = _transcript.entries
-        transcriptEntries.append(entry)
-        _transcript = Transcript(entries: transcriptEntries)
-        
-        // Extract content based on entry type
-        switch entry {
-        case .response(let response):
-            // Extract structured content from response
-            var content: GeneratedContent?
-            for segment in response.segments {
-                if case .structure(let structuredSegment) = segment {
-                    content = structuredSegment.content
-                    break
-                } else if case .text(let textSegment) = segment {
-                    // Try to parse text as JSON
-                    content = try? GeneratedContent(json: textSegment.content)
-                }
-            }
+        // Tool execution loop - continue until we get a response entry
+        while true {
+            // Get entry from model
+            let entry = try await model.generate(
+                transcript: _transcript,
+                options: options
+            )
             
-            guard let finalContent = content else {
-                throw GenerationError.decodingFailure(
+            // Add entry to transcript
+            var transcriptEntries = _transcript.entries
+            transcriptEntries.append(entry)
+            _transcript = Transcript(entries: transcriptEntries)
+            
+            switch entry {
+            case .toolCalls(let toolCalls):
+                // Execute tools and continue loop
+                try await executeAllToolCalls(toolCalls)
+                continue
+                
+            case .response(let response):
+                // Final response - extract structured content and return
+                var content: GeneratedContent?
+                for segment in response.segments {
+                    if case .structure(let structuredSegment) = segment {
+                        content = structuredSegment.content
+                        break
+                    } else if case .text(let textSegment) = segment {
+                        // Try to parse text as JSON
+                        content = try? GeneratedContent(json: textSegment.content)
+                    }
+                }
+                
+                guard let finalContent = content else {
+                    throw GenerationError.decodingFailure(
+                        GenerationError.Context(
+                            debugDescription: "Failed to extract structured content from response"
+                        )
+                    )
+                }
+                
+                let recentEntries = Array(_transcript.entries.suffix(2))
+                let entriesSlice = ArraySlice(recentEntries)
+                
+                return Response(
+                    content: finalContent,
+                    rawContent: finalContent,
+                    transcriptEntries: entriesSlice
+                )
+                
+            default:
+                throw GenerationError.unexpectedEntryType(
                     GenerationError.Context(
-                        debugDescription: "Failed to extract structured content from response"
+                        debugDescription: "Unexpected entry type: \(entry)"
                     )
                 )
             }
-            
-            let recentEntries = Array(_transcript.entries.suffix(2))
-            let entriesSlice = ArraySlice(recentEntries)
-            
-            return Response(
-                content: finalContent,
-                rawContent: finalContent,
-                transcriptEntries: entriesSlice
-            )
-            
-        default:
-            throw GenerationError.decodingFailure(
-                GenerationError.Context(
-                    debugDescription: "Model returned non-response entry: \(entry). Model should handle tool execution internally."
-                )
-            )
         }
     }
     
@@ -339,57 +351,64 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         entries.append(promptEntry)
         _transcript = Transcript(entries: entries)
         
-        // Get response from model
-        let entry = try await model.generate(
-            transcript: _transcript,
-            options: options
-        )
-        
-        // Add entry to transcript
-        var transcriptEntries = _transcript.entries
-        transcriptEntries.append(entry)
-        _transcript = Transcript(entries: transcriptEntries)
-        
-        // Extract content based on entry type
-        switch entry {
-        case .response(let response):
-            // Extract structured content from response
-            var generatedContent: GeneratedContent?
-            for segment in response.segments {
-                if case .structure(let structuredSegment) = segment {
-                    generatedContent = structuredSegment.content
-                    break
-                } else if case .text(let textSegment) = segment {
-                    // Try to parse text as JSON
-                    generatedContent = try? GeneratedContent(json: textSegment.content)
-                }
-            }
+        // Tool execution loop - continue until we get a response entry
+        while true {
+            // Get entry from model
+            let entry = try await model.generate(
+                transcript: _transcript,
+                options: options
+            )
             
-            guard let finalContent = generatedContent else {
-                throw GenerationError.decodingFailure(
+            // Add entry to transcript
+            var transcriptEntries = _transcript.entries
+            transcriptEntries.append(entry)
+            _transcript = Transcript(entries: transcriptEntries)
+            
+            switch entry {
+            case .toolCalls(let toolCalls):
+                // Execute tools and continue loop
+                try await executeAllToolCalls(toolCalls)
+                continue
+                
+            case .response(let response):
+                // Final response - extract structured content and return
+                var generatedContent: GeneratedContent?
+                for segment in response.segments {
+                    if case .structure(let structuredSegment) = segment {
+                        generatedContent = structuredSegment.content
+                        break
+                    } else if case .text(let textSegment) = segment {
+                        // Try to parse text as JSON
+                        generatedContent = try? GeneratedContent(json: textSegment.content)
+                    }
+                }
+                
+                guard let finalContent = generatedContent else {
+                    throw GenerationError.decodingFailure(
+                        GenerationError.Context(
+                            debugDescription: "Failed to extract structured content from response"
+                        )
+                    )
+                }
+                
+                let content = try Content(finalContent)
+                
+                let recentEntries = Array(_transcript.entries.suffix(2))
+                let entriesSlice = ArraySlice(recentEntries)
+                
+                return Response(
+                    content: content,
+                    rawContent: finalContent,
+                    transcriptEntries: entriesSlice
+                )
+                
+            default:
+                throw GenerationError.unexpectedEntryType(
                     GenerationError.Context(
-                        debugDescription: "Failed to extract structured content from response"
+                        debugDescription: "Unexpected entry type: \(entry)"
                     )
                 )
             }
-            
-            let content = try Content(finalContent)
-            
-            let recentEntries = Array(_transcript.entries.suffix(2))
-            let entriesSlice = ArraySlice(recentEntries)
-            
-            return Response(
-                content: content,
-                rawContent: finalContent,
-                transcriptEntries: entriesSlice
-            )
-            
-        default:
-            throw GenerationError.decodingFailure(
-                GenerationError.Context(
-                    debugDescription: "Model returned non-response entry: \(entry). Model should handle tool execution internally."
-                )
-            )
         }
     }
     
@@ -432,48 +451,84 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 _isResponding = true
                 defer { _isResponding = false }
                 
-                let entryStream = model.stream(
-                    transcript: _transcript,
-                    options: options
-                )
                 var accumulatedContent = ""
-                var finalEntry: Transcript.Entry?
                 
-                for await entry in entryStream {
-                    // Handle streaming entries
-                    switch entry {
-                    case .response(let response):
-                        // Extract text from response segments
-                        for segment in response.segments {
-                            switch segment {
-                            case .text(let textSegment):
-                                accumulatedContent += textSegment.content
-                            case .structure(let structuredSegment):
-                                accumulatedContent += structuredSegment.content.text
+                // Tool execution loop - continue until we get a response entry
+                while true {
+                    let entryStream = model.stream(
+                        transcript: _transcript,
+                        options: options
+                    )
+                    var currentEntry: Transcript.Entry?
+                    
+                    // Process streaming entries
+                    for await entry in entryStream {
+                        currentEntry = entry
+                        
+                        switch entry {
+                        case .response(let response):
+                            // Extract text from response segments and yield
+                            for segment in response.segments {
+                                switch segment {
+                                case .text(let textSegment):
+                                    accumulatedContent += textSegment.content
+                                case .structure(let structuredSegment):
+                                    accumulatedContent += structuredSegment.content.text
+                                }
                             }
+                            
+                            let snapshot = ResponseStream<String>.Snapshot(
+                                content: accumulatedContent,
+                                rawContent: GeneratedContent(accumulatedContent)
+                            )
+                            continuation.yield(snapshot)
+                            
+                        case .toolCalls:
+                            // For toolCalls, optionally yield intermediate state
+                            let snapshot = ResponseStream<String>.Snapshot(
+                                content: accumulatedContent,
+                                rawContent: GeneratedContent(accumulatedContent)
+                            )
+                            continuation.yield(snapshot)
+                            
+                        default:
+                            // Other entries are stored but not yielded
+                            break
                         }
+                    }
+                    
+                    // Add entry to transcript and handle based on type
+                    if let finalEntry = currentEntry {
+                        var transcriptEntries = _transcript.entries
+                        transcriptEntries.append(finalEntry)
+                        _transcript = Transcript(entries: transcriptEntries)
                         
-                        let snapshot = ResponseStream<String>.Snapshot(
-                            content: accumulatedContent,
-                            rawContent: GeneratedContent(accumulatedContent)
-                        )
-                        continuation.yield(snapshot)
-                        finalEntry = entry
-                        
-                    default:
-                        // For non-response entries during streaming, store but don't yield
-                        finalEntry = entry
+                        switch finalEntry {
+                        case .toolCalls(let toolCalls):
+                            // Execute tools and continue loop
+                            do {
+                                try await executeAllToolCalls(toolCalls)
+                                continue // Continue to next iteration
+                            } catch {
+                                continuation.finish(throwing: error)
+                                return
+                            }
+                            
+                        case .response:
+                            // Final response received - end streaming
+                            continuation.finish()
+                            return
+                            
+                        default:
+                            continuation.finish(throwing: GenerationError.unexpectedEntryType(
+                                GenerationError.Context(
+                                    debugDescription: "Unexpected entry type during streaming: \(finalEntry)"
+                                )
+                            ))
+                            return
+                        }
                     }
                 }
-                
-                // Add final entry to transcript
-                if let finalEntry = finalEntry {
-                    var transcriptEntries = _transcript.entries
-                    transcriptEntries.append(finalEntry)
-                    _transcript = Transcript(entries: transcriptEntries)
-                }
-                
-                continuation.finish()
             }
         }
         
@@ -706,6 +761,62 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
     }
     
     
+    // MARK: - Tool Execution
+    
+    private func executeAllToolCalls(_ toolCalls: Transcript.ToolCalls) async throws {
+        for toolCall in toolCalls {
+            let output = try await executeToolCall(toolCall)
+            
+            // Add tool output to transcript
+            let outputEntry = Transcript.Entry.toolOutput(
+                Transcript.ToolOutput(
+                    id: UUID().uuidString,
+                    toolName: toolCall.toolName,
+                    segments: [.text(Transcript.TextSegment(
+                        id: UUID().uuidString,
+                        content: output
+                    ))]
+                )
+            )
+            
+            var entries = _transcript.entries
+            entries.append(outputEntry)
+            _transcript = Transcript(entries: entries)
+        }
+    }
+    
+    private func executeToolCall(_ toolCall: Transcript.ToolCall) async throws -> String {
+        // Find the tool instance from available tools
+        guard let tool = self.tools.first(where: { $0.name == toolCall.toolName }) else {
+            throw GenerationError.toolNotFound(
+                toolCall.toolName,
+                GenerationError.Context(
+                    debugDescription: "Tool '\(toolCall.toolName)' not found in available tools"
+                )
+            )
+        }
+        
+        do {
+            // Use a helper method that can handle the existential type
+            return try await executeToolWithHelper(tool, arguments: toolCall.arguments)
+            
+        } catch {
+            throw GenerationError.toolExecutionFailed(
+                toolCall.toolName,
+                error,
+                GenerationError.Context(
+                    debugDescription: "Failed to execute tool '\(toolCall.toolName)': \(error.localizedDescription)"
+                )
+            )
+        }
+    }
+    
+    private func executeToolWithHelper<T: Tool>(_ tool: T, arguments: GeneratedContent) async throws -> String {
+        let typedArguments = try T.Arguments(arguments)
+        let output = try await tool.call(arguments: typedArguments)
+        return output.promptRepresentation.description
+    }
+    
     @discardableResult
     public final func logFeedbackAttachment(
         sentiment: LanguageModelFeedback.Sentiment?,
@@ -877,6 +988,12 @@ extension LanguageModelSession {
         
         case refusal(Refusal, Context)
         
+        case toolNotFound(String, Context)
+        
+        case toolExecutionFailed(String, Error, Context)
+        
+        case unexpectedEntryType(Context)
+        
         public var errorDescription: String? {
             switch self {
             case .exceededContextWindowSize(let context):
@@ -897,6 +1014,12 @@ extension LanguageModelSession {
                 return "Concurrent requests: \(context.debugDescription)"
             case .refusal(_, let context):
                 return "Model refusal: \(context.debugDescription)"
+            case .toolNotFound(let toolName, let context):
+                return "Tool not found: '\(toolName)' - \(context.debugDescription)"
+            case .toolExecutionFailed(let toolName, let error, let context):
+                return "Tool execution failed: '\(toolName)' - \(error.localizedDescription) - \(context.debugDescription)"
+            case .unexpectedEntryType(let context):
+                return "Unexpected entry type: \(context.debugDescription)"
             }
         }
         
@@ -920,6 +1043,12 @@ extension LanguageModelSession {
                 return "Wait for the current request to complete before making another."
             case .refusal:
                 return "Modify your request to comply with model guidelines."
+            case .toolNotFound:
+                return "Ensure the tool is included in the session's tools array."
+            case .toolExecutionFailed:
+                return "Check the tool arguments and implementation for errors."
+            case .unexpectedEntryType:
+                return "This is likely an internal error - please report if persistent."
             }
         }
         
