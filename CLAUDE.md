@@ -2,6 +2,28 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ CRITICAL: Apple API Compliance
+
+**THIS IS THE HIGHEST PRIORITY REQUIREMENT:**
+
+This project MUST maintain 100% compatibility with Apple Foundation Models β SDK. Any deviation from Apple's official API specification is STRICTLY PROHIBITED.
+
+### Mandatory Compliance Rules:
+
+1. **NEVER modify or deviate from Apple's API signatures** - All public methods, properties, and protocol requirements must match Apple's specification exactly
+2. **NEVER add custom extensions to Apple's core protocols** unless explicitly documented in Apple's API
+3. **NEVER change the behavior of Apple's defined types** - Implementations must behave identically to Apple's specification
+4. **ALWAYS verify against Apple's documentation** before making any changes to public APIs
+5. **ALWAYS maintain exact type signatures** including generics, associated types, and protocol conformances
+6. **NEVER introduce breaking changes** to existing Apple-compatible code
+
+### When implementing:
+- Check Apple's Foundation Models documentation first
+- Ensure all public APIs match Apple's specification exactly
+- Internal implementation details can vary, but public interface MUST be identical
+- If Apple's behavior is unclear, prefer the most conservative interpretation
+
+**Violations of Apple API compatibility are considered critical bugs and must be fixed immediately.**
 
 ## Project Overview
 **100% Apple Foundation Models β SDK Compatible Implementation**

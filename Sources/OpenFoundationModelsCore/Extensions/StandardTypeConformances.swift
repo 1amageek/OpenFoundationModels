@@ -1,5 +1,26 @@
 import Foundation
-import OpenFoundationModelsCore
+
+// MARK: - String Conformance
+
+extension String: Generable {
+    public static var generationSchema: GenerationSchema {
+        return GenerationSchema(
+            type: String.self,
+            description: "Text content",
+            properties: []
+        )
+    }
+    
+    public init(_ content: GeneratedContent) throws {
+        self = content.text
+    }
+    
+    public var generatedContent: GeneratedContent {
+        return GeneratedContent(kind: .string(self))
+    }
+}
+
+// MARK: - Bool Conformance
 
 extension Bool: Generable {
     public static var generationSchema: GenerationSchema {
@@ -44,8 +65,9 @@ extension Bool: Generable {
     public var generatedContent: GeneratedContent {
         return GeneratedContent(kind: .bool(self))
     }
-    
 }
+
+// MARK: - Int Conformance
 
 extension Int: Generable {
     public static var generationSchema: GenerationSchema {
@@ -94,6 +116,8 @@ extension Int: Generable {
     }
 }
 
+// MARK: - Float Conformance
+
 extension Float: Generable {
     public static var generationSchema: GenerationSchema {
         return GenerationSchema(
@@ -131,8 +155,9 @@ extension Float: Generable {
     public var generatedContent: GeneratedContent {
         return GeneratedContent(kind: .number(Double(self)))
     }
-    
 }
+
+// MARK: - Double Conformance
 
 extension Double: Generable {
     public static var generationSchema: GenerationSchema {
@@ -171,8 +196,9 @@ extension Double: Generable {
     public var generatedContent: GeneratedContent {
         return GeneratedContent(kind: .number(self))
     }
-    
 }
+
+// MARK: - Decimal Conformance
 
 extension Decimal: Generable {
     public static var generationSchema: GenerationSchema {
@@ -211,8 +237,9 @@ extension Decimal: Generable {
     public var generatedContent: GeneratedContent {
         return GeneratedContent(kind: .number(NSDecimalNumber(decimal: self).doubleValue))
     }
-    
 }
+
+// MARK: - UUID Conformance
 
 extension UUID: Generable {
     public static var generationSchema: GenerationSchema {
@@ -240,8 +267,9 @@ extension UUID: Generable {
     public var generatedContent: GeneratedContent {
         return GeneratedContent(kind: .string(self.uuidString))
     }
-    
 }
+
+// MARK: - Date Conformance
 
 extension Date: Generable {
     private static func createISO8601Formatter(withFractionalSeconds: Bool = true) -> ISO8601DateFormatter {
@@ -289,8 +317,9 @@ extension Date: Generable {
         let formatter = Self.createISO8601Formatter(withFractionalSeconds: true)
         return GeneratedContent(kind: .string(formatter.string(from: self)))
     }
-    
 }
+
+// MARK: - URL Conformance
 
 extension URL: Generable {
     public static var generationSchema: GenerationSchema {
@@ -318,8 +347,9 @@ extension URL: Generable {
     public var generatedContent: GeneratedContent {
         return GeneratedContent(kind: .string(self.absoluteString))
     }
-    
 }
+
+// MARK: - Never Conformance
 
 extension Never: Generable {
     public static var generationSchema: GenerationSchema {
@@ -342,5 +372,4 @@ extension Never: Generable {
     public var generatedContent: GeneratedContent {
         fatalError("Never has no instances")
     }
-    
 }

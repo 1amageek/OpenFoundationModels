@@ -67,8 +67,10 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
     }
 
 
-    public init(_ value: some ConvertibleToGeneratedContent) { self = value.generatedContent }
-
+    public init(_ value: some ConvertibleToGeneratedContent) { 
+        self = value.generatedContent 
+    }
+    
     public init(_ value: some ConvertibleToGeneratedContent, id: GenerationID) {
         self = value.generatedContent
         self.storage.generationID = id

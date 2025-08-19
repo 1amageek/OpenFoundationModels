@@ -1,25 +1,6 @@
 import Foundation
-import OpenFoundationModelsCore
 
-extension String: Generable {
-    public static var generationSchema: GenerationSchema {
-        return GenerationSchema(
-            type: String.self,
-            description: "Text content",
-            properties: []
-        )
-    }
-    
-    public init(_ content: GeneratedContent) throws {
-        self = content.text
-    }
-    
-    public var generatedContent: GeneratedContent {
-        return GeneratedContent(kind: .string(self))
-    }
-}
-
-// GeneratedContent already conforms to Generable in OpenFoundationModelsCore
+// MARK: - Array Generable Conformance
 
 extension Array: Generable where Element: Generable {
     
@@ -41,12 +22,16 @@ extension Array: Generable where Element: Generable {
     }
 }
 
+// MARK: - Array ConvertibleToGeneratedContent
+
 extension Array: ConvertibleToGeneratedContent where Element: ConvertibleToGeneratedContent {
     public var generatedContent: GeneratedContent {
         let elements = self.map { $0.generatedContent }
         return GeneratedContent(kind: .array(elements))
     }
 }
+
+// MARK: - Array ConvertibleFromGeneratedContent
 
 extension Array: ConvertibleFromGeneratedContent where Element: ConvertibleFromGeneratedContent {
     public init(_ content: GeneratedContent) throws {

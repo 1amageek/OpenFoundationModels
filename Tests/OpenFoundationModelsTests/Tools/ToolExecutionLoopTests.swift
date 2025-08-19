@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import OpenFoundationModels
+import OpenFoundationModelsMacros
 
 @Suite("Tool Execution Loop Tests")
 struct ToolExecutionLoopTests {
@@ -10,12 +11,9 @@ struct ToolExecutionLoopTests {
     struct WeatherTool: Tool {
         let description = "Get weather information for a city"
         
-        struct Arguments: ConvertibleFromGeneratedContent {
+        @Generable
+        struct Arguments {
             let city: String
-            
-            init(_ content: GeneratedContent) throws {
-                self.city = content.text
-            }
         }
         
         typealias Output = String
@@ -28,12 +26,9 @@ struct ToolExecutionLoopTests {
     struct CalculatorTool: Tool {
         let description = "Perform mathematical calculations"
         
-        struct Arguments: ConvertibleFromGeneratedContent {
+        @Generable
+        struct Arguments {
             let expression: String
-            
-            init(_ content: GeneratedContent) throws {
-                self.expression = content.text
-            }
         }
         
         typealias Output = String
@@ -49,8 +44,9 @@ struct ToolExecutionLoopTests {
     struct FailingTool: Tool {
         let description = "A tool that always fails"
         
-        struct Arguments: ConvertibleFromGeneratedContent {
-            init(_ content: GeneratedContent) throws {}
+        @Generable
+        struct Arguments {
+            // Empty arguments for failing tool
         }
         
         typealias Output = String
@@ -107,10 +103,22 @@ struct ToolExecutionLoopTests {
     // MARK: - Helper Methods
     
     private func createToolCall(toolName: String, arguments: String) -> Transcript.ToolCall {
+        // For @Generable structs with properties, we need dictionary format
+        let argsContent: GeneratedContent
+        if toolName == "WeatherTool" {
+            argsContent = GeneratedContent(properties: ["city": arguments])
+        } else if toolName == "CalculatorTool" {
+            argsContent = GeneratedContent(properties: ["expression": arguments])
+        } else if toolName == "FailingTool" {
+            argsContent = GeneratedContent(properties: [:])
+        } else {
+            argsContent = GeneratedContent(arguments)
+        }
+        
         return Transcript.ToolCall(
             id: UUID().uuidString,
             toolName: toolName,
-            arguments: GeneratedContent(arguments)
+            arguments: argsContent
         )
     }
     
@@ -317,14 +325,16 @@ struct ToolExecutionLoopTests {
     
     // MARK: - Structured Generation Tests
     
+    // Move WeatherResult outside of test function
+    @Generable
+    struct WeatherResult {
+        let city: String
+        let temperature: Int
+        let condition: String
+    }
+    
     @Test("Tool execution with schema generation")
     func toolExecutionWithSchemaGeneration() async throws {
-        struct WeatherResult: Generable {
-            let city: String
-            let temperature: Int
-            let condition: String
-        }
-        
         let weatherCall = createToolCall(toolName: "WeatherTool", arguments: "Tokyo")
         let toolCallsEntry = createToolCallsEntry(calls: [weatherCall])
         
@@ -336,7 +346,7 @@ struct ToolExecutionLoopTests {
                 segments: [.structure(Transcript.StructuredSegment(
                     id: UUID().uuidString,
                     source: "model",
-                    content: GeneratedContent(json: #"{"city":"Tokyo","temperature":22,"condition":"sunny"}"#)!
+                    content: try GeneratedContent(json: #"{"city":"Tokyo","temperature":22,"condition":"sunny"}"#)
                 ))]
             )
         )

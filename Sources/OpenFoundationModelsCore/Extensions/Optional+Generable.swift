@@ -1,10 +1,26 @@
 import Foundation
-import OpenFoundationModelsCore
 
-// MARK: - Optional PartiallyGenerated
+// MARK: - Optional Generable Conformance
 
-extension Optional where Wrapped: Generable {
+extension Optional: Generable where Wrapped: Generable {
     public typealias PartiallyGenerated = Wrapped.PartiallyGenerated
+    
+    public static var generationSchema: GenerationSchema {
+        return GenerationSchema(
+            type: Optional<Wrapped>.self,
+            description: "Optional \(String(describing: Wrapped.self))",
+            properties: []
+        )
+    }
+    
+    public func asPartiallyGenerated() -> PartiallyGenerated {
+        switch self {
+        case .none:
+            fatalError("Cannot convert nil to PartiallyGenerated")
+        case .some(let wrapped):
+            return wrapped.asPartiallyGenerated()
+        }
+    }
 }
 
 // MARK: - ConvertibleFromGeneratedContent

@@ -62,6 +62,7 @@ internal enum SchemaCompatibility {
                     reason: "Array maximum elements mismatch: expected \(currentMax ?? -1), got \(savedMax ?? -1)"
                 )
             }
+            // Compare array element schemas
             try compareSchemas(
                 current: currentOf,
                 saved: savedOf,
@@ -106,6 +107,7 @@ internal enum SchemaCompatibility {
             )
             
         case (.anyOf(let currentSchemas), .anyOf(let savedSchemas)):
+            // AnyOf schemas are now directly DynamicGenerationSchema
             try compareAnyOfSchemas(
                 current: currentSchemas,
                 saved: savedSchemas,
@@ -157,6 +159,7 @@ internal enum SchemaCompatibility {
                 )
             }
             
+            // Compare property schemas
             try compareSchemas(
                 current: currentProp.schema,
                 saved: savedProp.schema,

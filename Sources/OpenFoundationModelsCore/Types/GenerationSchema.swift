@@ -3,26 +3,25 @@ import Foundation
 public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible {
     private let schemaType: SchemaType
     private let _description: String?
-    private indirect enum SchemaType: Sendable {
-        case object(properties: [GenerationSchema.Property])
-        case enumeration(values: [String])
-        case dynamic(root: DynamicGenerationSchema, dependencies: [DynamicGenerationSchema])
-        case array(items: GenerationSchema?)
-        case primitive(type: String)
+    
+    // MARK: - Nested Types
+    
+    internal indirect enum SchemaType: Sendable {
+        case object(properties: [PropertyInfo])
+        case array(element: SchemaType, minItems: Int?, maxItems: Int?)
+        case anyOf([SchemaType])
+        case generic(type: any Generable.Type, guides: [AnyGenerationGuide])
     }
+    
+    internal struct PropertyInfo: Sendable {
+        let name: String
+        let description: String?
+        let type: SchemaType
+        let isOptional: Bool
+    }
+    
     internal var type: String {
-        switch schemaType {
-        case .object:
-            return "object"
-        case .enumeration:
-            return "string"
-        case .dynamic:
-            return "object"
-        case .array:
-            return "array"
-        case .primitive(type: let type):
-            return type
-        }
+        return schemaType.jsonSchemaType
     }
     
     internal var description: String? {
@@ -45,76 +44,145 @@ public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible 
         self._description = description
         
         if type == "object" {
-            let props: [GenerationSchema.Property] = (properties ?? [:]).map { (name, schema) in
-                let isOptional = !(required?.contains(name) ?? false)
-                return GenerationSchema.Property(
+            let propInfos = (properties ?? [:]).map { (name, schema) in
+                return PropertyInfo(
                     name: name,
                     description: schema._description,
-                    type: String.self, // Default type, as we can't infer the actual type
-                    guides: [],
-                    regexPatterns: [],
-                    isOptional: isOptional
+                    type: schema.schemaType,
+                    isOptional: false  // Default to required for JSON parsing
                 )
             }.sorted { $0.name < $1.name }
-            self.schemaType = .object(properties: props)
+            self.schemaType = .object(properties: propInfos)
         } else if type == "array" {
-            self.schemaType = .array(items: items)
-        } else if type == "string" && !anyOf.isEmpty {
-            let values = anyOf.compactMap { schema -> String? in
-                return nil // Simplified for now
+            if let items = items {
+                self.schemaType = .array(element: items.schemaType, minItems: nil, maxItems: nil)
+            } else {
+                self.schemaType = .array(element: .generic(type: String.self, guides: []), minItems: nil, maxItems: nil)
             }
-            self.schemaType = .enumeration(values: values)
+        } else if type == "string" && !anyOf.isEmpty {
+            let schemas = anyOf.map { $0.schemaType }
+            self.schemaType = .anyOf(schemas)
         } else {
-            self.schemaType = .primitive(type: type)
+            // Infer Generable type from primitive type string
+            let generableType: any Generable.Type = switch type {
+            case "string": String.self
+            case "integer": Int.self
+            case "number": Double.self
+            case "boolean": Bool.self
+            default: String.self
+            }
+            self.schemaType = .generic(type: generableType, guides: [])
         }
     }
     
     
     public init(root: DynamicGenerationSchema, dependencies: [DynamicGenerationSchema]) throws {
-        self.schemaType = .dynamic(root: root, dependencies: dependencies)
-        self._description = nil
+        self._description = root.description
+        
+        // Create dependency map for easier lookup
+        let dependencyMap = Dictionary(uniqueKeysWithValues: dependencies.map { ($0.name, $0) })
+        
+        // Fully resolve all references at initialization
+        self.schemaType = try Self.resolve(root.schemaType, dependencies: dependencyMap)
+    }
+    
+    private static func resolve(
+        _ dynamicType: DynamicGenerationSchema.SchemaType,
+        dependencies: [String: DynamicGenerationSchema],
+        visitedRefs: Set<String> = []
+    ) throws -> GenerationSchema.SchemaType {
+        switch dynamicType {
+        case .object(let properties):
+            // Resolve all properties
+            let resolvedProps = try properties.map { prop in
+                PropertyInfo(
+                    name: prop.name,
+                    description: prop.description,
+                    type: try resolve(prop.schema.schemaType, dependencies: dependencies, visitedRefs: visitedRefs),
+                    isOptional: prop.isOptional
+                )
+            }
+            return .object(properties: resolvedProps)
+            
+        case .array(let element, let minItems, let maxItems):
+            // Resolve array element
+            let resolvedElement = try resolve(element.schemaType, dependencies: dependencies, visitedRefs: visitedRefs)
+            return .array(element: resolvedElement, minItems: minItems, maxItems: maxItems)
+            
+        case .reference(let name):
+            // Check for circular reference
+            guard !visitedRefs.contains(name) else {
+                throw SchemaError.undefinedReferences(
+                    schema: name,
+                    references: [name],
+                    context: SchemaError.Context(debugDescription: "Circular reference detected: \(name)")
+                )
+            }
+            
+            // Find the referenced schema
+            guard let referenced = dependencies[name] else {
+                throw SchemaError.undefinedReferences(
+                    schema: name,
+                    references: [name],
+                    context: SchemaError.Context(debugDescription: "Reference '\(name)' not found in dependencies")
+                )
+            }
+            
+            // Recursively resolve the referenced schema
+            var newVisited = visitedRefs
+            newVisited.insert(name)
+            return try resolve(referenced.schemaType, dependencies: dependencies, visitedRefs: newVisited)
+            
+        case .anyOf(let schemas):
+            // Resolve all schemas in anyOf
+            let resolved = try schemas.map { schema in
+                try resolve(schema.schemaType, dependencies: dependencies, visitedRefs: visitedRefs)
+            }
+            return .anyOf(resolved)
+            
+        case .generic(let type, let guides):
+            // Generic types are already resolved
+            return .generic(type: type, guides: guides)
+        }
     }
     
     public init(type: any Generable.Type, description: String? = nil, anyOf choices: [String]) {
-        self.schemaType = .enumeration(values: choices)
+        // Create anyOf with string constants
+        let schemas = choices.map { choice in
+            SchemaType.generic(
+                type: String.self,
+                guides: [AnyGenerationGuide(GenerationGuide<String>.constant(choice))]
+            )
+        }
+        self.schemaType = .anyOf(schemas)
         self._description = description
     }
     
     public init(type: any Generable.Type, description: String? = nil, properties: [GenerationSchema.Property]) {
         // Check if this is a standard primitive type with empty properties
         if properties.isEmpty {
-            let typeName = String(describing: type)
-            if typeName == "String" {
-                self.schemaType = .primitive(type: "string")
-            } else if typeName == "Int" {
-                self.schemaType = .primitive(type: "integer")
-            } else if typeName == "Double" || typeName == "Float" {
-                self.schemaType = .primitive(type: "number")
-            } else if typeName == "Bool" {
-                self.schemaType = .primitive(type: "boolean")
-            } else if typeName == "Decimal" {
-                self.schemaType = .primitive(type: "number")
-            } else if typeName == "UUID" {
-                self.schemaType = .primitive(type: "string")
-            } else if typeName == "Date" {
-                self.schemaType = .primitive(type: "string")
-            } else if typeName == "URL" {
-                self.schemaType = .primitive(type: "string")
-            } else {
-                // Default to object for unknown types with empty properties
-                self.schemaType = .object(properties: properties)
-            }
+            self.schemaType = .generic(type: type, guides: [])
         } else {
-            self.schemaType = .object(properties: properties)
+            // Convert Property to PropertyInfo
+            let propInfos = properties.map { prop in
+                PropertyInfo(
+                    name: prop.name,
+                    description: prop.description,
+                    type: .generic(type: prop.type, guides: prop.guides),
+                    isOptional: SchemaType.isOptionalType(prop.type)
+                )
+            }
+            self.schemaType = .object(properties: propInfos)
         }
         self._description = description
     }
     
     public init(type: any Generable.Type, description: String? = nil, anyOf types: [any Generable.Type]) {
-        // For union types, we store them as enumeration with type names for now
-        // This is a simplified implementation - a full implementation would need more complex handling
-        let typeNames = types.map { String(describing: $0) }
-        self.schemaType = .enumeration(values: typeNames)
+        // For union types, create schemas for each type
+        let schemas = types.map { genType in
+            SchemaType.generic(type: genType, guides: [])
+        }
+        self.schemaType = .anyOf(schemas)
         self._description = description
     }
     
@@ -124,154 +192,51 @@ public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible 
     }
     
     
+    
     public var debugDescription: String {
         switch schemaType {
         case .object(let properties):
-            let propList = properties.map { "\($0.name): \($0.type)" }.joined(separator: ", ")
+            let propList = properties.map { "\($0.name)" }.joined(separator: ", ")
             return "GenerationSchema(object: [\(propList)])"
-        case .enumeration(let values):
-            return "GenerationSchema(enum: \(values))"
-        case .dynamic(_, let dependencies):
-            return "GenerationSchema(dynamic: root + \(dependencies.count) dependencies)"
-        case .array(let items):
-            if let items = items {
-                return "GenerationSchema(array of: \(items.debugDescription))"
-            } else {
-                return "GenerationSchema(array)"
+        case .anyOf(let schemas):
+            // Check if this is a simple enum (all string constants)
+            var isEnum = true
+            for schema in schemas {
+                if case .generic(let type, let guides) = schema {
+                    if type != String.self || guides.isEmpty {
+                        isEnum = false
+                        break
+                    }
+                } else {
+                    isEnum = false
+                    break
+                }
             }
-        case .primitive(type: let type):
-            return "GenerationSchema(\(type))"
+            if isEnum {
+                return "GenerationSchema(enum: \(schemas.count) values)"
+            }
+            return "GenerationSchema(anyOf: \(schemas.count) schemas)"
+        case .array(let element, let minItems, let maxItems):
+            var desc = "GenerationSchema(array"
+            desc += " of: \(element)"
+            if let min = minItems {
+                desc += ", min: \(min)"
+            }
+            if let max = maxItems {
+                desc += ", max: \(max)"
+            }
+            desc += ")"
+            return desc
+        case .generic(let type, _):
+            return "GenerationSchema(\(String(describing: type)))"
         }
     }
     
     internal func toSchemaDictionary() -> [String: Any] {
-        switch schemaType {
-        case .object(let properties):
-            var schema: [String: Any] = [
-                "type": "object"
-            ]
-            
-            if let description = _description {
-                schema["description"] = description
-            }
-            
-            if !properties.isEmpty {
-                var propertiesDict: [String: Any] = [:]
-                var requiredFields: [String] = []
-                
-                for property in properties {
-                    var propertySchema: [String: Any] = [
-                        "type": mapPropertyType(property.typeDescription)
-                    ]
-                    
-                    if !property.propertyDescription.isEmpty {
-                        propertySchema["description"] = property.propertyDescription
-                    }
-                    
-                    if property.type == String.self && !property.regexPatterns.isEmpty {
-                        if let lastRegex = property.regexPatterns.last {
-                            propertySchema["pattern"] = String(describing: lastRegex)
-                        }
-                    }
-                    
-                    for guide in property.guides {
-                        applyGuide(guide, to: &propertySchema)
-                    }
-                    
-                    propertiesDict[property.name] = propertySchema
-                    if !property.isOptional {
-                        requiredFields.append(property.name)
-                    }
-                }
-                
-                schema["properties"] = propertiesDict
-                if !requiredFields.isEmpty {
-                    schema["required"] = requiredFields
-                }
-            }
-            
-            return schema
-            
-        case .enumeration(let values):
-            var schema: [String: Any] = [
-                "type": "string",
-                "enum": values
-            ]
-            
-            if let description = _description {
-                schema["description"] = description
-            }
-            
-            return schema
-            
-        case .dynamic(_, _):
-            var schema: [String: Any] = [
-                "type": "object"
-            ]
-            
-            if let description = _description {
-                schema["description"] = description
-            }
-            
-            return schema
-            
-        case .array(let items):
-            var schema: [String: Any] = [
-                "type": "array"
-            ]
-            if let description = _description {
-                schema["description"] = description
-            }
-            if let items = items {
-                schema["items"] = items.toSchemaDictionary()
-            }
-            return schema
-            
-        case .primitive(type: let type):
-            var schema: [String: Any] = [
-                "type": type
-            ]
-            if let description = _description {
-                schema["description"] = description
-            }
-            return schema
-        }
+        return schemaType.toJSONSchema(description: _description)
     }
     
-    private func mapPropertyType(_ type: String) -> String {
-        // Handle Optional types by extracting the wrapped type
-        let cleanType = type
-            .replacingOccurrences(of: "Optional<", with: "")
-            .replacingOccurrences(of: ">", with: "")
-            .replacingOccurrences(of: "?", with: "")
-            .lowercased()
-        
-        switch cleanType {
-        case "string":
-            return "string"
-        case "int", "integer":
-            return "integer"
-        case "double", "float":
-            return "number"
-        case "bool", "boolean":
-            return "boolean"
-        case let t where t.contains("array") || t.contains("["):
-            return "array"
-        case let t where t.contains("dictionary"):
-            return "object"
-        default:
-            return "string"
-        }
-    }
-    
-    private func applyGuide(_ guide: AnyGenerationGuide, to schema: inout [String: Any]) {
-        guide.applyToSchema(&schema)
-    }
 }
-
-
-
-
 
 
 /// Guides that control how values are generated.
@@ -561,11 +526,183 @@ internal struct AnyGenerationGuide: @unchecked Sendable, Equatable {
 }
 
 
+// MARK: - Helper Extensions
+
+extension GenerationSchema.SchemaType {
+    var jsonSchemaType: String {
+        switch self {
+        case .object:
+            return "object"
+        case .array:
+            return "array"
+        case .generic(let type, _):
+            return Self.jsonSchemaType(for: type)
+        case .anyOf:
+            return "object" // Default for complex types
+        }
+    }
+    
+    /// Helper function to determine if a type is Optional
+    static func isOptionalType(_ type: any Generable.Type) -> Bool {
+        let typeName = String(describing: type)
+        return typeName.hasPrefix("Optional<")
+    }
+    
+    static func jsonSchemaType(for type: any Generable.Type) -> String {
+        let typeName = String(describing: type)
+        switch typeName {
+        case "String":
+            return "string"
+        case "Int", "Int8", "Int16", "Int32", "Int64",
+             "UInt", "UInt8", "UInt16", "UInt32", "UInt64":
+            return "integer"
+        case "Float", "Double", "Decimal":
+            return "number"
+        case "Bool":
+            return "boolean"
+        case let t where t.contains("Array"):
+            return "array"
+        case let t where t.contains("Dictionary"):
+            return "object"
+        default:
+            // For complex types, check if it's an enum or object
+            if typeName.contains("Optional") {
+                // Extract wrapped type and recurse
+                return "object" // Simplified for Optional
+            }
+            return "object" // Default for custom types
+        }
+    }
+    
+    func toJSONSchema(description: String? = nil) -> [String: Any] {
+        var result: [String: Any] = [:]
+        
+        if let description = description {
+            result["description"] = description
+        }
+        
+        switch self {
+        case .object(let properties):
+            result["type"] = "object"
+            if !properties.isEmpty {
+                var props: [String: Any] = [:]
+                var required: [String] = []
+                
+                for property in properties {
+                    var propSchema = property.type.toJSONSchema(description: property.description)
+                    // Remove description from nested schema if it was added at property level
+                    if property.description != nil {
+                        propSchema.removeValue(forKey: "description")
+                        propSchema["description"] = property.description
+                    }
+                    props[property.name] = propSchema
+                    
+                    // Check if the property is optional using PropertyInfo's isOptional field
+                    if !property.isOptional {
+                        required.append(property.name)
+                    }
+                }
+                
+                result["properties"] = props
+                if !required.isEmpty {
+                    result["required"] = required
+                }
+            }
+            
+        case .array(let element, let minItems, let maxItems):
+            result["type"] = "array"
+            result["items"] = element.toJSONSchema()
+            if let min = minItems { result["minItems"] = min }
+            if let max = maxItems { result["maxItems"] = max }
+            
+        case .anyOf(let types):
+            // Check if all types are simple string constants
+            var enumValues: [String] = []
+            var isSimpleEnum = true
+            
+            for schemaType in types {
+                if case .generic(let type, let guides) = schemaType,
+                   type == String.self,
+                   guides.count == 1 {
+                    // Try to extract constant value
+                    var tempSchema: [String: Any] = [:]
+                    guides[0].applyToSchema(&tempSchema)
+                    if let constValue = tempSchema["const"] as? String {
+                        enumValues.append(constValue)
+                    } else {
+                        isSimpleEnum = false
+                        break
+                    }
+                } else {
+                    isSimpleEnum = false
+                    break
+                }
+            }
+            
+            if isSimpleEnum && !enumValues.isEmpty {
+                result["type"] = "string"
+                result["enum"] = enumValues
+            } else {
+                result["anyOf"] = types.map { $0.toJSONSchema() }
+            }
+            
+        case .generic(let type, let guides):
+            // Use type casting for more robust type detection
+            let jsonType: String
+            switch type {
+            case is String.Type:
+                jsonType = "string"
+            case is Bool.Type:
+                jsonType = "boolean"
+            case is any FixedWidthInteger.Type:
+                // Covers Int, Int8, Int16, Int32, Int64, UInt, UInt8, UInt16, UInt32, UInt64
+                jsonType = "integer"
+            case is any BinaryFloatingPoint.Type:
+                // Covers Float, Double, Float80 (if available)
+                jsonType = "number"
+            case is Decimal.Type:
+                jsonType = "number"
+            default:
+                // Check for Optional types
+                let typeName = String(describing: type)
+                if typeName.hasPrefix("Optional<") {
+                    // For Optional types, try to determine inner type
+                    // This is a simplified approach; could be enhanced
+                    if typeName.contains("String") {
+                        jsonType = "string"
+                    } else if typeName.contains("Int") || typeName.contains("UInt") {
+                        jsonType = "integer"
+                    } else if typeName.contains("Float") || typeName.contains("Double") || typeName.contains("Decimal") {
+                        jsonType = "number"
+                    } else if typeName.contains("Bool") {
+                        jsonType = "boolean"
+                    } else {
+                        jsonType = "object"
+                    }
+                } else {
+                    // For complex Generable types, treat as objects
+                    // Note: This avoids infinite recursion with self-referential types
+                    jsonType = "object"
+                }
+            }
+            
+            result["type"] = jsonType
+            
+            // Apply generation guides
+            for guide in guides {
+                guide.applyToSchema(&result)
+            }
+        }
+        
+        return result
+    }
+}
+
 extension GenerationSchema {
     public struct Property: Sendable {
         internal let name: String
         
-        internal let type: any Sendable.Type
+        internal let type: any Generable.Type
         
         internal let description: String?
         
@@ -573,25 +710,14 @@ extension GenerationSchema {
         
         internal let guides: [AnyGenerationGuide]
         
-        internal let isOptional: Bool
-        
         public init<Value>(name: String, description: String? = nil, type: Value.Type, guides: [GenerationGuide<Value>] = []) where Value: Generable {
             self.name = name
             self.description = description
-            self.type = type as Any.Type as Any as! any Sendable.Type  // Force cast for type erasure
+            self.type = type
             self.regexPatterns = []
             self.guides = guides.map(AnyGenerationGuide.init)
-            self.isOptional = false  // Non-optional type
         }
         
-        public init<Value>(name: String, description: String? = nil, type: Value?.Type, guides: [GenerationGuide<Value>] = []) where Value: Generable {
-            self.name = name
-            self.description = description
-            self.type = type as Any.Type as Any as! any Sendable.Type  // Force cast for type erasure
-            self.regexPatterns = []
-            self.guides = guides.map(AnyGenerationGuide.init)
-            self.isOptional = true  // Optional type
-        }
         
         public init<RegexOutput>(name: String, description: String? = nil, type: String.Type, guides: [Regex<RegexOutput>] = []) {
             self.name = name
@@ -599,32 +725,21 @@ extension GenerationSchema {
             self.type = type
             self.regexPatterns = guides.map { String(describing: $0) }
             self.guides = []
-            self.isOptional = false  // Non-optional String
         }
         
-        public init<RegexOutput>(name: String, description: String? = nil, type: String?.Type, guides: [Regex<RegexOutput>] = []) {
-            self.name = name
-            self.description = description
-            self.type = type
-            self.regexPatterns = guides.map { String(describing: $0) }
-            self.guides = []
-            self.isOptional = true  // Optional String
-        }
         
         internal init(
             name: String,
             description: String?,
-            type: any Sendable.Type,
+            type: any Generable.Type,
             guides: [AnyGenerationGuide] = [],
-            regexPatterns: [String] = [],
-            isOptional: Bool
+            regexPatterns: [String] = []
         ) {
             self.name = name
             self.description = description
             self.type = type
             self.guides = guides
             self.regexPatterns = regexPatterns
-            self.isOptional = isOptional
         }
         
         internal var typeDescription: String {
@@ -643,28 +758,10 @@ extension GenerationSchema {
         // Convert to JSON Schema format using toSchemaDictionary()
         let jsonSchema = self.toSchemaDictionary()
         
-        // Encode as JSON data
-        let jsonData = try JSONSerialization.data(withJSONObject: jsonSchema, options: [])
-        
-        // Decode to a generic structure that can be encoded
-        let jsonObject = try JSONSerialization.jsonObject(with: jsonData, options: [])
-        
+        // Directly encode the schema dictionary using AnyCodable
         var container = encoder.singleValueContainer()
-        
-        // Re-encode using JSONSerialization to maintain compatibility
-        if let dict = jsonObject as? [String: Any] {
-            // Convert to encodable structure
-            let encodableDict = try convertToEncodable(dict)
-            try container.encode(encodableDict)
-        } else {
-            throw EncodingError.invalidValue(
-                jsonObject,
-                EncodingError.Context(
-                    codingPath: encoder.codingPath,
-                    debugDescription: "Failed to convert GenerationSchema to JSON Schema format"
-                )
-            )
-        }
+        let encodableDict = AnyCodable(jsonSchema)
+        try container.encode(encodableDict)
     }
     
     public init(from decoder: Decoder) throws {
@@ -686,35 +783,57 @@ extension GenerationSchema {
         if let type = dict["type"] as? String {
             switch type {
             case "object":
-                self.schemaType = .object(properties: Self.parseProperties(from: dict))
+                self.schemaType = .object(properties: Self.parsePropertiesUnified(from: dict))
             case "string":
                 if let enumValues = dict["enum"] as? [String] {
-                    self.schemaType = .enumeration(values: enumValues)
+                    // Create anyOf with string constants
+                    let schemas = enumValues.map { value in
+                        SchemaType.generic(
+                            type: String.self,
+                            guides: [AnyGenerationGuide(GenerationGuide<String>.constant(value))]
+                        )
+                    }
+                    self.schemaType = .anyOf(schemas)
                 } else {
-                    self.schemaType = .primitive(type: "string")
+                    self.schemaType = .generic(type: String.self, guides: [])
                 }
             case "integer":
-                self.schemaType = .primitive(type: "integer")
+                self.schemaType = .generic(type: Int.self, guides: [])
             case "number":
-                self.schemaType = .primitive(type: "number")
+                self.schemaType = .generic(type: Double.self, guides: [])
             case "boolean":
-                self.schemaType = .primitive(type: "boolean")
+                self.schemaType = .generic(type: Bool.self, guides: [])
             case "array":
+                let element: SchemaType
                 if let items = dict["items"] as? [String: Any] {
                     // Recursively parse item schema
                     let itemData = try JSONSerialization.data(withJSONObject: items)
                     let itemSchema = try JSONDecoder().decode(GenerationSchema.self, from: itemData)
-                    self.schemaType = .array(items: itemSchema)
+                    element = itemSchema.schemaType
                 } else {
-                    self.schemaType = .array(items: nil)
+                    element = .generic(type: String.self, guides: [])
                 }
+                let minItems = dict["minItems"] as? Int
+                let maxItems = dict["maxItems"] as? Int
+                self.schemaType = .array(element: element, minItems: minItems, maxItems: maxItems)
             default:
-                self.schemaType = .primitive(type: type)
+                // Try to infer type
+                let generableType: any Generable.Type = switch type {
+                case "string": String.self
+                case "integer": Int.self
+                case "number": Double.self
+                case "boolean": Bool.self
+                default: String.self
+                }
+                self.schemaType = .generic(type: generableType, guides: [])
             }
         } else if dict["anyOf"] != nil {
-            // Handle union types - for now treat as dynamic
-            self.schemaType = .dynamic(root: DynamicGenerationSchema(name: "Union", properties: []), dependencies: [])
+            // Handle union types - for now treat as object
+            self.schemaType = .object(properties: [])
         } else {
+            // Set default values before throwing
+            self.schemaType = .object(properties: [])
+            self._description = nil
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
                     codingPath: decoder.codingPath,
@@ -726,8 +845,8 @@ extension GenerationSchema {
         self._description = dict["description"] as? String
     }
     
-    // Helper method to parse properties from JSON Schema
-    private static func parseProperties(from dict: [String: Any]) -> [GenerationSchema.Property] {
+    // Helper method to parse properties from JSON Schema (unified)
+    private static func parsePropertiesUnified(from dict: [String: Any]) -> [PropertyInfo] {
         guard let properties = dict["properties"] as? [String: [String: Any]] else {
             return []
         }
@@ -735,20 +854,30 @@ extension GenerationSchema {
         let required = dict["required"] as? [String] ?? []
         
         return properties.compactMap { key, value in
-            let type = inferTypeFromSchema(value)
-            return GenerationSchema.Property(
+            // Create a GenerationSchema for each property
+            let propSchema: GenerationSchema
+            do {
+                let propData = try JSONSerialization.data(withJSONObject: value)
+                propSchema = try JSONDecoder().decode(GenerationSchema.self, from: propData)
+            } catch {
+                // Fallback to string type
+                propSchema = GenerationSchema(
+                    schemaType: .generic(type: String.self, guides: []),
+                    description: value["description"] as? String
+                )
+            }
+            
+            return PropertyInfo(
                 name: key,
                 description: value["description"] as? String,
-                type: type,
-                guides: [],
-                regexPatterns: value["pattern"].flatMap { [$0 as? String].compactMap { $0 } } ?? [],
-                isOptional: !required.contains(key)
+                type: propSchema.schemaType,
+                isOptional: !required.contains(key)  // Check if in required array
             )
         }.sorted { $0.name < $1.name }
     }
     
     // Helper to infer type from JSON Schema
-    private static func inferTypeFromSchema(_ schema: [String: Any]) -> any Sendable.Type {
+    private static func inferTypeFromSchema(_ schema: [String: Any]) -> any Generable.Type {
         guard let type = schema["type"] as? String else {
             return String.self
         }
@@ -771,10 +900,6 @@ extension GenerationSchema {
         }
     }
     
-    // Helper to convert [String: Any] to encodable format
-    private func convertToEncodable(_ dict: [String: Any]) throws -> AnyCodable {
-        return AnyCodable(dict)
-    }
 }
 
 extension GenerationSchema.Property: Codable {
@@ -788,7 +913,6 @@ extension GenerationSchema.Property: Codable {
         try container.encodeIfPresent(description, forKey: .description)
         try container.encode(String(describing: type), forKey: .typeString)
         try container.encode(regexPatterns, forKey: .regexPatterns)
-        try container.encode(isOptional, forKey: .isOptional)
         // Note: guides are not encoded as they are type-erased
     }
     
@@ -800,7 +924,6 @@ extension GenerationSchema.Property: Codable {
         self.type = String.self // Default type as we cannot reconstruct the actual type
         self.regexPatterns = try container.decode([String].self, forKey: .regexPatterns)
         self.guides = [] // Guides cannot be reconstructed from encoded data
-        self.isOptional = try container.decode(Bool.self, forKey: .isOptional)
     }
 }
 

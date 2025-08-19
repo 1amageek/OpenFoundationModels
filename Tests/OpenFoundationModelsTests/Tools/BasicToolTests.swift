@@ -2,6 +2,7 @@
 import Foundation
 import Testing
 @testable import OpenFoundationModels
+import OpenFoundationModelsMacros
 
 @Suite("Basic Tool Tests")
 struct BasicToolTests {
@@ -10,13 +11,9 @@ struct BasicToolTests {
     struct SimpleWeatherTool: Tool {
         let description = "Get weather information for a city"
         
-        struct Arguments: ConvertibleFromGeneratedContent {
+        @Generable
+        struct Arguments {
             let city: String
-            
-            init(_ content: GeneratedContent) throws {
-                let value = content.text
-                self.city = value.isEmpty ? "Unknown" : value
-            }
         }
         
         typealias Output = String
@@ -37,12 +34,9 @@ struct BasicToolTests {
         let name = "calculate"
         let description = "Perform basic mathematical calculations"
         
-        struct Arguments: ConvertibleFromGeneratedContent {
+        @Generable
+        struct Arguments {
             let expression: String
-            
-            init(_ content: GeneratedContent) throws {
-                self.expression = content.text
-            }
         }
         
         typealias Output = String
@@ -135,7 +129,7 @@ struct BasicToolTests {
     @Test("Basic tool execution")
     func basicToolExecution() async throws {
         let tool = SimpleWeatherTool()
-        let content = GeneratedContent("Tokyo")
+        let content = GeneratedContent(properties: ["city": "Tokyo"])
         let args = try SimpleWeatherTool.Arguments(content)
         
         let result = try await tool.call(arguments: args)
@@ -162,7 +156,7 @@ struct BasicToolTests {
     @Test("Tool error handling")
     func toolErrorHandling() async throws {
         let tool = CalculatorTool()
-        let content = GeneratedContent("10/0")
+        let content = GeneratedContent(properties: ["expression": "10/0"])
         let args = try CalculatorTool.Arguments(content)
         
         do {
@@ -179,7 +173,7 @@ struct BasicToolTests {
     @Test("Tool successful calculation")
     func toolSuccessfulCalculation() async throws {
         let tool = CalculatorTool()
-        let content = GeneratedContent("2 + 2")
+        let content = GeneratedContent(properties: ["expression": "2 + 2"])
         let args = try CalculatorTool.Arguments(content)
         
         let result = try await tool.call(arguments: args)
@@ -210,9 +204,9 @@ struct BasicToolTests {
     func concurrentToolExecution() async throws {
         let tool = SimpleWeatherTool()
         
-        async let result1 = try SimpleWeatherTool.Arguments(GeneratedContent("Tokyo"))
-        async let result2 = try SimpleWeatherTool.Arguments(GeneratedContent("London"))
-        async let result3 = try SimpleWeatherTool.Arguments(GeneratedContent("Paris"))
+        async let result1 = try SimpleWeatherTool.Arguments(GeneratedContent(properties: ["city": "Tokyo"]))
+        async let result2 = try SimpleWeatherTool.Arguments(GeneratedContent(properties: ["city": "London"]))
+        async let result3 = try SimpleWeatherTool.Arguments(GeneratedContent(properties: ["city": "Paris"]))
         
         let args = try await [result1, result2, result3]
         
@@ -234,28 +228,29 @@ struct BasicToolTests {
     }
     
     
-    @Test("Tool with empty arguments")
-    func toolWithEmptyArguments() async throws {
-        struct EmptyArgumentsTool: Tool {
-            let description = "Tool with no meaningful arguments"
-            
-            struct Arguments: ConvertibleFromGeneratedContent {
-                init(_ content: GeneratedContent) throws {
-                }
-            }
-            
-            typealias Output = String
-            
-            func call(arguments: Arguments) async throws -> String {
-                let result = SimpleResult(output: "executed")
-                let encoder = JSONEncoder()
-                let data = try encoder.encode(result)
-                return String(data: data, encoding: .utf8) ?? "{}"
-            }
+    // Move EmptyArgumentsTool outside of test function
+    struct EmptyArgumentsTool: Tool {
+        let description = "Tool with no meaningful arguments"
+        
+        @Generable
+        struct Arguments {
+            // Empty arguments struct
         }
         
+        typealias Output = String
+        
+        func call(arguments: Arguments) async throws -> String {
+            let result = SimpleResult(output: "executed")
+            let encoder = JSONEncoder()
+            let data = try encoder.encode(result)
+            return String(data: data, encoding: .utf8) ?? "{}"
+        }
+    }
+    
+    @Test("Tool with empty arguments")
+    func toolWithEmptyArguments() async throws {
         let tool = EmptyArgumentsTool()
-        let args = try EmptyArgumentsTool.Arguments(GeneratedContent(""))
+        let args = try EmptyArgumentsTool.Arguments(GeneratedContent(properties: [:]))
         
         let result = try await tool.call(arguments: args)
         let data = result.data(using: .utf8)!
