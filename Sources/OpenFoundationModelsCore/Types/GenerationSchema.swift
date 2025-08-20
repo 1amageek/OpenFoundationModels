@@ -1,7 +1,7 @@
 import Foundation
 
 public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible {
-    private let schemaType: SchemaType
+    internal let schemaType: SchemaType
     private let _description: String?
     
     // MARK: - Nested Types
@@ -165,10 +165,19 @@ public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible 
         } else {
             // Convert Property to PropertyInfo
             let propInfos = properties.map { prop in
-                PropertyInfo(
+                // Use the actual generationSchema for the property type
+                // This ensures arrays and other complex types are handled correctly
+                let propertySchemaType: SchemaType
+                if let generableType = prop.type as? any Generable.Type {
+                    propertySchemaType = generableType.generationSchema.schemaType
+                } else {
+                    propertySchemaType = .generic(type: prop.type, guides: prop.guides)
+                }
+                
+                return PropertyInfo(
                     name: prop.name,
                     description: prop.description,
-                    type: .generic(type: prop.type, guides: prop.guides),
+                    type: propertySchemaType,
                     isOptional: SchemaType.isOptionalType(prop.type)
                 )
             }
@@ -186,7 +195,7 @@ public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible 
         self._description = description
     }
     
-    private init(schemaType: SchemaType, description: String? = nil) {
+    internal init(schemaType: SchemaType, description: String? = nil) {
         self.schemaType = schemaType
         self._description = description
     }

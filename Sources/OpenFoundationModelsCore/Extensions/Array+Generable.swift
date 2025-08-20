@@ -9,10 +9,15 @@ extension Array: Generable where Element: Generable {
     
     /// An instance of the generation schema.
     public static var generationSchema: GenerationSchema {
+        let elementSchema = Element.generationSchema
+        
         return GenerationSchema(
-            type: Array<Element>.self,
-            description: "Array of \(String(describing: Element.self))",
-            properties: []
+            schemaType: .array(
+                element: elementSchema.schemaType,
+                minItems: nil,
+                maxItems: nil
+            ),
+            description: "Array of \(String(describing: Element.self))"
         )
     }
     
