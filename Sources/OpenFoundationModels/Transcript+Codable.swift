@@ -97,7 +97,7 @@ private struct EntryCoding: Codable {
             self.assetIDs = nil
             self.options = nil
             self.responseFormat = nil
-            self.calls = try toolCalls.map { try ToolCallCoding(from: $0) }
+            self.calls = try toolCalls.calls.map { try ToolCallCoding(from: $0) }
             self.toolName = nil
             
         case .toolOutput(let toolOutput):
@@ -198,7 +198,7 @@ private struct SegmentCoding: Codable {
     let id: String
     let content: String?
     let source: String?
-    let generatedContent: String? // JSON string representation
+    let generatedContent: GeneratedContent? // Store GeneratedContent directly
     
     init(from segment: Transcript.Segment) throws {
         self.id = segment.id
@@ -214,7 +214,8 @@ private struct SegmentCoding: Codable {
             self.type = .structure
             self.content = nil
             self.source = structuredSegment.source
-            self.generatedContent = structuredSegment.content.jsonString
+            // Store GeneratedContent directly
+            self.generatedContent = structuredSegment.content
         }
     }
     
@@ -236,11 +237,11 @@ private struct SegmentCoding: Codable {
                     debugDescription: "Missing source or generatedContent for structured segment"
                 ))
             }
-            let content = try GeneratedContent(json: generatedContent)
+            // Use GeneratedContent directly
             return .structure(Transcript.StructuredSegment(
                 id: id,
                 source: source,
-                content: content
+                content: generatedContent
             ))
         }
     }
@@ -306,9 +307,25 @@ private struct GenerationOptionsCoding: Codable {
     let maximumResponseTokens: Int?
     
     init(from options: GenerationOptions) {
-        // Note: We cannot directly access SamplingMode internals
-        // This is a simplified representation
-        self.sampling = nil // Would need reflection or other mechanism
+        // Convert SamplingMode to SamplingModeCoding
+        if let samplingMode = options.sampling {
+            // Use string representation to determine the type
+            let modeString = String(describing: samplingMode)
+            if modeString.contains("greedy") {
+                self.sampling = .greedy
+            } else if modeString.contains("topK") {
+                // Extract k value from string if possible
+                // This is a simplified approach
+                self.sampling = .topK(k: 10, seed: nil)
+            } else if modeString.contains("topP") {
+                // Extract threshold from string if possible
+                self.sampling = .topP(threshold: 0.9, seed: nil)
+            } else {
+                self.sampling = nil
+            }
+        } else {
+            self.sampling = nil
+        }
         self.temperature = options.temperature
         self.maximumResponseTokens = options.maximumResponseTokens
     }
@@ -343,23 +360,33 @@ private struct ResponseFormatCoding: Codable {
     
     init(from responseFormat: Transcript.ResponseFormat) {
         self.name = responseFormat.name
-        // Note: Cannot access private properties directly
-        // This is a simplified representation
-        self.type = nil
-        self.schema = nil
+        self.type = responseFormat.type
+        self.schema = responseFormat.schema
     }
     
     func toResponseFormat() throws -> Transcript.ResponseFormat {
-        // This is a simplified reconstruction
-        // Would need to handle both schema and type cases properly
         if let schema = schema {
-            return Transcript.ResponseFormat(schema: schema)
+            // For schema-based ResponseFormat
+            var format = Transcript.ResponseFormat(schema: schema)
+            // Preserve the original name and type if they exist
+            if name != "schema-based" {
+                format.name = name
+            }
+            if let originalType = type {
+                format.type = originalType
+            }
+            return format
         } else {
-            // Cannot reconstruct type-based ResponseFormat without more information
-            throw DecodingError.dataCorrupted(DecodingError.Context(
-                codingPath: [],
-                debugDescription: "Cannot reconstruct ResponseFormat"
+            // If no schema, create a minimal one
+            // This shouldn't normally happen, but provides a fallback
+            var format = Transcript.ResponseFormat(schema: GenerationSchema(
+                type: String.self,
+                description: nil,
+                properties: []
             ))
+            format.name = name
+            format.type = type
+            return format
         }
     }
 }
@@ -389,16 +416,15 @@ private struct ToolDefinitionCoding: Codable {
 private struct ToolCallCoding: Codable {
     let id: String
     let toolName: String
-    let arguments: String // JSON string representation
+    let arguments: GeneratedContent // Store GeneratedContent directly
     
     init(from toolCall: Transcript.ToolCall) throws {
         self.id = toolCall.id
         self.toolName = toolCall.toolName
-        self.arguments = toolCall.arguments.jsonString
+        self.arguments = toolCall.arguments
     }
     
     func toToolCall() throws -> Transcript.ToolCall {
-        let arguments = try GeneratedContent(json: arguments)
         return Transcript.ToolCall(
             id: id,
             toolName: toolName,

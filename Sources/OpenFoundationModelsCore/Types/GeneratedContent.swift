@@ -179,8 +179,24 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
             self.storage = Storage(root: .number(d), partialRaw: nil, isComplete: true, generationID: nil)
         } else if let s = try? container.decode(String.self) {
             let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
-            if t.hasPrefix("{") || t.hasPrefix("[") { self.storage = Storage(root: nil, partialRaw: s, isComplete: false, generationID: nil) }
-            else { self.storage = Storage(root: .string(s), partialRaw: nil, isComplete: true, generationID: nil) }
+            if t.hasPrefix("{") || t.hasPrefix("[") {
+                // JSON文字列の場合、実際にパースを試みる
+                if let data = s.data(using: .utf8),
+                   let _ = try? JSONSerialization.jsonObject(with: data) {
+                    // 完全なJSONの場合は、GeneratedContent(json:)を使って正しく処理
+                    if let parsed = try? GeneratedContent(json: s) {
+                        self.storage = parsed.storage
+                    } else {
+                        // パースエラーの場合は文字列として扱う
+                        self.storage = Storage(root: .string(s), partialRaw: nil, isComplete: true, generationID: nil)
+                    }
+                } else {
+                    // パースできない場合のみ部分的として扱う（ストリーミング対応）
+                    self.storage = Storage(root: nil, partialRaw: s, isComplete: false, generationID: nil)
+                }
+            } else {
+                self.storage = Storage(root: .string(s), partialRaw: nil, isComplete: true, generationID: nil)
+            }
         } else if let arr = try? container.decode([GeneratedContent].self) {
             self.storage = Storage(root: .array(arr.map { $0.asJSONValue() }), partialRaw: nil, isComplete: true, generationID: nil)
         } else if let dict = try? container.decode([String: GeneratedContent].self) {
@@ -235,8 +251,50 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
             }
         }
         let v = asJSONValue()
-        let data = try JSONSerialization.data(withJSONObject: toAny(v), options: [.prettyPrinted])
-        return String(data: data, encoding: .utf8) ?? "{}"
+        let anyValue = toAny(v)
+        
+        // JSONSerialization requires top-level object to be NSArray or NSDictionary
+        // Wrap primitive values in a dictionary
+        let jsonObject: Any
+        switch v {
+        case .array, .object:
+            jsonObject = anyValue
+        default:
+            // Wrap primitive values in a dictionary with a special key
+            jsonObject = ["__value": anyValue]
+        }
+        
+        let data = try JSONSerialization.data(withJSONObject: jsonObject, options: [.prettyPrinted])
+        
+        // If we wrapped it, unwrap the JSON string
+        if let jsonString = String(data: data, encoding: .utf8) {
+            switch v {
+            case .array, .object:
+                return jsonString
+            default:
+                // Extract the wrapped value from the JSON string
+                // This is a bit hacky but preserves the exact JSON formatting
+                if let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let wrappedValue = parsed["__value"] {
+                    // Re-encode just the value
+                    if JSONSerialization.isValidJSONObject([wrappedValue]) {
+                        let valueData = try JSONSerialization.data(withJSONObject: [wrappedValue], options: [])
+                        if let valueString = String(data: valueData, encoding: .utf8),
+                           valueString.hasPrefix("[") && valueString.hasSuffix("]") {
+                            // Remove the array brackets to get the raw value
+                            let startIndex = valueString.index(valueString.startIndex, offsetBy: 1)
+                            let endIndex = valueString.index(valueString.endIndex, offsetBy: -1)
+                            return String(valueString[startIndex..<endIndex])
+                        }
+                    }
+                    // Fallback: return the value as a JSON string
+                    return "\"\(wrappedValue)\""
+                }
+                return jsonString
+            }
+        }
+        
+        return "{}"
     }
 }
 

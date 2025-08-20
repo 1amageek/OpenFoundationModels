@@ -182,7 +182,7 @@ extension Transcript {
         public typealias ID = String
         
         public var id: String
-        private var calls: [ToolCall]
+        internal var calls: [ToolCall]
         
         public init<S>(id: String = UUID().uuidString, _ calls: S) where S: Sequence, S.Element == ToolCall {
             self.id = id
@@ -227,9 +227,9 @@ extension Transcript {
     public struct ResponseFormat: Sendable {
         public var name: String
         
-        private var type: String?
+        internal var type: String?
         
-        private var schema: GenerationSchema?
+        internal var schema: GenerationSchema?
         
         public init(schema: GenerationSchema) {
             self.name = "schema-based"
