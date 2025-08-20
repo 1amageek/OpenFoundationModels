@@ -1,7 +1,6 @@
 import Foundation
 import OpenFoundationModelsCore
 
-// MARK: - Transcript Codable Implementation
 extension Transcript: Codable {
     private enum CodingKeys: String, CodingKey {
         case entries
@@ -10,7 +9,6 @@ extension Transcript: Codable {
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
-        // Decode entries array
         var decodedEntries: [Entry] = []
         var entriesContainer = try container.nestedUnkeyedContainer(forKey: .entries)
         
@@ -25,7 +23,6 @@ extension Transcript: Codable {
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         
-        // Encode entries array
         var entriesContainer = container.nestedUnkeyedContainer(forKey: .entries)
         for entry in entries {
             let entryCoding = try EntryCoding(from: entry)
@@ -34,9 +31,6 @@ extension Transcript: Codable {
     }
 }
 
-// MARK: - Internal Coding Types
-
-// Entry Coding
 private struct EntryCoding: Codable {
     enum EntryType: String, Codable {
         case instructions
@@ -187,7 +181,6 @@ private struct EntryCoding: Codable {
     }
 }
 
-// Segment Coding
 private struct SegmentCoding: Codable {
     enum SegmentType: String, Codable {
         case text
@@ -198,7 +191,7 @@ private struct SegmentCoding: Codable {
     let id: String
     let content: String?
     let source: String?
-    let generatedContent: GeneratedContent? // Store GeneratedContent directly
+    let generatedContent: GeneratedContent?
     
     init(from segment: Transcript.Segment) throws {
         self.id = segment.id
@@ -214,7 +207,6 @@ private struct SegmentCoding: Codable {
             self.type = .structure
             self.content = nil
             self.source = structuredSegment.source
-            // Store GeneratedContent directly
             self.generatedContent = structuredSegment.content
         }
     }
@@ -237,7 +229,6 @@ private struct SegmentCoding: Codable {
                     debugDescription: "Missing source or generatedContent for structured segment"
                 ))
             }
-            // Use GeneratedContent directly
             return .structure(Transcript.StructuredSegment(
                 id: id,
                 source: source,
@@ -247,7 +238,6 @@ private struct SegmentCoding: Codable {
     }
 }
 
-// GenerationOptions Coding
 private struct GenerationOptionsCoding: Codable {
     enum SamplingModeCoding: Codable {
         case greedy
@@ -307,18 +297,13 @@ private struct GenerationOptionsCoding: Codable {
     let maximumResponseTokens: Int?
     
     init(from options: GenerationOptions) {
-        // Convert SamplingMode to SamplingModeCoding
         if let samplingMode = options.sampling {
-            // Use string representation to determine the type
             let modeString = String(describing: samplingMode)
             if modeString.contains("greedy") {
                 self.sampling = .greedy
             } else if modeString.contains("topK") {
-                // Extract k value from string if possible
-                // This is a simplified approach
                 self.sampling = .topK(k: 10, seed: nil)
             } else if modeString.contains("topP") {
-                // Extract threshold from string if possible
                 self.sampling = .topP(threshold: 0.9, seed: nil)
             } else {
                 self.sampling = nil
@@ -352,7 +337,6 @@ private struct GenerationOptionsCoding: Codable {
     }
 }
 
-// ResponseFormat Coding
 private struct ResponseFormatCoding: Codable {
     let name: String
     let type: String?
@@ -366,9 +350,7 @@ private struct ResponseFormatCoding: Codable {
     
     func toResponseFormat() throws -> Transcript.ResponseFormat {
         if let schema = schema {
-            // For schema-based ResponseFormat
             var format = Transcript.ResponseFormat(schema: schema)
-            // Preserve the original name and type if they exist
             if name != "schema-based" {
                 format.name = name
             }
@@ -377,8 +359,6 @@ private struct ResponseFormatCoding: Codable {
             }
             return format
         } else {
-            // If no schema, create a minimal one
-            // This shouldn't normally happen, but provides a fallback
             var format = Transcript.ResponseFormat(schema: GenerationSchema(
                 type: String.self,
                 description: nil,
@@ -391,7 +371,6 @@ private struct ResponseFormatCoding: Codable {
     }
 }
 
-// ToolDefinition Coding
 private struct ToolDefinitionCoding: Codable {
     let name: String
     let description: String
@@ -412,11 +391,10 @@ private struct ToolDefinitionCoding: Codable {
     }
 }
 
-// ToolCall Coding
 private struct ToolCallCoding: Codable {
     let id: String
     let toolName: String
-    let arguments: GeneratedContent // Store GeneratedContent directly
+    let arguments: GeneratedContent
     
     init(from toolCall: Transcript.ToolCall) throws {
         self.id = toolCall.id

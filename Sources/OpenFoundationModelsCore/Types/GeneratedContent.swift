@@ -180,18 +180,14 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
         } else if let s = try? container.decode(String.self) {
             let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
             if t.hasPrefix("{") || t.hasPrefix("[") {
-                // JSON文字列の場合、実際にパースを試みる
                 if let data = s.data(using: .utf8),
                    let _ = try? JSONSerialization.jsonObject(with: data) {
-                    // 完全なJSONの場合は、GeneratedContent(json:)を使って正しく処理
                     if let parsed = try? GeneratedContent(json: s) {
                         self.storage = parsed.storage
                     } else {
-                        // パースエラーの場合は文字列として扱う
                         self.storage = Storage(root: .string(s), partialRaw: nil, isComplete: true, generationID: nil)
                     }
                 } else {
-                    // パースできない場合のみ部分的として扱う（ストリーミング対応）
                     self.storage = Storage(root: nil, partialRaw: s, isComplete: false, generationID: nil)
                 }
             } else {
