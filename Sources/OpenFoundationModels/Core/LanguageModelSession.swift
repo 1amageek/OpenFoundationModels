@@ -90,7 +90,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
     }
     
     
-    public struct Response<Content: Sendable>: Sendable {
+    public struct Response<Content> where Content: Generable {
         public let content: Content
         
         public let rawContent: GeneratedContent
@@ -728,23 +728,13 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                         }
                         
                         if let generatedContent = accumulatedContent {
-                            // Try to parse as PartialContent first
+                            // Try to parse as PartialContent
                             if let partialData = try? PartialContent(generatedContent) {
-                                if PartialContent.self == Content.self {
-                                    let snapshot = ResponseStream<Content>.Snapshot(
-                                        content: partialData as! Content,
-                                        rawContent: generatedContent
-                                    )
-                                    continuation.yield(snapshot)
-                                } else {
-                                    if let convertedContent = try? Content(generatedContent) {
-                                        let snapshot = ResponseStream<Content>.Snapshot(
-                                            content: convertedContent,
-                                            rawContent: generatedContent
-                                        )
-                                        continuation.yield(snapshot)
-                                    }
-                                }
+                                let snapshot = ResponseStream<Content>.Snapshot(
+                                    content: partialData,
+                                    rawContent: generatedContent
+                                )
+                                continuation.yield(snapshot)
                             }
                         }
                         finalEntry = entry
@@ -894,10 +884,10 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
 
 extension LanguageModelSession {
     
-    public struct ResponseStream<Content: Sendable>: AsyncSequence, Sendable {
+    public struct ResponseStream<Content>: AsyncSequence where Content: Generable {
         
-        public struct Snapshot: Sendable {
-            public var content: Content
+        public struct Snapshot {
+            public var content: Content.PartiallyGenerated
             
             public var rawContent: GeneratedContent
         }
@@ -939,8 +929,11 @@ extension LanguageModelSession {
                 throw GenerationError.decodingFailure(context)
             }
             
+            // Convert from PartiallyGenerated to full Content
+            let content = try Content(snapshot.rawContent)
+            
             return Response(
-                content: snapshot.content,
+                content: content,
                 rawContent: snapshot.rawContent,
                 transcriptEntries: allEntries
             )
@@ -949,28 +942,6 @@ extension LanguageModelSession {
 }
 
 
-extension LanguageModelSession.ResponseStream where Content: Generable {
-    
-    nonisolated(nonsending) public func collect() async throws -> sending LanguageModelSession.Response<Content> {
-        var finalSnapshot: Snapshot?
-        let allEntries = ArraySlice<Transcript.Entry>()
-        
-        for try await snapshot in self {
-            finalSnapshot = snapshot
-        }
-        
-        guard let snapshot = finalSnapshot else {
-            let context = LanguageModelSession.GenerationError.Context(debugDescription: "Stream completed without any content")
-            throw LanguageModelSession.GenerationError.decodingFailure(context)
-        }
-        
-        return LanguageModelSession.Response(
-            content: snapshot.content,
-            rawContent: snapshot.rawContent,
-            transcriptEntries: allEntries
-        )
-    }
-}
 
 
 extension LanguageModelSession {

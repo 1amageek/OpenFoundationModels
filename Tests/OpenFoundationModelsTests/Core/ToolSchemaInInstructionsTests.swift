@@ -27,8 +27,10 @@ struct ToolSchemaInInstructionsTests {
     struct CalculatorTool: Tool {
         let description = "Perform mathematical calculations"
         
-        // This tool has includesSchemaInInstructions = false
-        var includesSchemaInInstructions: Bool { false }
+        // Override to not include schema in instructions for testing
+        var includesSchemaInInstructions: Bool {
+            return false
+        }
         
         @Generable
         struct Arguments {

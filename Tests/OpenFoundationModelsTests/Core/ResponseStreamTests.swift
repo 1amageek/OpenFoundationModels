@@ -220,15 +220,15 @@ struct ResponseStreamTests {
         #expect(fourth == nil) // Stream should be finished
     }
     
-    @Test("ResponseStream Sendable conformance")
-    func responseStreamSendableConformance() {
+    @Test("ResponseStream AsyncSequence conformance")
+    func responseStreamAsyncSequenceConformance() {
         let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
             continuation.finish()
         }
         
         let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
         
-        let _: any Sendable = responseStream
+        let _: any AsyncSequence = responseStream
         #expect(Bool(true)) // Compilation success
     }
 }

@@ -167,12 +167,8 @@ public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible 
             let propInfos = properties.map { prop in
                 // Use the actual generationSchema for the property type
                 // This ensures arrays and other complex types are handled correctly
-                let propertySchemaType: SchemaType
-                if let generableType = prop.type as? any Generable.Type {
-                    propertySchemaType = generableType.generationSchema.schemaType
-                } else {
-                    propertySchemaType = .generic(type: prop.type, guides: prop.guides)
-                }
+                // prop.type is already defined as any Generable.Type in the Property struct
+                let propertySchemaType: SchemaType = prop.type.generationSchema.schemaType
                 
                 return PropertyInfo(
                     name: prop.name,

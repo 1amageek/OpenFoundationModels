@@ -124,15 +124,4 @@ struct ResponseTests {
         }
     }
     
-    @Test("Response conforms to Sendable")
-    func responseSendableConformance() {
-        let response = Response(
-            content: "test",
-            rawContent: GeneratedContent("test"),
-            transcriptEntries: ArraySlice<Transcript.Entry>()
-        )
-        
-        let _: any Sendable = response
-        #expect(Bool(true)) // Compilation success
-    }
 }
