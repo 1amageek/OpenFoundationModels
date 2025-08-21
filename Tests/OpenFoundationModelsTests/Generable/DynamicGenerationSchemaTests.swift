@@ -78,9 +78,16 @@ struct DynamicGenerationSchemaTests {
                 Issue.record("age property not found")
             }
             
-            // Check email property
+            // Check email property (optional, so type should be ["string", "null"])
             if let email = properties["email"] as? [String: Any] {
-                #expect(email["type"] as? String == "string")
+                // Since email is optional, type should be an array ["string", "null"]
+                if let typeArray = email["type"] as? [String] {
+                    #expect(typeArray.contains("string"))
+                    #expect(typeArray.contains("null"))
+                    #expect(typeArray.count == 2)
+                } else {
+                    Issue.record("email type should be an array for optional field")
+                }
                 #expect(email["description"] as? String == "Email address")
             } else {
                 Issue.record("email property not found")

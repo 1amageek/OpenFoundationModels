@@ -47,7 +47,13 @@ struct GenerationSchemaJSONSchemaTests {
             #expect(properties["age"]?["type"] as? String == "integer")
             
             #expect(properties["isActive"] != nil)
-            #expect(properties["isActive"]?["type"] as? String == "boolean")
+            // isActive is Optional<Bool>, so type should be ["boolean", "null"]
+            if let typeArray = properties["isActive"]?["type"] as? [String] {
+                #expect(typeArray.contains("boolean"))
+                #expect(typeArray.contains("null"))
+            } else {
+                Issue.record("isActive type should be an array for optional field")
+            }
         }
         
         // Check required fields

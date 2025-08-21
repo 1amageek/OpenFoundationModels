@@ -600,6 +600,25 @@ extension GenerationSchema.SchemaType {
                         propSchema.removeValue(forKey: "description")
                         propSchema["description"] = property.description
                     }
+                    
+                    // If property is optional, modify schema to allow null
+                    if property.isOptional {
+                        if let baseType = propSchema["type"] as? String {
+                            // Simple types: use array notation ["type", "null"]
+                            propSchema["type"] = [baseType, "null"]
+                        } else if propSchema["anyOf"] != nil || propSchema["enum"] != nil {
+                            // Complex types with anyOf or enum: wrap with anyOf including null
+                            let originalSchema = propSchema
+                            propSchema = [
+                                "anyOf": [originalSchema, ["type": "null"]]
+                            ]
+                            // Preserve description at the top level
+                            if let desc = property.description {
+                                propSchema["description"] = desc
+                            }
+                        }
+                    }
+                    
                     props[property.name] = propSchema
                     
                     // Check if the property is optional using PropertyInfo's isOptional field

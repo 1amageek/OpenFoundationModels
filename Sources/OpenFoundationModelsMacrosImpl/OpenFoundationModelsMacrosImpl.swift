@@ -205,15 +205,26 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             generatePropertyExtraction(propertyName: prop.name, propertyType: prop.type)
         }.joined(separator: "\n            ")
         
-        return DeclSyntax(stringLiteral: """
-        public init(_ generatedContent: GeneratedContent) throws {
-            self._rawGeneratedContent = generatedContent
-            
-            let properties = try generatedContent.properties()
-            
-            \(propertyExtractions)
+        // If there are no properties, we don't need to extract them
+        if properties.isEmpty {
+            return DeclSyntax(stringLiteral: """
+            public init(_ generatedContent: GeneratedContent) throws {
+                self._rawGeneratedContent = generatedContent
+                
+                _ = try generatedContent.properties()  // Validate structure even if empty
+            }
+            """)
+        } else {
+            return DeclSyntax(stringLiteral: """
+            public init(_ generatedContent: GeneratedContent) throws {
+                self._rawGeneratedContent = generatedContent
+                
+                let properties = try generatedContent.properties()
+                
+                \(propertyExtractions)
+            }
+            """)
         }
-        """)
     }
     
     private static func generatePartialPropertyExtraction(propertyName: String, propertyType: String) -> String {
@@ -364,19 +375,35 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         
         let orderedKeys = properties.map { "\"\($0.name)\"" }.joined(separator: ", ")
         
-        return DeclSyntax(stringLiteral: """
-        public var generatedContent: GeneratedContent {
-            var properties: [String: GeneratedContent] = [:]
-            \(propertyConversions)
-            
-            return GeneratedContent(
-                kind: .structure(
-                    properties: properties,
-                    orderedKeys: [\(orderedKeys)]
+        if properties.isEmpty {
+            // For empty structs, use let since properties won't be modified
+            return DeclSyntax(stringLiteral: """
+            public var generatedContent: GeneratedContent {
+                let properties: [String: GeneratedContent] = [:]
+                
+                return GeneratedContent(
+                    kind: .structure(
+                        properties: properties,
+                        orderedKeys: []
+                    )
                 )
-            )
+            }
+            """)
+        } else {
+            return DeclSyntax(stringLiteral: """
+            public var generatedContent: GeneratedContent {
+                var properties: [String: GeneratedContent] = [:]
+                \(propertyConversions)
+                
+                return GeneratedContent(
+                    kind: .structure(
+                        properties: properties,
+                        orderedKeys: [\(orderedKeys)]
+                    )
+                )
+            }
+            """)
         }
-        """)
     }
     
     private static func generateFromGeneratedContentMethod(structName: String) -> DeclSyntax {
@@ -513,7 +540,7 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             public init(_ generatedContent: GeneratedContent) throws {
                 self.rawContent = generatedContent
                 
-                if let properties = try? generatedContent.properties() {
+                if \(properties.isEmpty ? "let _ = try? generatedContent.properties()" : "let properties = try? generatedContent.properties()") {
                     \(propertyExtractions)
                     
                     self.isComplete = generatedContent.isComplete && \(requiredPropertiesCheck)

@@ -153,7 +153,7 @@ final class ArraySchemaTests: XCTestCase {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
         let jsonData = try encoder.encode(schema)
-        let jsonString = String(data: jsonData, encoding: .utf8)!
+        _ = String(data: jsonData, encoding: .utf8)!  // Computed but not used in test
         
         // Parse JSON to verify structure
         let json = try JSONSerialization.jsonObject(with: jsonData) as! [String: Any]
