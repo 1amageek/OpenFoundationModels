@@ -266,13 +266,39 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             let isArray = propertyType.hasPrefix("[") && propertyType.hasSuffix("]")
             
             if isOptional {
-                return """
-                if let value = properties["\(propertyName)"] {
-                    self.\(propertyName) = try \(propertyType.replacingOccurrences(of: "?", with: ""))(value)
+                let baseType = propertyType.replacingOccurrences(of: "?", with: "")
+                
+                // For basic optional types like Int?, String?, etc.
+                if baseType == "Int" || baseType == "String" || baseType == "Double" || 
+                   baseType == "Float" || baseType == "Bool" {
+                    return """
+                    if let value = properties["\(propertyName)"] {
+                        switch value.kind {
+                        case .null:
+                            self.\(propertyName) = nil
+                        default:
+                            self.\(propertyName) = try value.value(\(baseType).self)
+                        }
+                    } else {
+                        self.\(propertyName) = nil
+                    }
+                    """
                 } else {
-                    self.\(propertyName) = nil
+                    // For custom types that have Optional<T: ConvertibleFromGeneratedContent>
+                    return """
+                    if let value = properties["\(propertyName)"] {
+                        switch value.kind {
+                        case .null:
+                            self.\(propertyName) = nil
+                        default:
+                            self.\(propertyName) = try \(baseType)(value)
+                        }
+                    } else {
+                        self.\(propertyName) = nil
+                    }
+                    """
                 }
-                """
+                
             } else if isArray {
                 return """
                 if let value = properties["\(propertyName)"] {
