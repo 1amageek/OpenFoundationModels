@@ -288,7 +288,7 @@ let response = try await session.respond {
 // Output: "Tokyo is 22°C and sunny, while Paris is 15°C with clouds."
 ```
 
-### 6. Generation Control
+### 6. Generation Control & Response Format
 
 ```swift
 // Fine-tune generation behavior
@@ -315,6 +315,31 @@ let session = LanguageModelSession(
 let response = try await session.respond(options: options) {
     Prompt("Write a networking function")
 }
+
+// Response Format for structured output
+// ResponseFormat is automatically set when using respond(generating:)
+@Generable
+struct CodeReview {
+    let summary: String
+    let issues: [Issue]
+    let rating: Int
+}
+
+// When using respond(generating:), ResponseFormat is automatically included
+let review = try await session.respond(generating: CodeReview.self) {
+    Prompt("Review this Swift code: \(code)")
+}
+// Internally sets: responseFormat: Transcript.ResponseFormat(type: CodeReview.self)
+
+// Or explicitly with schema
+let schema = GenerationSchema(
+    type: CodeReview.self,
+    description: "Code review structure",
+    properties: [...]
+)
+
+let review = try await session.respond(to: prompt, schema: schema)
+// Internally sets: responseFormat: Transcript.ResponseFormat(schema: schema)
 ```
 
 ### 7. Use Any LLM Provider
@@ -421,10 +446,24 @@ OpenFoundationModels follows Apple's Foundation Models design philosophy where `
 public struct Transcript {
     public enum Entry {
         case instructions(Instructions)  // System instructions & tool definitions
-        case prompt(Prompt)              // User input
+        case prompt(Prompt)              // User input with optional ResponseFormat
         case response(Response)          // Model output
         case toolCalls(ToolCalls)        // Tool invocations
         case toolOutput(ToolOutput)      // Tool results
+    }
+    
+    // Prompt includes ResponseFormat for structured output
+    public struct Prompt {
+        var segments: [Segment]
+        var options: GenerationOptions
+        var responseFormat: ResponseFormat?  // Optional structured output format
+    }
+    
+    // ResponseFormat defines expected output structure
+    public struct ResponseFormat {
+        public init(schema: GenerationSchema)      // From explicit schema
+        public init<Content: Generable>(type: Content.Type)  // From Generable type
+        public var name: String { get }
     }
 }
 
@@ -440,9 +479,15 @@ let response = try await session.respond {
 }
 // Response is added to Transcript after generation
 
+// Structured output with ResponseFormat
+let response = try await session.respond(generating: ProductReview.self) {
+    Prompt("Review the iPhone 15")
+    // ResponseFormat(type: ProductReview.self) automatically added to Prompt
+}
+
 // LanguageModel receives complete context
 protocol LanguageModel {
-    // Receives full Transcript with all history, instructions, and tools
+    // Receives full Transcript with all history, instructions, tools, and ResponseFormat
     func generate(transcript: Transcript, options: GenerationOptions?) async throws -> String
 }
 ```
