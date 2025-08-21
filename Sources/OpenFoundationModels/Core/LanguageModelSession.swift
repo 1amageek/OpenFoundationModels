@@ -45,12 +45,20 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         self.init(model: model)
         self.tools = tools
         if let instructions = instructions {
+            var instructionContent = instructions.description
+            
+            // Add tool schemas to the instructions
+            let toolInstructions = generateToolInstructions(for: tools)
+            if !toolInstructions.isEmpty {
+                instructionContent += toolInstructions
+            }
+            
             let instructionEntry = Transcript.Entry.instructions(
                 Transcript.Instructions(
                     id: UUID().uuidString,
                     segments: [.text(Transcript.TextSegment(
                         id: UUID().uuidString,
-                        content: instructions.description
+                        content: instructionContent
                     ))],
                     toolDefinitions: tools.map { Transcript.ToolDefinition(tool: $0) }
                 )
@@ -815,6 +823,39 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         let typedArguments = try T.Arguments(arguments)
         let output = try await tool.call(arguments: typedArguments)
         return output.promptRepresentation.description
+    }
+    
+    private func generateToolInstructions(for tools: [any Tool]) -> String {
+        guard !tools.isEmpty else { return "" }
+        
+        var instructions = "\n\n## Available Tools\n"
+        
+        for tool in tools {
+            instructions += "\n### Tool: \(tool.name)\n"
+            instructions += "Description: \(tool.description)\n"
+            
+            if tool.includesSchemaInInstructions {
+                instructions += "Parameters:\n```json\n"
+                instructions += formatJSONSchema(tool.parameters)
+                instructions += "\n```\n"
+            }
+        }
+        
+        return instructions
+    }
+    
+    private func formatJSONSchema(_ schema: GenerationSchema) -> String {
+        // Since GenerationSchema is Codable, we can encode it to JSON
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        
+        if let data = try? encoder.encode(schema),
+           let string = String(data: data, encoding: .utf8) {
+            return string
+        }
+        
+        // Fallback to debug description
+        return schema.debugDescription
     }
     
     @discardableResult
