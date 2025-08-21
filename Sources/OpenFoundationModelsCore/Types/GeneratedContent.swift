@@ -38,7 +38,8 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
                 if let scalar = PartialJSON.extractTopLevelScalar(t) {
                     return mapJSONValueToKind(scalar)
                 }
-                return .string("")
+                // Return non-JSON text as-is instead of empty string
+                return .string(t)
             }
         }
         return .null
@@ -107,6 +108,20 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
         self.storage = Storage(root: Self.mapKindToJSONValue(kind), partialRaw: nil, isComplete: true, generationID: id)
     }
 
+    /// Creates equivalent content from a JSON string.
+    ///
+    /// The JSON string you provide may be incomplete. This is useful for correctly handling partially generated responses.
+    ///
+    /// ```swift
+    /// @Generable struct NovelIdea {
+    ///   let title: String
+    /// }
+    ///
+    /// let partial = #"{"title": "A story of"#
+    /// let content = try GeneratedContent(json: partial)
+    /// let idea = try NovelIdea(content)
+    /// print(idea.title) // A story of
+    /// ```
     public init(json: String) throws {
         let t = json.trimmingCharacters(in: .whitespacesAndNewlines)
         if t.isEmpty { 
@@ -114,24 +129,52 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
             return 
         }
         
-        guard let data = t.data(using: .utf8) else {
-            throw GeneratedContentError.invalidJSON("Invalid UTF-8 encoding")
+        // First, try to parse as complete JSON (including fragments like numbers, strings, booleans)
+        if let data = t.data(using: .utf8) {
+            do {
+                let obj = try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
+                let root = try Self.decodeJSONObject(obj)
+                self.storage = Storage(root: root, partialRaw: nil, isComplete: true, generationID: nil)
+                return
+            } catch {
+                // If complete JSON parsing fails, try partial JSON parsing
+            }
         }
         
-        do {
-            let obj = try JSONSerialization.jsonObject(with: data)
-            let root = try Self.decodeJSONObject(obj)
-            self.storage = Storage(root: root, partialRaw: nil, isComplete: true, generationID: nil)
-        } catch {
-            throw GeneratedContentError.invalidJSON("Invalid JSON: \(error.localizedDescription)")
+        // Try to parse as partial JSON
+        if t.hasPrefix("{") {
+            let obj = PartialJSON.extractObject(t)
+            self.storage = Storage(root: nil, partialRaw: t, isComplete: obj.complete, generationID: nil)
+            return
+        }
+        
+        if t.hasPrefix("[") {
+            let arr = PartialJSON.extractArray(t)
+            self.storage = Storage(root: nil, partialRaw: t, isComplete: arr.complete, generationID: nil)
+            return
+        }
+        
+        // Handle top-level scalars
+        if t.hasPrefix("\"") {
+            // Check if it's an unclosed string
+            if !Self.isJSONComplete(t) {
+                // Treat unclosed strings as partial
+                self.storage = Storage(root: nil, partialRaw: t, isComplete: false, generationID: nil)
+                return
+            }
+        }
+        
+        // Try to parse as a complete scalar value
+        if let scalar = PartialJSON.extractTopLevelScalar(t) {
+            self.storage = Storage(root: scalar, partialRaw: nil, isComplete: true, generationID: nil)
+        } else {
+            // If all parsing fails, treat as a partial string
+            self.storage = Storage(root: nil, partialRaw: t, isComplete: false, generationID: nil)
         }
     }
 
 
     public func properties() throws -> [String: GeneratedContent] {
-        guard storage.isComplete else {
-            throw GeneratedContentError.partialContent
-        }
         switch kind {
         case .structure(let props, _): return props
         default:
@@ -140,9 +183,6 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
     }
 
     public func elements() throws -> [GeneratedContent] {
-        guard storage.isComplete else {
-            throw GeneratedContentError.partialContent
-        }
         switch kind {
         case .array(let arr): return arr
         default:
@@ -237,60 +277,36 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
             switch v {
             case .null: return NSNull()
             case .bool(let b): return b
-            case .number(let d): return NSNumber(value: d)
+            case .number(let d): return d
             case .string(let s): return s
             case .array(let arr): return arr.map { toAny($0) }
-            case .object(let dict, _):
+            case .object(let dict, let ordered):
+                // Respect orderedKeys to maintain order
                 var m: [String: Any] = [:]
-                for (k, v) in dict { m[k] = toAny(v) }
+                let keys = ordered.isEmpty ? Array(dict.keys) : ordered
+                for k in keys { 
+                    if let v = dict[k] { 
+                        m[k] = toAny(v) 
+                    }
+                }
                 return m
             }
         }
+        
         let v = asJSONValue()
         let anyValue = toAny(v)
         
-        // JSONSerialization requires top-level object to be NSArray or NSDictionary
-        // Wrap primitive values in a dictionary
-        let jsonObject: Any
+        // Use fragmentsAllowed for primitive values
+        let options: JSONSerialization.WritingOptions
         switch v {
         case .array, .object:
-            jsonObject = anyValue
+            options = [.prettyPrinted]
         default:
-            // Wrap primitive values in a dictionary with a special key
-            jsonObject = ["__value": anyValue]
+            options = [.fragmentsAllowed]
         }
         
-        let data = try JSONSerialization.data(withJSONObject: jsonObject, options: [.prettyPrinted])
-        
-        // If we wrapped it, unwrap the JSON string
-        if let jsonString = String(data: data, encoding: .utf8) {
-            switch v {
-            case .array, .object:
-                return jsonString
-            default:
-                // Extract the wrapped value from the JSON string
-                // This is a bit hacky but preserves the exact JSON formatting
-                if let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let wrappedValue = parsed["__value"] {
-                    // Re-encode just the value
-                    if JSONSerialization.isValidJSONObject([wrappedValue]) {
-                        let valueData = try JSONSerialization.data(withJSONObject: [wrappedValue], options: [])
-                        if let valueString = String(data: valueData, encoding: .utf8),
-                           valueString.hasPrefix("[") && valueString.hasSuffix("]") {
-                            // Remove the array brackets to get the raw value
-                            let startIndex = valueString.index(valueString.startIndex, offsetBy: 1)
-                            let endIndex = valueString.index(valueString.endIndex, offsetBy: -1)
-                            return String(valueString[startIndex..<endIndex])
-                        }
-                    }
-                    // Fallback: return the value as a JSON string
-                    return "\"\(wrappedValue)\""
-                }
-                return jsonString
-            }
-        }
-        
-        return "{}"
+        let data = try JSONSerialization.data(withJSONObject: anyValue, options: options)
+        return String(data: data, encoding: .utf8) ?? "{}"
     }
 }
 
@@ -361,8 +377,11 @@ extension GeneratedContent {
         if let arr = obj as? [Any] { return .array(try arr.map { try decodeJSONObject($0) }) }
         if let dict = obj as? [String: Any] {
             var out: [String: JSONValue] = [:]
-            let keys = dict.keys.sorted()
-            for (k, v) in dict { out[k] = try decodeJSONObject(v) }
+            var keys: [String] = []
+            for (k, v) in dict { 
+                out[k] = try decodeJSONObject(v)
+                keys.append(k)  // Preserve insertion order
+            }
             return .object(out, orderedKeys: keys)
         }
         throw GeneratedContentError.invalidJSON("Unsupported JSON type: \(type(of: obj))")

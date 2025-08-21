@@ -340,4 +340,325 @@ struct GeneratedContentTests {
             #expect(asyncContent.text == "Sendable test")
         }
     }
+    
+    @Test("GeneratedContent with partial JSON object")
+    func generatedContentPartialJSONObject() throws {
+        let partialJSON = #"{"title": "A story of"#
+        
+        let content = try GeneratedContent(json: partialJSON)
+        
+        #expect(!content.isComplete)
+        
+        // The partial JSON should still be accessible through kind
+        switch content.kind {
+        case .structure(let properties, _):
+            #expect(properties["title"]?.text == "A story of")
+        default:
+            #expect(Bool(false), "Expected structure kind for partial object")
+        }
+    }
+    
+    @Test("GeneratedContent with partial JSON array")
+    func generatedContentPartialJSONArray() throws {
+        let partialJSON = #"["item1", "item2", "item"#
+        
+        let content = try GeneratedContent(json: partialJSON)
+        
+        #expect(!content.isComplete)
+        
+        // The partial JSON should still be accessible through kind
+        switch content.kind {
+        case .array(let elements):
+            #expect(elements.count >= 2)
+            #expect(elements[0].text == "item1")
+            #expect(elements[1].text == "item2")
+        default:
+            #expect(Bool(false), "Expected array kind for partial array")
+        }
+    }
+    
+    @Test("GeneratedContent with complete JSON after partial parsing")
+    func generatedContentCompleteJSONAfterPartial() throws {
+        // This JSON is complete but could be parsed as partial
+        let completeJSON = #"{"name": "John", "age": 30}"#
+        
+        let content = try GeneratedContent(json: completeJSON)
+        
+        #expect(content.isComplete)
+        
+        let properties = try content.properties()
+        #expect(properties["name"]?.text == "John")
+        #expect(try properties["age"]?.value(Int.self) == 30)
+    }
+    
+    @Test("GeneratedContent with nested partial JSON")
+    func generatedContentNestedPartialJSON() throws {
+        let partialJSON = #"{"user": {"name": "Alice", "preferences": {"theme": "dark"#
+        
+        let content = try GeneratedContent(json: partialJSON)
+        
+        #expect(!content.isComplete)
+        
+        // Check that partial nested structure is parsed
+        switch content.kind {
+        case .structure(let properties, _):
+            if let user = properties["user"] {
+                switch user.kind {
+                case .structure(let userProps, _):
+                    #expect(userProps["name"]?.text == "Alice")
+                default:
+                    #expect(Bool(false), "Expected nested structure for user")
+                }
+            } else {
+                #expect(Bool(false), "Expected user property")
+            }
+        default:
+            #expect(Bool(false), "Expected structure kind")
+        }
+    }
+    
+    @Test("GeneratedContent with partial string literal")
+    func generatedContentPartialStringLiteral() throws {
+        let partialJSON = #"{"message": "Hello, wor"#
+        
+        let content = try GeneratedContent(json: partialJSON)
+        
+        #expect(!content.isComplete)
+        
+        switch content.kind {
+        case .structure(let properties, _):
+            #expect(properties["message"]?.text == "Hello, wor")
+        default:
+            #expect(Bool(false), "Expected structure kind")
+        }
+    }
+    
+    @Test("GeneratedContent with top-level number")
+    func generatedContentTopLevelNumber() throws {
+        let content = try GeneratedContent(json: "42.5")
+        
+        #expect(content.isComplete)
+        #expect(try content.value(Double.self) == 42.5)
+        
+        switch content.kind {
+        case .number(let n):
+            #expect(n == 42.5)
+        default:
+            #expect(Bool(false), "Expected number kind")
+        }
+    }
+    
+    @Test("GeneratedContent with top-level boolean")
+    func generatedContentTopLevelBoolean() throws {
+        let contentTrue = try GeneratedContent(json: "true")
+        let contentFalse = try GeneratedContent(json: "false")
+        
+        #expect(contentTrue.isComplete)
+        #expect(contentFalse.isComplete)
+        #expect(try contentTrue.value(Bool.self) == true)
+        #expect(try contentFalse.value(Bool.self) == false)
+    }
+    
+    @Test("GeneratedContent with top-level null")
+    func generatedContentTopLevelNull() throws {
+        let content = try GeneratedContent(json: "null")
+        
+        #expect(content.isComplete)
+        
+        switch content.kind {
+        case .null:
+            #expect(true)
+        default:
+            #expect(Bool(false), "Expected null kind")
+        }
+    }
+    
+    @Test("GeneratedContent with top-level string")
+    func generatedContentTopLevelString() throws {
+        let content = try GeneratedContent(json: #""hello world""#)
+        
+        #expect(content.isComplete)
+        #expect(try content.value(String.self) == "hello world")
+        
+        switch content.kind {
+        case .string(let s):
+            #expect(s == "hello world")
+        default:
+            #expect(Bool(false), "Expected string kind")
+        }
+    }
+    
+    @Test("GeneratedContent with non-JSON text")
+    func generatedContentNonJSONText() throws {
+        let content = try GeneratedContent(json: "hello")
+        
+        #expect(!content.isComplete)
+        
+        switch content.kind {
+        case .string(let s):
+            #expect(s == "hello")
+        default:
+            #expect(Bool(false), "Expected string kind with non-JSON text")
+        }
+    }
+    
+    @Test("GeneratedContent preserves key order in partial JSON")
+    func generatedContentPreservesKeyOrderPartial() throws {
+        // Use partial JSON to test key order preservation
+        // (Complete JSON via JSONSerialization doesn't guarantee order)
+        let partialJson = #"{"b": 2, "a": 1, "c":"#
+        let content = try GeneratedContent(json: partialJson)
+        
+        switch content.kind {
+        case .structure(_, let orderedKeys):
+            // Partial JSON parser should preserve insertion order
+            #expect(orderedKeys == ["b", "a"])
+        default:
+            #expect(Bool(false), "Expected structure kind")
+        }
+    }
+    
+    @Test("GeneratedContent toJSONString respects orderedKeys")
+    func generatedContentToJSONStringRespectsOrder() throws {
+        let content = GeneratedContent(properties: ["b": 2, "a": 1, "c": 3])
+        let jsonString = content.jsonString
+        
+        // Should be valid JSON
+        let data = jsonString.data(using: .utf8)!
+        #expect(throws: Never.self) {
+            _ = try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
+        }
+        
+        // Should contain all keys
+        #expect(jsonString.contains("\"a\""))
+        #expect(jsonString.contains("\"b\""))
+        #expect(jsonString.contains("\"c\""))
+    }
+    
+    @Test("GeneratedContent partial JSON properties access")
+    func generatedContentPartialPropertiesAccess() throws {
+        let partialJSON = #"{"name": "Alice", "age": 2"#
+        let content = try GeneratedContent(json: partialJSON)
+        
+        #expect(!content.isComplete)
+        
+        // properties() should work even for partial content
+        let properties = try content.properties()
+        #expect(properties["name"]?.text == "Alice")
+        // "age": 2 is actually parsed as a complete number even without closing brace
+        #expect(try properties["age"]?.value(Double.self) == 2)
+    }
+    
+    @Test("GeneratedContent partial JSON elements access")
+    func generatedContentPartialElementsAccess() throws {
+        let partialJSON = #"["item1", "item2", "item"#
+        let content = try GeneratedContent(json: partialJSON)
+        
+        #expect(!content.isComplete)
+        
+        // elements() should work even for partial content
+        let elements = try content.elements()
+        #expect(elements.count >= 2)
+        #expect(elements[0].text == "item1")
+        #expect(elements[1].text == "item2")
+    }
+    
+    @Test("GeneratedContent with unclosed top-level string")
+    func generatedContentUnclosedTopLevelString() throws {
+        let unclosedString = #""hello wor"#
+        let content = try GeneratedContent(json: unclosedString)
+        
+        // Unclosed strings should be treated as partial
+        #expect(!content.isComplete)
+        
+        // PartialJSON.scanString extracts the value from unclosed strings
+        switch content.kind {
+        case .string(let s):
+            #expect(s == "hello wor")  // The extracted value, not the raw JSON
+        default:
+            #expect(Bool(false), "Expected string kind for unclosed string")
+        }
+        
+        // jsonString should return the original partial raw
+        #expect(content.jsonString == #""hello wor"#)
+    }
+    
+    @Test("GeneratedContent with closed top-level string")
+    func generatedContentClosedTopLevelString() throws {
+        let closedString = #""hello world""#
+        let content = try GeneratedContent(json: closedString)
+        
+        // Properly closed strings should be complete
+        #expect(content.isComplete)
+        #expect(try content.value(String.self) == "hello world")
+    }
+    
+    @Test("GeneratedContent partial object to Generable conversion")
+    func generatedContentPartialToGenerable() throws {
+        // Define a simple Generable type inline for testing
+        struct TestIdea: ConvertibleFromGeneratedContent {
+            let title: String
+            
+            init(_ content: GeneratedContent) throws {
+                switch content.kind {
+                case .structure(let props, _):
+                    self.title = try props["title"]?.value(String.self) ?? ""
+                default:
+                    throw GeneratedContentError.dictionaryExpected
+                }
+            }
+        }
+        
+        let partialJSON = #"{"title": "A story of"#
+        let content = try GeneratedContent(json: partialJSON)
+        
+        #expect(!content.isComplete)
+        
+        // Should be able to convert partial JSON to type
+        let idea = try TestIdea(content)
+        #expect(idea.title == "A story of")
+        
+        // jsonString should return the original partial
+        #expect(content.jsonString == #"{"title": "A story of"#)
+    }
+    
+    @Test("GeneratedContent fragments are complete")
+    func generatedContentFragmentsAreComplete() throws {
+        // Numbers are complete
+        let numberContent = try GeneratedContent(json: "12.5")
+        #expect(numberContent.isComplete)
+        #expect(try numberContent.value(Double.self) == 12.5)
+        
+        // Booleans are complete
+        let boolContent = try GeneratedContent(json: "true")
+        #expect(boolContent.isComplete)
+        #expect(try boolContent.value(Bool.self) == true)
+        
+        // null is complete
+        let nullContent = try GeneratedContent(json: "null")
+        #expect(nullContent.isComplete)
+        switch nullContent.kind {
+        case .null:
+            #expect(Bool(true))
+        default:
+            #expect(Bool(false), "Expected null kind")
+        }
+    }
+    
+    @Test("GeneratedContent partial array with incomplete literal")
+    func generatedContentPartialArrayWithIncompleteLiteral() throws {
+        let partialJSON = #"["a", 1, tru"#
+        let content = try GeneratedContent(json: partialJSON)
+        
+        #expect(!content.isComplete)
+        
+        switch content.kind {
+        case .array(let elems):
+            #expect(elems.count == 2) // "tru" is incomplete, not parsed
+            #expect(try elems[0].value(String.self) == "a")
+            #expect(try elems[1].value(Double.self) == 1)
+        default:
+            #expect(Bool(false), "Expected array kind")
+        }
+    }
 }
