@@ -213,14 +213,13 @@ let stream = session.streamResponse {
     Prompt("Explain the history of Swift programming language in detail")
 }
 
-for try await partial in stream {
-    print(partial.content, terminator: "")
-    
-    if partial.isComplete {
-        print("\n--- Generation Complete ---")
-        break
-    }
+for try await snapshot in stream {
+    print(snapshot.content, terminator: "")
 }
+
+// The stream completes when generation is done
+let finalResponse = try await stream.collect()
+print("\n--- Generation Complete ---")
 ```
 
 ### 4. Stream Complex Data Structures
@@ -245,9 +244,13 @@ for try await partial in stream {
         print("Progress: \(post.content.count) characters")
     }
     
-    if partial.isComplete {
-        print("Article generation complete!")
-    }
+    // Stream continues until completion
+}
+
+// Collect final response when stream ends
+let finalArticle = try await stream.collect()
+print("Article generation complete!")
+print("Final article: \(finalArticle.content)"
 }
 ```
 
