@@ -2,7 +2,7 @@ import Foundation
 import OpenFoundationModelsCore
 
 public struct Transcript: Sendable, Equatable, RandomAccessCollection {
-    internal private(set) var entries: [Entry]
+    package private(set) var entries: [Entry]
     
     public init<S: Sequence<Entry>>(entries: S = []) {
         self.entries = Array(entries)
@@ -182,7 +182,7 @@ extension Transcript {
         public typealias ID = String
         
         public var id: String
-        internal var calls: [ToolCall]
+        package var calls: [ToolCall]
         
         public init<S>(id: String = UUID().uuidString, _ calls: S) where S: Sequence, S.Element == ToolCall {
             self.id = id
@@ -227,9 +227,9 @@ extension Transcript {
     public struct ResponseFormat: Sendable {
         public var name: String
         
-        internal var type: String?
+        package var type: String?
         
-        internal var schema: GenerationSchema?
+        package var schema: GenerationSchema?
         
         public init(schema: GenerationSchema) {
             self.name = "schema-based"

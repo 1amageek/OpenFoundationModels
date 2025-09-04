@@ -22,6 +22,9 @@ let package = Package(
         .library(
             name: "OpenFoundationModelsMacros",
             targets: ["OpenFoundationModelsMacros"]),
+        .library(
+            name: "OpenFoundationModelsExtra",
+            targets: ["OpenFoundationModelsExtra"]),
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "600.0.0"),
@@ -56,6 +59,11 @@ let package = Package(
                 "OpenFoundationModelsMacrosImpl",
                 "OpenFoundationModelsCore"
             ]
+        ),
+        
+        .target(
+            name: "OpenFoundationModelsExtra",
+            dependencies: ["OpenFoundationModels"]
         ),
         
         .testTarget(
