@@ -520,20 +520,9 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             generatePartialPropertyExtraction(propertyName: prop.name, propertyType: prop.type)
         }.joined(separator: "\n            ")
         
-        let requiredProperties = properties.filter { !$0.type.hasSuffix("?") }
-        let requiredPropertiesCheck: String
-        if requiredProperties.isEmpty {
-            requiredPropertiesCheck = "true"
-        } else {
-            let checks = requiredProperties.map { "self.\($0.name) != nil" }.joined(separator: " && ")
-            requiredPropertiesCheck = "(\(checks))"
-        }
-        
         return DeclSyntax(stringLiteral: """
-        public struct PartiallyGenerated: Sendable, ConvertibleFromGeneratedContent, PartiallyGeneratedProtocol {
+        public struct PartiallyGenerated: Sendable, ConvertibleFromGeneratedContent {
             \(optionalProperties)
-            
-            public let isComplete: Bool
             
             private let rawContent: GeneratedContent
             
@@ -542,11 +531,8 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                 
                 if \(properties.isEmpty ? "let _ = try? generatedContent.properties()" : "let properties = try? generatedContent.properties()") {
                     \(propertyExtractions)
-                    
-                    self.isComplete = generatedContent.isComplete && \(requiredPropertiesCheck)
                 } else {
                     \(properties.map { "self.\($0.name) = nil" }.joined(separator: "\n                    "))
-                    self.isComplete = false
                 }
             }
             

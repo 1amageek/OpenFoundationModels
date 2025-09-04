@@ -75,7 +75,8 @@ struct PartiallyGeneratedOptionalTests {
         #expect(partial.optionalInt == nil)
         
         
-        #expect(partial.isComplete == false)
+        // Note: Completion is now tracked via GeneratedContent.isComplete
+        // #expect(partial.isComplete == false)
     }
     
     @Test("PartiallyGenerated with partial data")
@@ -91,7 +92,8 @@ struct PartiallyGeneratedOptionalTests {
         #expect(partial.optionalArray == nil)
         #expect(partial.requiredInt == nil)
         
-        #expect(partial.isComplete == false)  // Not all required fields present
+        // Note: Completion is now tracked via GeneratedContent.isComplete
+        // #expect(partial.isComplete == false)  // Not all required fields present
     }
     
     @Test("Array types get empty array defaults in normal init")
@@ -112,7 +114,6 @@ struct PartiallyGeneratedOptionalTests {
         #expect(partial1.numbers == nil)
         #expect(partial1.booleans == nil)
         #expect(partial1.custom == nil)
-        #expect(partial1.isComplete == false)
         
         let json2 = #"{"strings": ["a", "b"], "numbers": []}"#
         let partial2 = try TestArrayDefaults.PartiallyGenerated(GeneratedContent(json: json2))
@@ -121,7 +122,6 @@ struct PartiallyGeneratedOptionalTests {
         #expect(partial2.numbers == [])  // Empty array is valid data
         #expect(partial2.booleans == nil)  // Missing
         #expect(partial2.custom == nil)  // Missing
-        #expect(partial2.isComplete == false)
     }
     
     @Test("Custom types handle missing data gracefully")
@@ -132,7 +132,8 @@ struct PartiallyGeneratedOptionalTests {
         #expect(partial.optional == nil)
         #expect(partial.array == nil)
         #expect(partial.optionalArray == nil)
-        #expect(partial.isComplete == false)
+        // Note: Completion is now tracked via GeneratedContent.isComplete
+        // #expect(partial.isComplete == false)
         
         do {
             let _ = try TestCustomDefaults(GeneratedContent(json: "{}"))
@@ -185,7 +186,8 @@ struct PartiallyGeneratedOptionalTests {
         #expect(partial.requiredInt == 42)
         #expect(partial.optionalInt == 100)
         
-        #expect(partial.isComplete == true)
+        // Note: Completion is now tracked via GeneratedContent.isComplete
+        // #expect(partial.isComplete == true)
     }
     
     @Test("Type preservation in PartiallyGenerated")
@@ -211,6 +213,7 @@ struct PartiallyGeneratedOptionalTests {
         #expect(partial.optionalArray == ["b"])
         #expect(partial.requiredInt == 1)
         #expect(partial.optionalInt == 2)
-        #expect(partial.isComplete == true)
+        // Note: Completion is now tracked via GeneratedContent.isComplete
+        // #expect(partial.isComplete == true)
     }
 }

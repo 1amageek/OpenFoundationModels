@@ -89,7 +89,6 @@ struct PartiallyGeneratedTests {
         
         #expect(partial.name == "Alice")
         #expect(partial.age == 25)
-        #expect(partial.isComplete == true)
     }
     
     @Test("Partial Response creation and isComplete flag", .disabled("Response.Partial not implemented"))
@@ -147,7 +146,7 @@ struct PartiallyGeneratedTests {
         #expect(partial.name == "Widget")
         #expect(partial.price == 19.99)
         #expect(partial.inStock == nil)  // Missing property should be nil
-        #expect(partial.isComplete == false)  // Not all properties present
+        // Note: Completion is now tracked via GeneratedContent.isComplete, not on PartiallyGenerated
         
         let completeJSON = #"{"name": "Widget", "price": 19.99, "inStock": true}"#
         let complete = try TestProduct.PartiallyGenerated(GeneratedContent(json: completeJSON))
@@ -155,7 +154,7 @@ struct PartiallyGeneratedTests {
         #expect(complete.name == "Widget")
         #expect(complete.price == 19.99)
         #expect(complete.inStock == true)
-        #expect(complete.isComplete == true)  // All properties present
+        // Note: Completion is tracked via GeneratedContent.isComplete
     }
     
     @Test("PartiallyGenerated Sendable conformance")
@@ -252,7 +251,6 @@ struct PartiallyGeneratedTests {
         #expect(partial1.username == nil)
         #expect(partial1.email == nil)
         #expect(partial1.score == nil)
-        #expect(partial1.isComplete == false)
         
         let stage2 = try GeneratedContent(json: #"{"id": "user123"}"#)
         let partial2 = try TestStreamingProfile.PartiallyGenerated(stage2)
@@ -260,7 +258,6 @@ struct PartiallyGeneratedTests {
         #expect(partial2.username == nil)
         #expect(partial2.email == nil)
         #expect(partial2.score == nil)
-        #expect(partial2.isComplete == false)
         
         let stage3 = try GeneratedContent(json: #"{"id": "user123", "username": "alice", "email": "alice@example.com"}"#)
         let partial3 = try TestStreamingProfile.PartiallyGenerated(stage3)
@@ -268,7 +265,6 @@ struct PartiallyGeneratedTests {
         #expect(partial3.username == "alice")
         #expect(partial3.email == "alice@example.com")
         #expect(partial3.score == nil)
-        #expect(partial3.isComplete == false)
         
         let stage4 = try GeneratedContent(json: #"{"id": "user123", "username": "alice", "email": "alice@example.com", "score": 95}"#)
         let partial4 = try TestStreamingProfile.PartiallyGenerated(stage4)
@@ -276,7 +272,6 @@ struct PartiallyGeneratedTests {
         #expect(partial4.username == "alice")
         #expect(partial4.email == "alice@example.com")
         #expect(partial4.score == 95)
-        #expect(partial4.isComplete == true)
     }
     
     @Test("Progressive nested JSON parsing")
@@ -287,14 +282,12 @@ struct PartiallyGeneratedTests {
         #expect(partial1.name == nil)
         #expect(partial1.address == nil)
         #expect(partial1.employees == nil)
-        #expect(partial1.isComplete == false)
         
         let stage2 = try GeneratedContent(json: #"{"name": "TechCorp"}"#)
         let partial2 = try TestCompany.PartiallyGenerated(stage2)
         #expect(partial2.name == "TechCorp")
         #expect(partial2.address == nil)
         #expect(partial2.employees == nil)
-        #expect(partial2.isComplete == false)
         
         let stage3 = try GeneratedContent(json: #"""
         {
@@ -316,7 +309,6 @@ struct PartiallyGeneratedTests {
         #expect(partial3.address?.street == "123 Main St")
         #expect(partial3.employees != nil)
         #expect(partial3.employees?.count == 2)
-        #expect(partial3.isComplete == true)
     }
     
     @Test("Array streaming with partial elements", .disabled("Array structures temporarily disabled"))
