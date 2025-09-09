@@ -27,13 +27,12 @@ fileprivate struct TestArrays {
     var requiredArray: [String]
 }
 
-// Dictionary tests will be added later
-// @Generable
-// fileprivate struct TestDictionary {
-//     var metadata: [String: Int]?
-//     var config: [String: String]?
-//     var requiredDict: [String: Bool]
-// }
+@Generable
+fileprivate struct TestDictionary {
+    var metadata: [String: Int]?
+    var config: [String: String]?
+    var requiredDict: [String: Bool]
+}
 
 @Generable
 fileprivate struct OuterNested {
@@ -53,8 +52,44 @@ fileprivate struct OuterNested {
     }
 }
 
+@Generable
+fileprivate struct RootSchemaTest {
+    var name: String
+    var value: Int
+}
+
 @Suite("Complete JSON Schema Generation Tests", .tags(.schema, .unit))
 struct CompleteJSONSchemaTests {
+    
+    @Test("Root schema includes $schema field")
+    func testRootSchemaField() throws {
+        let schema = RootSchemaTest.generationSchema
+        let json = schema.toSchemaDictionary(asRootSchema: true)
+        
+        // Check for $schema field
+        if let schemaField = json["$schema"] as? String {
+            #expect(schemaField == "https://json-schema.org/draft/2020-12/schema")
+        } else {
+            Issue.record("$schema field not found in root schema")
+        }
+        
+        // Verify basic schema structure is preserved
+        #expect(json["type"] as? String == "object")
+        #expect(json["properties"] != nil)
+    }
+    
+    @Test("Non-root schemas do not include $schema field")
+    func testNonRootSchemaField() throws {
+        let schema = RootSchemaTest.generationSchema
+        let json = schema.toSchemaDictionary() // Default is non-root
+        
+        // $schema should not be present
+        #expect(json["$schema"] == nil)
+        
+        // Verify basic schema structure is preserved
+        #expect(json["type"] as? String == "object")
+        #expect(json["properties"] != nil)
+    }
     
     @Test("PersonProfile generates complete JSON Schema with nested objects and arrays")
     func testPersonProfileCompleteSchema() throws {
@@ -204,7 +239,73 @@ struct CompleteJSONSchemaTests {
         }
     }
     
-    // Dictionary test will be added later after fixing Dictionary+Generable
+    @Test("Dictionary types generate JSON Schema with additionalProperties")
+    func testDictionaryAdditionalProperties() throws {
+        let schema = TestDictionary.generationSchema
+        let json = schema.toSchemaDictionary()
+        
+        guard let properties = json["properties"] as? [String: Any] else {
+            Issue.record("Properties not found")
+            return
+        }
+        
+        // Test optional [String: Int] dictionary
+        if let metadata = properties["metadata"] as? [String: Any] {
+            // Should be ["object", "null"] for optional
+            if let type = metadata["type"] as? [String] {
+                #expect(type.contains("object"))
+                #expect(type.contains("null"))
+            }
+            
+            // Should have additionalProperties for dictionary values
+            if let additionalProps = metadata["additionalProperties"] as? [String: Any] {
+                #expect(additionalProps["type"] as? String == "integer")
+            } else {
+                Issue.record("metadata should have additionalProperties field")
+            }
+        } else {
+            Issue.record("metadata property not found")
+        }
+        
+        // Test optional [String: String] dictionary
+        if let config = properties["config"] as? [String: Any] {
+            // Should be ["object", "null"] for optional
+            if let type = config["type"] as? [String] {
+                #expect(type.contains("object"))
+                #expect(type.contains("null"))
+            }
+            
+            // Should have additionalProperties for dictionary values
+            if let additionalProps = config["additionalProperties"] as? [String: Any] {
+                #expect(additionalProps["type"] as? String == "string")
+            } else {
+                Issue.record("config should have additionalProperties field")
+            }
+        } else {
+            Issue.record("config property not found")
+        }
+        
+        // Test required [String: Bool] dictionary
+        if let requiredDict = properties["requiredDict"] as? [String: Any] {
+            #expect(requiredDict["type"] as? String == "object")
+            
+            // Should have additionalProperties for dictionary values
+            if let additionalProps = requiredDict["additionalProperties"] as? [String: Any] {
+                #expect(additionalProps["type"] as? String == "boolean")
+            } else {
+                Issue.record("requiredDict should have additionalProperties field")
+            }
+        } else {
+            Issue.record("requiredDict property not found")
+        }
+        
+        // Check required fields
+        if let required = json["required"] as? [String] {
+            #expect(required.contains("requiredDict"))
+            #expect(!required.contains("metadata"))
+            #expect(!required.contains("config"))
+        }
+    }
     
     @Test("Deeply nested optional objects preserve complete structure")
     func testNestedOptionalObjects() throws {

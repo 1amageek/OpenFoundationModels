@@ -5,10 +5,11 @@ import Foundation
 extension Dictionary: Generable where Key == String, Value: Generable {
     
     public static var generationSchema: GenerationSchema {
+        // Create a dictionary schema with additionalProperties
+        let valueSchema = Value.generationSchema.schemaType
         return GenerationSchema(
-            type: Dictionary<String, Value>.self,
-            description: "Dictionary with String keys and \(String(describing: Value.self)) values",
-            properties: []
+            schemaType: .dictionary(valueType: valueSchema),
+            description: "Dictionary with String keys and \(String(describing: Value.self)) values"
         )
     }
 }

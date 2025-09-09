@@ -148,11 +148,40 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         return (nil, [], nil)
     }
     
+    // MARK: - Dictionary Type Helpers
+    
+    private static func isDictionaryType(_ type: String) -> Bool {
+        let trimmed = type.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Check for Dictionary format: [Key: Value]
+        return trimmed.hasPrefix("[") && trimmed.contains(":") && trimmed.hasSuffix("]")
+    }
+    
+    private static func extractDictionaryTypes(_ type: String) -> (key: String, value: String)? {
+        let trimmed = type.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Remove brackets and split by colon
+        guard trimmed.hasPrefix("[") && trimmed.hasSuffix("]") && trimmed.contains(":") else {
+            return nil
+        }
+        
+        let inner = String(trimmed.dropFirst().dropLast())
+        let parts = inner.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        
+        guard parts.count == 2 else { return nil }
+        
+        return (key: parts[0], value: parts[1])
+    }
+    
     private static func getDefaultValue(for type: String) -> String {
         let trimmedType = type.trimmingCharacters(in: .whitespacesAndNewlines)
         
         if trimmedType.hasSuffix("?") {
             return "nil"
+        }
+        
+        // Check for Dictionary type first
+        if isDictionaryType(trimmedType) {
+            return "[:]"
         }
         
         if trimmedType.hasPrefix("[") && trimmedType.hasSuffix("]") {
@@ -240,13 +269,25 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         case "Bool", "Bool?":
             return "self.\(propertyName) = try? properties[\"\(propertyName)\"]?.value(Bool.self)"
         default:
-            return """
-            if let value = properties[\"\(propertyName)\"] {
-                self.\(propertyName) = try? \(propertyType)(value)
+            // Check if it's a Dictionary type
+            let baseType = propertyType.replacingOccurrences(of: "?", with: "")
+            if isDictionaryType(baseType) {
+                return """
+                if let value = properties[\"\(propertyName)\"] {
+                    self.\(propertyName) = try? \(baseType)(value)
+                } else {
+                    self.\(propertyName) = nil
+                }
+                """
             } else {
-                self.\(propertyName) = nil
+                return """
+                if let value = properties[\"\(propertyName)\"] {
+                    self.\(propertyName) = try? \(propertyType)(value)
+                } else {
+                    self.\(propertyName) = nil
+                }
+                """
             }
-            """
         }
     }
     
@@ -274,7 +315,8 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             """
         default:
             let isOptional = propertyType.hasSuffix("?")
-            let isArray = propertyType.hasPrefix("[") && propertyType.hasSuffix("]")
+            let isDictionary = isDictionaryType(propertyType.replacingOccurrences(of: "?", with: ""))
+            let isArray = !isDictionary && propertyType.hasPrefix("[") && propertyType.hasSuffix("]")
             
             if isOptional {
                 let baseType = propertyType.replacingOccurrences(of: "?", with: "")
@@ -310,6 +352,14 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                     """
                 }
                 
+            } else if isDictionary {
+                return """
+                if let value = properties["\(propertyName)"] {
+                    self.\(propertyName) = try \(propertyType)(value)
+                } else {
+                    self.\(propertyName) = [:]
+                }
+                """
             } else if isArray {
                 return """
                 if let value = properties["\(propertyName)"] {
@@ -341,6 +391,9 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                     return "properties[\"\(propName)\"] = \(propName).map { GeneratedContent($0) } ?? GeneratedContent(kind: .null)"
                 } else if baseType == "Int" || baseType == "Double" || baseType == "Float" || baseType == "Bool" || baseType == "Decimal" {
                     return "properties[\"\(propName)\"] = \(propName).map { $0.generatedContent } ?? GeneratedContent(kind: .null)"
+                } else if isDictionaryType(baseType) {
+                    // Handle optional dictionary types
+                    return "properties[\"\(propName)\"] = \(propName).map { $0.generatedContent } ?? GeneratedContent(kind: .null)"
                 } else if baseType.hasPrefix("[") && baseType.hasSuffix("]") {
                     return "properties[\"\(propName)\"] = \(propName).map { GeneratedContent(elements: $0) } ?? GeneratedContent(kind: .null)"
                 } else {
@@ -352,6 +405,9 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                             }
                     """
                 }
+            } else if isDictionaryType(propType) {
+                // Handle non-optional dictionary types
+                return "properties[\"\(propName)\"] = \(propName).generatedContent"
             } else if propType.hasPrefix("[") && propType.hasSuffix("]") {
                 let elementType = String(propType.dropFirst().dropLast())
                 if elementType == "String" {

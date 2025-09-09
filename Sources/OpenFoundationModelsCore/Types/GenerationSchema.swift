@@ -9,6 +9,7 @@ public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible 
     internal indirect enum SchemaType: Sendable {
         case object(properties: [PropertyInfo])
         case array(element: SchemaType, minItems: Int?, maxItems: Int?)
+        case dictionary(valueType: SchemaType)
         case anyOf([SchemaType])
         case generic(type: any Generable.Type, guides: [AnyGenerationGuide])
     }
@@ -73,6 +74,14 @@ public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible 
             }
             self.schemaType = .generic(type: generableType, guides: [])
         }
+    }
+    
+    internal init(
+        schemaType: SchemaType,
+        description: String? = nil
+    ) {
+        self.schemaType = schemaType
+        self._description = description
     }
     
     
@@ -191,10 +200,6 @@ public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible 
         self._description = description
     }
     
-    internal init(schemaType: SchemaType, description: String? = nil) {
-        self.schemaType = schemaType
-        self._description = description
-    }
     
     
     
@@ -203,6 +208,8 @@ public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible 
         case .object(let properties):
             let propList = properties.map { "\($0.name)" }.joined(separator: ", ")
             return "GenerationSchema(object: [\(propList)])"
+        case .dictionary(let valueType):
+            return "GenerationSchema(dictionary: \(valueType))"
         case .anyOf(let schemas):
             // Check if this is a simple enum (all string constants)
             var isEnum = true
@@ -237,8 +244,15 @@ public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible 
         }
     }
     
-    internal func toSchemaDictionary() -> [String: Any] {
-        return schemaType.toJSONSchema(description: _description)
+    internal func toSchemaDictionary(asRootSchema: Bool = false) -> [String: Any] {
+        var schema = schemaType.toJSONSchema(description: _description)
+        
+        // Add $schema field for root schemas
+        if asRootSchema {
+            schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
+        }
+        
+        return schema
     }
     
 }
@@ -540,6 +554,8 @@ extension GenerationSchema.SchemaType {
             return "object"
         case .array:
             return "array"
+        case .dictionary:
+            return "object"
         case .generic(let type, _):
             return Self.jsonSchemaType(for: type)
         case .anyOf:
@@ -632,6 +648,10 @@ extension GenerationSchema.SchemaType {
                     result["required"] = required
                 }
             }
+            
+        case .dictionary(let valueType):
+            result["type"] = "object"
+            result["additionalProperties"] = valueType.toJSONSchema()
             
         case .array(let element, let minItems, let maxItems):
             result["type"] = "array"
