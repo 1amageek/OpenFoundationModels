@@ -22,7 +22,8 @@
       "Bash(swift:*)",
       "Bash(sed:*)",
       "WebSearch",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:json-schema.org)"
     ],
     "deny": []
   }

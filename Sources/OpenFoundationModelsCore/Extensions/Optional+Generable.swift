@@ -6,11 +6,9 @@ extension Optional: Generable where Wrapped: Generable {
     public typealias PartiallyGenerated = Wrapped.PartiallyGenerated
     
     public static var generationSchema: GenerationSchema {
-        return GenerationSchema(
-            type: Optional<Wrapped>.self,
-            description: "Optional \(String(describing: Wrapped.self))",
-            properties: []
-        )
+        // Return the wrapped type's schema directly
+        // The Optional handling will be done at the PropertyInfo level
+        return Wrapped.generationSchema
     }
     
     public func asPartiallyGenerated() -> PartiallyGenerated {
