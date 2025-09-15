@@ -88,8 +88,8 @@ struct ToolExecutionLoopTests {
             ))
         }
         
-        func stream(transcript: Transcript, options: GenerationOptions?) -> AsyncStream<Transcript.Entry> {
-            return AsyncStream { continuation in
+        func stream(transcript: Transcript, options: GenerationOptions?) -> AsyncThrowingStream<Transcript.Entry, Error> {
+            return AsyncThrowingStream { continuation in
                 Task {
                     for response in responses[currentIndex...] {
                         continuation.yield(response)

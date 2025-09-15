@@ -470,10 +470,11 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                     var currentEntry: Transcript.Entry?
                     
                     // Process streaming entries
-                    for await entry in entryStream {
-                        currentEntry = entry
-                        
-                        switch entry {
+                    do {
+                        for try await entry in entryStream {
+                            currentEntry = entry
+
+                            switch entry {
                         case .response(let response):
                             // Extract text from response segments and yield
                             for segment in response.segments {
@@ -499,10 +500,15 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                             )
                             continuation.yield(snapshot)
                             
-                        default:
-                            // Other entries are stored but not yielded
-                            break
+                            default:
+                                // Other entries are stored but not yielded
+                                break
+                            }
                         }
+                    } catch {
+                        // Forward stream errors
+                        continuation.finish(throwing: error)
+                        return
                     }
                     
                     // Add entry to transcript and handle based on type
@@ -603,35 +609,41 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 )
                 var accumulatedContent: GeneratedContent?
                 var finalEntry: Transcript.Entry?
-                
-                for await entry in entryStream {
-                    switch entry {
-                    case .response(let response):
-                        // Extract structured content from response
-                        for segment in response.segments {
-                            if case .structure(let structuredSegment) = segment {
-                                accumulatedContent = structuredSegment.content
-                            } else if case .text(let textSegment) = segment {
-                                // Try to parse as JSON or use as is
-                                accumulatedContent = try? GeneratedContent(json: textSegment.content)
-                                if accumulatedContent == nil {
-                                    accumulatedContent = GeneratedContent(textSegment.content)
+
+                do {
+                    for try await entry in entryStream {
+                        switch entry {
+                        case .response(let response):
+                            // Extract structured content from response
+                            for segment in response.segments {
+                                if case .structure(let structuredSegment) = segment {
+                                    accumulatedContent = structuredSegment.content
+                                } else if case .text(let textSegment) = segment {
+                                    // Try to parse as JSON or use as is
+                                    accumulatedContent = try? GeneratedContent(json: textSegment.content)
+                                    if accumulatedContent == nil {
+                                        accumulatedContent = GeneratedContent(textSegment.content)
+                                    }
                                 }
                             }
+
+                            if let content = accumulatedContent {
+                                let snapshot = ResponseStream<GeneratedContent>.Snapshot(
+                                    content: content,
+                                    rawContent: content
+                                )
+                                continuation.yield(snapshot)
+                            }
+                            finalEntry = entry
+
+                        default:
+                            finalEntry = entry
                         }
-                        
-                        if let content = accumulatedContent {
-                            let snapshot = ResponseStream<GeneratedContent>.Snapshot(
-                                content: content,
-                                rawContent: content
-                            )
-                            continuation.yield(snapshot)
-                        }
-                        finalEntry = entry
-                        
-                    default:
-                        finalEntry = entry
                     }
+                } catch {
+                    // Forward stream errors
+                    continuation.finish(throwing: error)
+                    return
                 }
                 
                 // Add final entry to transcript
@@ -710,38 +722,44 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 )
                 var accumulatedContent: GeneratedContent?
                 var finalEntry: Transcript.Entry?
-                
-                for await entry in entryStream {
-                    switch entry {
-                    case .response(let response):
-                        // Extract structured content from response
-                        for segment in response.segments {
-                            if case .structure(let structuredSegment) = segment {
-                                accumulatedContent = structuredSegment.content
-                            } else if case .text(let textSegment) = segment {
-                                // Try to parse as JSON
-                                accumulatedContent = try? GeneratedContent(json: textSegment.content)
-                                if accumulatedContent == nil {
-                                    accumulatedContent = GeneratedContent(textSegment.content)
+
+                do {
+                    for try await entry in entryStream {
+                        switch entry {
+                        case .response(let response):
+                            // Extract structured content from response
+                            for segment in response.segments {
+                                if case .structure(let structuredSegment) = segment {
+                                    accumulatedContent = structuredSegment.content
+                                } else if case .text(let textSegment) = segment {
+                                    // Try to parse as JSON
+                                    accumulatedContent = try? GeneratedContent(json: textSegment.content)
+                                    if accumulatedContent == nil {
+                                        accumulatedContent = GeneratedContent(textSegment.content)
+                                    }
                                 }
                             }
-                        }
-                        
-                        if let generatedContent = accumulatedContent {
-                            // Try to parse as PartialContent
-                            if let partialData = try? PartialContent(generatedContent) {
-                                let snapshot = ResponseStream<Content>.Snapshot(
-                                    content: partialData,
-                                    rawContent: generatedContent
-                                )
-                                continuation.yield(snapshot)
+
+                            if let generatedContent = accumulatedContent {
+                                // Try to parse as PartialContent
+                                if let partialData = try? PartialContent(generatedContent) {
+                                    let snapshot = ResponseStream<Content>.Snapshot(
+                                        content: partialData,
+                                        rawContent: generatedContent
+                                    )
+                                    continuation.yield(snapshot)
+                                }
                             }
+                            finalEntry = entry
+
+                        default:
+                            finalEntry = entry
                         }
-                        finalEntry = entry
-                        
-                    default:
-                        finalEntry = entry
                     }
+                } catch {
+                    // Forward stream errors
+                    continuation.finish(throwing: error)
+                    return
                 }
                 
                 // Add final entry to transcript

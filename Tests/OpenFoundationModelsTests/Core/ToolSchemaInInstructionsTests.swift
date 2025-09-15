@@ -67,10 +67,10 @@ struct ToolSchemaInInstructionsTests {
             ))
         }
         
-        func stream(transcript: Transcript, options: GenerationOptions?) -> AsyncStream<Transcript.Entry> {
+        func stream(transcript: Transcript, options: GenerationOptions?) -> AsyncThrowingStream<Transcript.Entry, Error> {
             capturedTranscript = transcript
-            
-            return AsyncStream { continuation in
+
+            return AsyncThrowingStream { continuation in
                 continuation.yield(.response(Transcript.Response(
                     id: UUID().uuidString,
                     assetIDs: [],

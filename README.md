@@ -491,7 +491,8 @@ let response = try await session.respond(generating: ProductReview.self) {
 // LanguageModel receives complete context
 protocol LanguageModel {
     // Receives full Transcript with all history, instructions, tools, and ResponseFormat
-    func generate(transcript: Transcript, options: GenerationOptions?) async throws -> String
+    func generate(transcript: Transcript, options: GenerationOptions?) async throws -> Transcript.Entry
+    func stream(transcript: Transcript, options: GenerationOptions?) -> AsyncThrowingStream<Transcript.Entry, Error>
 }
 ```
 
