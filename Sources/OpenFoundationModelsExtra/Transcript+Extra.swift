@@ -24,3 +24,11 @@ extension Transcript.ToolCalls {
         return calls
     }
 }
+
+extension Transcript.ResponseFormat {
+    /// Access to internal schema for provider implementations
+    /// - Note: This property provides direct access to the internal schema
+    public var _schema: GenerationSchema? {
+        return schema
+    }
+}
