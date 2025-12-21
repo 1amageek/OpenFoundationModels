@@ -1,33 +1,53 @@
 import Foundation
 import OpenFoundationModelsCore
 
-public struct Transcript: Sendable, Equatable, RandomAccessCollection {
+/// A record of the conversation between the user and the language model.
+///
+/// Transcript maintains the complete history of interactions including instructions,
+/// prompts, responses, tool calls, and tool outputs.
+public struct Transcript: Sendable,
+                          Equatable,
+                          SendableMetatype,
+                          BidirectionalCollection,
+                          RandomAccessCollection {
+
     package private(set) var entries: [Entry]
-    
+
+    /// Creates a transcript with the given entries.
     public init<S: Sequence<Entry>>(entries: S = []) {
         self.entries = Array(entries)
     }
-    
+
     // MARK: - RandomAccessCollection
+
     public typealias Index = Int
     public typealias Element = Transcript.Entry
     public typealias Indices = Range<Transcript.Index>
     public typealias Iterator = IndexingIterator<Transcript>
     public typealias SubSequence = Slice<Transcript>
-    
-    public var startIndex: Int { 
-        entries.startIndex 
+
+    public var startIndex: Int {
+        entries.startIndex
     }
-    
-    public var endIndex: Int { 
-        entries.endIndex 
+
+    public var endIndex: Int {
+        entries.endIndex
     }
-    
+
     public subscript(index: Transcript.Index) -> Transcript.Entry {
         entries[index]
     }
-    
+
+    public func index(before i: Int) -> Int {
+        entries.index(before: i)
+    }
+
+    public func index(after i: Int) -> Int {
+        entries.index(after: i)
+    }
+
     // MARK: - Equatable
+
     public static func ==(lhs: Transcript, rhs: Transcript) -> Bool {
         return lhs.entries == rhs.entries
     }

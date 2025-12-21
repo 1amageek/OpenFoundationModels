@@ -1,14 +1,14 @@
 # OpenFoundationModels
 
-[![Swift](https://img.shields.io/badge/Swift-6.1+-orange.svg)](https://swift.org)
-[![Platform](https://img.shields.io/badge/Platform-iOS%20%7C%20macOS%20%7C%20tvOS%20%7C%20watchOS%20%7C%20visionOS-blue.svg)](https://developer.apple.com)
-[![Tests](https://img.shields.io/badge/Tests-221%20passing-brightgreen.svg)](#testing)
+[![Swift](https://img.shields.io/badge/Swift-6.2+-orange.svg)](https://swift.org)
+[![Platform](https://img.shields.io/badge/Platform-iOS%2026%2B%20%7C%20macOS%2026%2B%20%7C%20visionOS%2026%2B-blue.svg)](https://developer.apple.com)
+[![Tests](https://img.shields.io/badge/Tests-328%20passing-brightgreen.svg)](#testing)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/1amageek/OpenFoundationModels)
 
 **100% Apple Foundation Models β SDK Compatible Implementation**
 
-OpenFoundationModels is a complete **open-source implementation** of Apple's Foundation Models framework (iOS 26/macOS 15 Xcode 17b3), providing 100% API compatibility while enabling use outside Apple's ecosystem.
+OpenFoundationModels is a complete **open-source implementation** of Apple's Foundation Models framework (iOS 26.0+/macOS 26.0+), providing 100% API compatibility while enabling integration with any LLM provider.
 
 ## Why OpenFoundationModels?
 
@@ -27,23 +27,25 @@ OpenFoundationModels solves these limitations as an **Apple-compatible alternati
 
 ```swift
 // Apple Foundation Models (Apple ecosystem only)
+#if canImport(FoundationModels)
 import FoundationModels
-
-// OpenFoundationModels (works everywhere)
+let model = SystemLanguageModel.default
+#else
+// OpenFoundationModels with any provider
 import OpenFoundationModels
+import OpenFoundationModelsOpenAI  // or MLX, Anthropic, etc.
+let model = OpenAILanguageModel(apiKey: "your-key")
+#endif
 
-// 🎯 100% API Compatible - No code changes required
-let session = LanguageModelSession(
-    model: SystemLanguageModel.default,
-    tools: []
-) {
+// 🎯 100% API Compatible - Same code works with any backend
+let session = LanguageModelSession(model: model) {
     Instructions("You are a helpful assistant")
 }
 ```
 
-**✅ Apple Official API Compliant**: Code migration with just `import` change  
-**✅ Multi-Platform**: Works on Linux, Windows, Android, etc.  
-**✅ Provider Choice**: OpenAI, Anthropic, local models, and more  
+**✅ Apple Official API Compliant**: Same API as Apple Foundation Models
+**✅ Provider Freedom**: OpenAI, Anthropic, MLX, Ollama, and more
+**✅ Seamless Migration**: Switch between Apple's model and third-party providers
 **✅ Enterprise Ready**: Integrates with existing infrastructure
 
 ## Quick Start
@@ -69,12 +71,13 @@ swift run openai-chat
 
 ```swift
 import OpenFoundationModels
+import OpenFoundationModelsOpenAI  // Choose your provider
 
-// Apple's official API - works everywhere
-let session = LanguageModelSession(
-    model: SystemLanguageModel.default,
-    tools: []
-) {
+// Create a model from any provider
+let model = OpenAILanguageModel(apiKey: "your-key")
+
+// Apple-compatible API works with any backend
+let session = LanguageModelSession(model: model) {
     Instructions("You are a helpful assistant")
 }
 
@@ -99,14 +102,13 @@ let response = try await session.respond {
 
 ## Key Features
 
-✅ **100% Apple API Compatible** - Same code as Apple Foundation Models, just change the import  
-✅ **Transcript-Centric Design** - Apple's official conversation management system  
-✅ **Multi-Platform** - Works everywhere: Linux, Windows, Android, Docker, CI/CD  
-✅ **Provider Freedom** - OpenAI, Anthropic, Ollama, or any LLM provider  
-✅ **Structured Generation** - Type-safe data with `@Generable` macro  
-✅ **Real-time Streaming** - Responsive UI with partial updates  
-✅ **Tool Calling** - Let LLMs execute your functions  
-✅ **Production Ready** - 221 tests passing, memory efficient, thread-safe
+✅ **100% Apple API Compatible** - Same API as Apple Foundation Models
+✅ **Transcript-Centric Design** - Apple's official conversation management system
+✅ **Provider Freedom** - OpenAI, Anthropic, MLX, Ollama, or any LLM provider
+✅ **Structured Generation** - Type-safe data with `@Generable` macro
+✅ **Real-time Streaming** - Responsive UI with partial updates
+✅ **Tool Calling** - Let LLMs execute your functions
+✅ **Production Ready** - 328 tests passing, memory efficient, thread-safe
 
 ## Installation
 
@@ -117,9 +119,10 @@ let response = try await session.respond {
 dependencies: [
     // Core framework
     .package(url: "https://github.com/1amageek/OpenFoundationModels.git", from: "1.0.0"),
-    
-    // Optional: OpenAI provider
-    .package(url: "https://github.com/1amageek/OpenFoundationModels-OpenAI.git", from: "1.0.0")
+
+    // Choose your provider(s):
+    .package(url: "https://github.com/1amageek/OpenFoundationModels-OpenAI.git", from: "1.0.0"),  // OpenAI
+    .package(url: "https://github.com/1amageek/OpenFoundationModels-MLX.git", from: "1.0.0"),    // Local MLX
 ]
 ```
 
@@ -144,9 +147,12 @@ swift run openai-chat
 
 ```swift
 import OpenFoundationModels
+import OpenFoundationModelsOpenAI  // Or MLX, Anthropic, etc.
+
+// Create model from your chosen provider
+let model = OpenAILanguageModel(apiKey: "your-key")
 
 // Check model availability
-let model = SystemLanguageModel.default
 guard model.isAvailable else {
     print("Model not available")
     return
@@ -154,17 +160,14 @@ guard model.isAvailable else {
 
 // Create session with instructions (Apple Official API)
 // Instructions and tools are stored in Transcript as the first entry
-let session = LanguageModelSession(
-    model: model,
-    tools: []
-) {
+let session = LanguageModelSession(model: model) {
     Instructions("You are a helpful assistant")
 }
 
 // Apple Official closure-based prompt
 // Each prompt is added to the Transcript, maintaining full conversation history
 let response = try await session.respond {
-    Prompt("Tell me about Swift 6.1 new features")
+    Prompt("Tell me about Swift 6.2 new features")
 }
 
 print(response.content)
@@ -278,7 +281,7 @@ struct WeatherTool: Tool {
 
 // LLM decides when to call tools
 let session = LanguageModelSession(
-    model: SystemLanguageModel.default,
+    model: model,  // Any LanguageModel provider
     tools: [WeatherTool()]
 ) {
     Instructions("You are a helpful assistant that can check weather")
@@ -304,13 +307,10 @@ let options = GenerationOptions(
 )
 
 // Apply custom instructions
-let session = LanguageModelSession(
-    model: SystemLanguageModel.default,
-    tools: []
-) {
+let session = LanguageModelSession(model: model) {
     Instructions("""
         You are a Swift expert.
-        Use modern Swift 6.1+ features.
+        Use modern Swift 6.2+ features.
         Include error handling in all examples.
         """)
 }
@@ -349,15 +349,19 @@ let review = try await session.respond(to: prompt, schema: schema)
 
 ```swift
 import OpenFoundationModels
-import OpenFoundationModelsOpenAI  // Or Anthropic, Ollama, etc.
 
 // Same API, different providers - all using Transcript-based interface
-let session = LanguageModelSession(
-    model: OpenAIProvider(apiKey: key).gpt4o        // OpenAI
-    // model: AnthropicProvider(apiKey: key).claude3  // Anthropic
-    // model: OllamaProvider().llama3                 // Local
-    // model: SystemLanguageModel.default             // Apple
-)
+#if canImport(FoundationModels)
+import FoundationModels
+let model = SystemLanguageModel.default              // Apple (on-device)
+#else
+import OpenFoundationModelsOpenAI
+let model = OpenAILanguageModel(apiKey: key)         // OpenAI
+// import OpenFoundationModelsMLX
+// let model = MLXLanguageModel()                    // MLX (local)
+#endif
+
+let session = LanguageModelSession(model: model)
 
 // Write once, run with any provider
 // Each provider receives the full Transcript and interprets it appropriately
@@ -387,15 +391,12 @@ let analysis = try await session.respond(
 
 ### 🤖 AI Chatbots
 ```swift
-// Build chatbots that work on any platform
-let chatbot = LanguageModelSession(
-    model: provider.model,
-    tools: []
-) {
+// Build chatbots that work with any provider
+let chatbot = LanguageModelSession(model: model) {
     Instructions("You are a helpful chatbot assistant")
 }
-let response = try await chatbot.respond { 
-    Prompt(userMessage) 
+let response = try await chatbot.respond {
+    Prompt(userMessage)
 }
 ```
 
@@ -528,13 +529,18 @@ OpenFoundationModels provides a complete ecosystem with core framework, provider
 ### 🏗️ Core Framework
 - **[OpenFoundationModels](https://github.com/1amageek/OpenFoundationModels)** - Apple Foundation Models compatible core framework
 - 100% API compatibility with Apple's official specification
-- 221 tests passing with comprehensive coverage
+- 328 tests passing with comprehensive coverage
 
 ### 🔗 Provider Integrations
 - **[OpenFoundationModels-OpenAI](https://github.com/1amageek/OpenFoundationModels-OpenAI)** ✅ **Complete**
   - Full GPT model support (GPT-4o, GPT-4o Mini, GPT-4 Turbo, o1, o1-pro, o3, o3-pro, o4-mini)
   - Streaming and multimodal capabilities
   - Production-ready with rate limiting and error handling
+
+- **[OpenFoundationModels-MLX](https://github.com/1amageek/OpenFoundationModels-MLX)** ✅ **Complete**
+  - Local LLM inference using Apple MLX framework
+  - Optimized for Apple Silicon (M1/M2/M3/M4)
+  - No API key required - fully on-device
 
 ### 📱 Sample Applications
 - **[OpenFoundationModels-Samples](https://github.com/1amageek/OpenFoundationModels-Samples)** ✅ **Complete**
@@ -546,7 +552,7 @@ OpenFoundationModels provides a complete ecosystem with core framework, provider
 Provider adapters can be added for:
 - **Anthropic** (Claude 3 Haiku, Sonnet, Opus, etc.)
 - **Google** (Gemini Pro, Ultra, etc.)
-- **Local Models** (Ollama, llama.cpp, etc.)
+- **Ollama** (Local models via Ollama)
 - **Azure OpenAI Service**
 - **AWS Bedrock**
 
@@ -567,7 +573,7 @@ Provider adapters can be added for:
 ## Testing
 
 ```bash
-# Run all 221 tests
+# Run all 328 tests
 swift test
 
 # Test specific components
@@ -605,12 +611,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ### Official OpenFoundationModels Extensions
 
 - **[OpenFoundationModels-OpenAI](https://github.com/1amageek/OpenFoundationModels-OpenAI)** - Complete OpenAI provider integration
+- **[OpenFoundationModels-MLX](https://github.com/1amageek/OpenFoundationModels-MLX)** - Local LLM with Apple MLX framework
 - **[OpenFoundationModels-Samples](https://github.com/1amageek/OpenFoundationModels-Samples)** - Sample chat applications and demos
 
 ### Community Swift AI Projects
 
 - [Swift OpenAI](https://github.com/MacPaw/OpenAI) - OpenAI API client
-- [LangChain Swift](https://github.com/bukowskidev/langchain-swift) - LangChain for Swift
+- [MLX Swift](https://github.com/ml-explore/mlx-swift) - Apple's MLX framework for Swift
 - [Ollama Swift](https://github.com/kevinhermawan/OllamaKit) - Ollama client for Swift
 
 ---
