@@ -17,7 +17,7 @@ extension String: PromptRepresentable {
 extension Array: InstructionsRepresentable where Element: InstructionsRepresentable {
     public var instructionsRepresentation: Instructions {
         let parts = self.map { $0.instructionsRepresentation }
-        let combinedText = parts.map { $0.description }.joined(separator: "\n")
+        let combinedText = parts.map { $0.content }.joined(separator: "\n")
         return Instructions(combinedText)
     }
 }
@@ -25,7 +25,7 @@ extension Array: InstructionsRepresentable where Element: InstructionsRepresenta
 extension Array: PromptRepresentable where Element: PromptRepresentable {
     public var promptRepresentation: Prompt {
         let parts = self.map { $0.promptRepresentation }
-        let combinedText = parts.map { $0.description }.joined(separator: "\n")
+        let combinedText = parts.map { $0.content }.joined(separator: "\n")
         return Prompt(combinedText)
     }
 }

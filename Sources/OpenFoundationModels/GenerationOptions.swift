@@ -1,8 +1,8 @@
 import Foundation
 
-public struct GenerationOptions: Sendable, Equatable {
-    
-    public struct SamplingMode: Sendable, Equatable {
+public struct GenerationOptions: Sendable, SendableMetatype, Equatable {
+
+    public struct SamplingMode: Sendable, SendableMetatype, Equatable {
         
         private enum Kind: Equatable {
             case greedy

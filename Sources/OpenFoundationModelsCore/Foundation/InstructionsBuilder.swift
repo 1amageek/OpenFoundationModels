@@ -6,14 +6,14 @@ public struct InstructionsBuilder {
     
     public static func buildBlock<each I>(_ components: repeat each I) -> Instructions where repeat each I: InstructionsRepresentable {
         var parts: [String] = []
-        repeat parts.append((each components).instructionsRepresentation.description)
+        repeat parts.append((each components).instructionsRepresentation.content)
         let combinedText = parts.joined(separator: "\n")
         return Instructions(combinedText.trimmingCharacters(in: .whitespacesAndNewlines))
     }
-    
+
     public static func buildArray(_ instructions: [some InstructionsRepresentable]) -> Instructions {
-        let combinedText = instructions.map { 
-            $0.instructionsRepresentation.description 
+        let combinedText = instructions.map {
+            $0.instructionsRepresentation.content
         }.joined(separator: "\n")
         return Instructions(combinedText)
     }

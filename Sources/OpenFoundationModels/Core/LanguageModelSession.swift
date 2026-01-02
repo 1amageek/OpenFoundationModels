@@ -45,7 +45,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         self.init(model: model)
         self.tools = tools
         if let instructions = instructions {
-            var instructionContent = instructions.description
+            var instructionContent = instructions.content
             
             // Add tool schemas to the instructions
             let toolInstructions = generateToolInstructions(for: tools)
@@ -121,7 +121,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         @PromptBuilder prompt: () throws -> Prompt
     ) async throws -> Response<String> {
         let promptValue = try prompt()
-        let promptText = promptValue.description
+        let promptText = promptValue.content
         
         _isResponding = true
         defer { _isResponding = false }
@@ -226,7 +226,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         @PromptBuilder prompt: () throws -> Prompt
     ) async throws -> Response<GeneratedContent> {
         let promptValue = try prompt()
-        let promptText = promptValue.description
+        let promptText = promptValue.content
         
         _isResponding = true
         defer { _isResponding = false }
@@ -341,7 +341,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         @PromptBuilder prompt: () throws -> Prompt
     ) async throws -> Response<Content> {
         let promptValue = try prompt()
-        let promptText = promptValue.description
+        let promptText = promptValue.content
         
         _isResponding = true
         defer { _isResponding = false }
@@ -440,7 +440,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         @PromptBuilder prompt: () throws -> Prompt
     ) rethrows -> sending ResponseStream<String> {
         let promptValue = try prompt()
-        let promptText = promptValue.description
+        let promptText = promptValue.content
         
         let promptEntry = Transcript.Entry.prompt(
             Transcript.Prompt(
@@ -584,7 +584,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         @PromptBuilder prompt: () throws -> Prompt
     ) rethrows -> sending ResponseStream<GeneratedContent> {
         let promptValue = try prompt()
-        let promptText = promptValue.description
+        let promptText = promptValue.content
         
         let stream = AsyncThrowingStream<ResponseStream<GeneratedContent>.Snapshot, Error> { continuation in
             Task {
@@ -695,7 +695,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         @PromptBuilder prompt: () throws -> Prompt
     ) rethrows -> sending ResponseStream<Content> {
         let promptValue = try prompt()
-        let promptText = promptValue.description
+        let promptText = promptValue.content
         
         typealias PartialContent = Content.PartiallyGenerated
         
@@ -830,7 +830,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
     private func executeToolWithHelper<T: Tool>(_ tool: T, arguments: GeneratedContent) async throws -> String {
         let typedArguments = try T.Arguments(arguments)
         let output = try await tool.call(arguments: typedArguments)
-        return output.promptRepresentation.description
+        return output.promptRepresentation.content
     }
     
     private func generateToolInstructions(for tools: [any Tool]) -> String {

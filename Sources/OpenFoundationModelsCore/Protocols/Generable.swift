@@ -5,10 +5,7 @@ import Foundation
 /// Types conforming to `Generable` can be used with `LanguageModelSession.respond(to:generating:)`
 /// to generate structured output from a language model.
 public protocol Generable: ConvertibleFromGeneratedContent,
-                           ConvertibleToGeneratedContent,
-                           InstructionsRepresentable,
-                           PromptRepresentable,
-                           SendableMetatype {
+                           ConvertibleToGeneratedContent {
 
     /// A representation of partially generated content
     associatedtype PartiallyGenerated: ConvertibleFromGeneratedContent = Self

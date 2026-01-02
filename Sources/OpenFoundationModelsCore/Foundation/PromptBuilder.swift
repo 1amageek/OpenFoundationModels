@@ -5,15 +5,15 @@ import Foundation
 public struct PromptBuilder {
     
     public static func buildArray(_ prompts: [some PromptRepresentable]) -> Prompt {
-        let combinedText = prompts.map { 
-            $0.promptRepresentation.description 
+        let combinedText = prompts.map {
+            $0.promptRepresentation.content
         }.joined(separator: "\n")
         return Prompt(combinedText)
     }
-    
+
     public static func buildBlock<each P>(_ components: repeat each P) -> Prompt where repeat each P: PromptRepresentable {
         var parts: [String] = []
-        repeat parts.append((each components).promptRepresentation.description)
+        repeat parts.append((each components).promptRepresentation.content)
         let combinedText = parts.joined(separator: "\n")
         return Prompt(combinedText.trimmingCharacters(in: .whitespacesAndNewlines))
     }

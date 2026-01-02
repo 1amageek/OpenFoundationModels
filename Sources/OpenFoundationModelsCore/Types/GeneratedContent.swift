@@ -3,8 +3,8 @@ import Foundation
 
 
 
-public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertible, Codable, ConvertibleToGeneratedContent {
-    public enum Kind: Sendable, Equatable {
+public struct GeneratedContent: Sendable, Copyable, SendableMetatype, Equatable, CustomDebugStringConvertible, ConvertibleToGeneratedContent {
+    public enum Kind: Sendable, SendableMetatype, Equatable {
         case null
         case bool(Bool)
         case number(Double)
@@ -209,51 +209,6 @@ public struct GeneratedContent: Sendable, Equatable, CustomDebugStringConvertibl
     }
 
 
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if container.decodeNil() {
-            self.storage = Storage(root: .null, partialRaw: nil, isComplete: true, generationID: nil)
-        } else if let b = try? container.decode(Bool.self) {
-            self.storage = Storage(root: .bool(b), partialRaw: nil, isComplete: true, generationID: nil)
-        } else if let d = try? container.decode(Double.self) {
-            self.storage = Storage(root: .number(d), partialRaw: nil, isComplete: true, generationID: nil)
-        } else if let s = try? container.decode(String.self) {
-            let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
-            if t.hasPrefix("{") || t.hasPrefix("[") {
-                if let data = s.data(using: .utf8),
-                   let _ = try? JSONSerialization.jsonObject(with: data) {
-                    if let parsed = try? GeneratedContent(json: s) {
-                        self.storage = parsed.storage
-                    } else {
-                        self.storage = Storage(root: .string(s), partialRaw: nil, isComplete: true, generationID: nil)
-                    }
-                } else {
-                    self.storage = Storage(root: nil, partialRaw: s, isComplete: false, generationID: nil)
-                }
-            } else {
-                self.storage = Storage(root: .string(s), partialRaw: nil, isComplete: true, generationID: nil)
-            }
-        } else if let arr = try? container.decode([GeneratedContent].self) {
-            self.storage = Storage(root: .array(arr.map { $0.asJSONValue() }), partialRaw: nil, isComplete: true, generationID: nil)
-        } else if let dict = try? container.decode([String: GeneratedContent].self) {
-            let ordered = Array(dict.keys)
-            self.storage = Storage(root: .object(dict.mapValues { $0.asJSONValue() }, orderedKeys: ordered), partialRaw: nil, isComplete: true, generationID: nil)
-        } else {
-            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unable to decode GeneratedContent")
-        }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch kind {
-            case .null: try container.encodeNil()
-            case .bool(let b): try container.encode(b)
-            case .number(let d): try container.encode(d)
-            case .string(let s): try container.encode(s)
-            case .array(let a): try container.encode(a)
-            case .structure(let props, _): try container.encode(props)
-        }
-    }
 
 
     internal var stringValue: String {
@@ -699,4 +654,54 @@ public extension GeneratedContent {
 fileprivate extension Character {
     var isDigit: Bool { ("0"..."9").contains(self) }
     var isJSONWhitespace: Bool { self == " " || self == "\n" || self == "\r" || self == "\t" }
+}
+
+// MARK: - Codable (package-internal for Transcript serialization)
+
+extension GeneratedContent: Codable {
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() {
+            self.storage = Storage(root: .null, partialRaw: nil, isComplete: true, generationID: nil)
+        } else if let b = try? container.decode(Bool.self) {
+            self.storage = Storage(root: .bool(b), partialRaw: nil, isComplete: true, generationID: nil)
+        } else if let d = try? container.decode(Double.self) {
+            self.storage = Storage(root: .number(d), partialRaw: nil, isComplete: true, generationID: nil)
+        } else if let s = try? container.decode(String.self) {
+            let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+            if t.hasPrefix("{") || t.hasPrefix("[") {
+                if let data = s.data(using: .utf8),
+                   let _ = try? JSONSerialization.jsonObject(with: data) {
+                    if let parsed = try? GeneratedContent(json: s) {
+                        self.storage = parsed.storage
+                    } else {
+                        self.storage = Storage(root: .string(s), partialRaw: nil, isComplete: true, generationID: nil)
+                    }
+                } else {
+                    self.storage = Storage(root: nil, partialRaw: s, isComplete: false, generationID: nil)
+                }
+            } else {
+                self.storage = Storage(root: .string(s), partialRaw: nil, isComplete: true, generationID: nil)
+            }
+        } else if let arr = try? container.decode([GeneratedContent].self) {
+            self.storage = Storage(root: .array(arr.map { $0.asJSONValue() }), partialRaw: nil, isComplete: true, generationID: nil)
+        } else if let dict = try? container.decode([String: GeneratedContent].self) {
+            let ordered = Array(dict.keys)
+            self.storage = Storage(root: .object(dict.mapValues { $0.asJSONValue() }, orderedKeys: ordered), partialRaw: nil, isComplete: true, generationID: nil)
+        } else {
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unable to decode GeneratedContent")
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch kind {
+            case .null: try container.encodeNil()
+            case .bool(let b): try container.encode(b)
+            case .number(let d): try container.encode(d)
+            case .string(let s): try container.encode(s)
+            case .array(let a): try container.encode(a)
+            case .structure(let props, _): try container.encode(props)
+        }
+    }
 }

@@ -50,12 +50,12 @@ func testOptionalPromptRepresentable() {
     let nilValue: String? = nil
     let nilPrompt = nilValue.promptRepresentation
     // nil should produce empty prompt
-    #expect(nilPrompt.promptRepresentation.description == "")
+    #expect(nilPrompt.promptRepresentation.content == "")
     
     // Test some case
     let someValue: String? = "prompt text"
     let somePrompt = someValue.promptRepresentation
-    #expect(somePrompt.promptRepresentation.description.contains("prompt text"))
+    #expect(somePrompt.promptRepresentation.content.contains("prompt text"))
 }
 
 @Test
@@ -64,12 +64,12 @@ func testOptionalInstructionsRepresentable() {
     let nilValue: String? = nil
     let nilInstructions = nilValue.instructionsRepresentation
     // nil should produce empty instructions
-    #expect(nilInstructions.instructionsRepresentation.description == "")
+    #expect(nilInstructions.instructionsRepresentation.content == "")
     
     // Test some case
     let someValue: String? = "instruction text"
     let someInstructions = someValue.instructionsRepresentation
-    #expect(someInstructions.instructionsRepresentation.description.contains("instruction text"))
+    #expect(someInstructions.instructionsRepresentation.content.contains("instruction text"))
 }
 
 @Test

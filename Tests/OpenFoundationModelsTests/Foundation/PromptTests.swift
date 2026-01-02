@@ -11,16 +11,16 @@ struct PromptTests {
     func promptStringCreation() {
         let prompt = Prompt("What is the weather like today?")
         
-        #expect(!prompt.description.isEmpty)
-        #expect(prompt.description == "What is the weather like today?")
+        #expect(!prompt.content.isEmpty)
+        #expect(prompt.content == "What is the weather like today?")
     }
     
     @Test("Prompt creation with empty string")
     func promptEmptyCreation() {
         let prompt = Prompt("")
         
-        #expect(prompt.description.isEmpty)
-        #expect(prompt.description == "")
+        #expect(prompt.content.isEmpty)
+        #expect(prompt.content == "")
     }
     
     @Test("Prompt text property access")
@@ -28,7 +28,7 @@ struct PromptTests {
         let text = "Generate a detailed user profile"
         let prompt = Prompt(text)
         
-        #expect(prompt.description == text)
+        #expect(prompt.content == text)
     }
     
     
@@ -37,7 +37,7 @@ struct PromptTests {
         let text = "Test prompt"
         let prompt = text.promptRepresentation
         
-        #expect(prompt.description == text)
+        #expect(prompt.content == text)
     }
     
     @Test("Prompt complex queries")
@@ -54,10 +54,10 @@ struct PromptTests {
         
         let prompt = Prompt(complexQuery)
         
-        #expect(prompt.description == complexQuery)
-        #expect(prompt.description.contains("JSON structure"))
-        #expect(prompt.description.contains("requirements:"))
-        #expect(prompt.description.contains("proper JSON formatting"))
+        #expect(prompt.content == complexQuery)
+        #expect(prompt.content.contains("JSON structure"))
+        #expect(prompt.content.contains("requirements:"))
+        #expect(prompt.content.contains("proper JSON formatting"))
     }
     
     @Test("Prompt with structured content")
@@ -78,10 +78,10 @@ struct PromptTests {
         
         let prompt = Prompt(structuredPrompt)
         
-        #expect(prompt.description.contains("TASK:"))
-        #expect(prompt.description.contains("INPUT:"))
-        #expect(prompt.description.contains("OUTPUT FORMAT:"))
-        #expect(prompt.description.contains("Tokyo, Japan"))
+        #expect(prompt.content.contains("TASK:"))
+        #expect(prompt.content.contains("INPUT:"))
+        #expect(prompt.content.contains("OUTPUT FORMAT:"))
+        #expect(prompt.content.contains("Tokyo, Japan"))
     }
     
     
@@ -102,9 +102,9 @@ struct PromptTests {
         
         let prompt = Prompt(formattedPrompt)
         
-        #expect(prompt.description.contains("```swift"))
-        #expect(prompt.description.contains("struct User"))
-        #expect(prompt.description.contains("Swift syntax"))
+        #expect(prompt.content.contains("```swift"))
+        #expect(prompt.content.contains("struct User"))
+        #expect(prompt.content.contains("Swift syntax"))
     }
     
     @Test("Prompt with markdown-like content")
@@ -127,10 +127,10 @@ struct PromptTests {
         
         let prompt = Prompt(markdownPrompt)
         
-        #expect(prompt.description.contains("# Task Description"))
-        #expect(prompt.description.contains("**detailed**"))
-        #expect(prompt.description.contains("*Item 1*"))
-        #expect(prompt.description.contains("## Output Requirements"))
+        #expect(prompt.content.contains("# Task Description"))
+        #expect(prompt.content.contains("**detailed**"))
+        #expect(prompt.content.contains("*Item 1*"))
+        #expect(prompt.content.contains("## Output Requirements"))
     }
     
     
@@ -150,13 +150,13 @@ struct PromptTests {
         
         let prompt = Prompt(internationalPrompt)
         
-        #expect(prompt.description.contains("Hello, how are you?"))
-        #expect(prompt.description.contains("¿cómo estás?"))
-        #expect(prompt.description.contains("comment allez-vous?"))
-        #expect(prompt.description.contains("こんにちは"))
-        #expect(prompt.description.contains("مرحبا"))
-        #expect(prompt.description.contains("Привет"))
-        #expect(prompt.description.contains("你好"))
+        #expect(prompt.content.contains("Hello, how are you?"))
+        #expect(prompt.content.contains("¿cómo estás?"))
+        #expect(prompt.content.contains("comment allez-vous?"))
+        #expect(prompt.content.contains("こんにちは"))
+        #expect(prompt.content.contains("مرحبا"))
+        #expect(prompt.content.contains("Привет"))
+        #expect(prompt.content.contains("你好"))
     }
     
     @Test("Prompt with emojis and symbols")
@@ -176,12 +176,12 @@ struct PromptTests {
         
         let prompt = Prompt(emojiPrompt)
         
-        #expect(prompt.description.contains("🌟"))
-        #expect(prompt.description.contains("🚀"))
-        #expect(prompt.description.contains("💡"))
-        #expect(prompt.description.contains("©"))
-        #expect(prompt.description.contains("∑"))
-        #expect(prompt.description.contains("π"))
+        #expect(prompt.content.contains("🌟"))
+        #expect(prompt.content.contains("🚀"))
+        #expect(prompt.content.contains("💡"))
+        #expect(prompt.content.contains("©"))
+        #expect(prompt.content.contains("∑"))
+        #expect(prompt.content.contains("π"))
     }
     
     
@@ -190,9 +190,9 @@ struct PromptTests {
         let longContent = String(repeating: "This is a test sentence. ", count: 100)
         let prompt = Prompt(longContent)
         
-        #expect(prompt.description.count > 2000)
-        #expect(prompt.description.hasPrefix("This is a test sentence."))
-        #expect(prompt.description.hasSuffix("This is a test sentence. "))
+        #expect(prompt.content.count > 2000)
+        #expect(prompt.content.hasPrefix("This is a test sentence."))
+        #expect(prompt.content.hasSuffix("This is a test sentence. "))
     }
     
     @Test("Prompt with whitespace variations")
@@ -213,11 +213,11 @@ struct PromptTests {
         
         let prompt = Prompt(whitespacePrompt)
         
-        #expect(prompt.description.contains("various whitespace"))
-        #expect(prompt.description.contains("Leading spaces"))
-        #expect(prompt.description.contains("Tabs and spaces"))
-        #expect(prompt.description.hasPrefix("\n\n"))
-        #expect(prompt.description.hasSuffix("\n\n"))
+        #expect(prompt.content.contains("various whitespace"))
+        #expect(prompt.content.contains("Leading spaces"))
+        #expect(prompt.content.contains("Tabs and spaces"))
+        #expect(prompt.content.hasPrefix("\n\n"))
+        #expect(prompt.content.hasSuffix("\n\n"))
     }
     
     @Test("Prompt with escape characters")
@@ -233,10 +233,10 @@ struct PromptTests {
         
         let prompt = Prompt(escapePrompt)
         
-        #expect(prompt.description.contains("\"double\""))
-        #expect(prompt.description.contains("'single'"))
-        #expect(prompt.description.contains("\\"))
-        #expect(prompt.description.contains("\\u0041"))
+        #expect(prompt.content.contains("\"double\""))
+        #expect(prompt.content.contains("'single'"))
+        #expect(prompt.content.contains("\\"))
+        #expect(prompt.content.contains("\\u0041"))
     }
     
     
@@ -246,7 +246,7 @@ struct PromptTests {
         
         for _ in 0..<1000 {
             let prompt = Prompt(content)
-            #expect(prompt.description == content)
+            #expect(prompt.content == content)
         }
     }
     
@@ -256,9 +256,9 @@ struct PromptTests {
         
         let prompt = Prompt(largeContent)
         
-        #expect(prompt.description.contains("Line 1:"))
-        #expect(prompt.description.contains("Line 1000:"))
-        #expect(prompt.description.components(separatedBy: "\n").count == 1000)
+        #expect(prompt.content.contains("Line 1:"))
+        #expect(prompt.content.contains("Line 1000:"))
+        #expect(prompt.content.components(separatedBy: "\n").count == 1000)
     }
     
     
@@ -267,16 +267,16 @@ struct PromptTests {
         let prompt1 = Prompt {
             "Hello, world!"
         }
-        #expect(prompt1.description == "Hello, world!")
+        #expect(prompt1.content == "Hello, world!")
         
         let prompt2 = Prompt {
             "Line 1"
             "Line 2"
             "Line 3"
         }
-        #expect(prompt2.description.contains("Line 1"))
-        #expect(prompt2.description.contains("Line 2"))
-        #expect(prompt2.description.contains("Line 3"))
+        #expect(prompt2.content.contains("Line 1"))
+        #expect(prompt2.content.contains("Line 2"))
+        #expect(prompt2.content.contains("Line 3"))
     }
     
     @Test("Prompt builder with conditional content")
@@ -291,9 +291,9 @@ struct PromptTests {
             }
         }
         
-        #expect(prompt.description.contains("Answer the following question"))
-        #expect(prompt.description.contains("What is Swift?"))
-        #expect(prompt.description.contains("Your response MUST rhyme!"))
+        #expect(prompt.content.contains("Answer the following question"))
+        #expect(prompt.content.contains("What is Swift?"))
+        #expect(prompt.content.contains("Your response MUST rhyme!"))
         
         let shouldBeVerbose = false
         let prompt2 = Prompt {
@@ -303,8 +303,8 @@ struct PromptTests {
             }
         }
         
-        #expect(prompt2.description.contains("Explain quantum physics"))
-        #expect(!prompt2.description.contains("Provide extensive details"))
+        #expect(prompt2.content.contains("Explain quantum physics"))
+        #expect(!prompt2.content.contains("Provide extensive details"))
     }
     
     @Test("Prompt builder with loops")
@@ -319,11 +319,11 @@ struct PromptTests {
             "End of list"
         }
         
-        #expect(prompt.description.contains("List the following fruits:"))
-        #expect(prompt.description.contains("- apple"))
-        #expect(prompt.description.contains("- banana"))
-        #expect(prompt.description.contains("- orange"))
-        #expect(prompt.description.contains("End of list"))
+        #expect(prompt.content.contains("List the following fruits:"))
+        #expect(prompt.content.contains("- apple"))
+        #expect(prompt.content.contains("- banana"))
+        #expect(prompt.content.contains("- orange"))
+        #expect(prompt.content.contains("End of list"))
     }
     
     @Test("Prompt builder with PromptRepresentable types")
@@ -337,9 +337,9 @@ struct PromptTests {
             "Final line"
         }
         
-        #expect(prompt.description.contains("This is a string"))
-        #expect(prompt.description.contains("Generated content"))
-        #expect(prompt.description.contains("Final line"))
+        #expect(prompt.content.contains("This is a string"))
+        #expect(prompt.content.contains("Generated content"))
+        #expect(prompt.content.contains("Final line"))
     }
     
     @Test("Prompt builder with nested builders")
@@ -355,10 +355,10 @@ struct PromptTests {
             "After nested"
         }
         
-        #expect(prompt.description.contains("Outer content"))
-        #expect(prompt.description.contains("Nested content"))
-        #expect(prompt.description.contains("More nested content"))
-        #expect(prompt.description.contains("After nested"))
+        #expect(prompt.content.contains("Outer content"))
+        #expect(prompt.content.contains("Nested content"))
+        #expect(prompt.content.contains("More nested content"))
+        #expect(prompt.content.contains("After nested"))
     }
     
     @Test("Prompt builder with optional content")
@@ -377,9 +377,9 @@ struct PromptTests {
             "End"
         }
         
-        #expect(prompt.description.contains("Start"))
-        #expect(prompt.description.contains("Optional text"))
-        #expect(prompt.description.contains("End"))
+        #expect(prompt.content.contains("Start"))
+        #expect(prompt.content.contains("Optional text"))
+        #expect(prompt.content.contains("End"))
     }
     
     @Test("Prompt builder with switch statements")
@@ -402,10 +402,10 @@ struct PromptTests {
             }
         }
         
-        #expect(prompt.description.contains("Answer this question:"))
-        #expect(prompt.description.contains("Use technical terminology"))
-        #expect(!prompt.description.contains("formal language"))
-        #expect(!prompt.description.contains("casual"))
+        #expect(prompt.content.contains("Answer this question:"))
+        #expect(prompt.content.contains("Use technical terminology"))
+        #expect(!prompt.content.contains("formal language"))
+        #expect(!prompt.content.contains("casual"))
     }
     
     @Test("Prompt builder with complex dynamic content")
@@ -428,13 +428,13 @@ struct PromptTests {
             "Format as markdown"
         }
         
-        #expect(prompt.description.contains("Create a tutorial"))
-        #expect(prompt.description.contains("1. Swift"))
-        #expect(prompt.description.contains("2. Objective-C"))
-        #expect(prompt.description.contains("3. SwiftUI"))
-        #expect(prompt.description.contains("Include examples"))
-        #expect(prompt.description.contains("Maximum 3 examples"))
-        #expect(prompt.description.contains("Format as markdown"))
+        #expect(prompt.content.contains("Create a tutorial"))
+        #expect(prompt.content.contains("1. Swift"))
+        #expect(prompt.content.contains("2. Objective-C"))
+        #expect(prompt.content.contains("3. SwiftUI"))
+        #expect(prompt.content.contains("Include examples"))
+        #expect(prompt.content.contains("Maximum 3 examples"))
+        #expect(prompt.content.contains("Format as markdown"))
     }
     
     
@@ -454,10 +454,10 @@ struct PromptTests {
         
         let prompt = Prompt(codePrompt)
         
-        #expect(prompt.description.contains("Swift function"))
-        #expect(prompt.description.contains("two integers"))
-        #expect(prompt.description.contains("documentation"))
-        #expect(prompt.description.contains("error handling"))
+        #expect(prompt.content.contains("Swift function"))
+        #expect(prompt.content.contains("two integers"))
+        #expect(prompt.content.contains("documentation"))
+        #expect(prompt.content.contains("error handling"))
     }
     
     @Test("Prompt for data analysis")
@@ -479,9 +479,9 @@ struct PromptTests {
         
         let prompt = Prompt(analysisPrompt)
         
-        #expect(prompt.description.contains("dataset characteristics"))
-        #expect(prompt.description.contains("10,000 active users"))
-        #expect(prompt.description.contains("Mobile (60%)"))
-        #expect(prompt.description.contains("Optimization recommendations"))
+        #expect(prompt.content.contains("dataset characteristics"))
+        #expect(prompt.content.contains("10,000 active users"))
+        #expect(prompt.content.contains("Mobile (60%)"))
+        #expect(prompt.content.contains("Optimization recommendations"))
     }
 }

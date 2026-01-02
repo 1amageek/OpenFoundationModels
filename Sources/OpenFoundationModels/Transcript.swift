@@ -6,6 +6,7 @@ import OpenFoundationModelsCore
 /// Transcript maintains the complete history of interactions including instructions,
 /// prompts, responses, tool calls, and tool outputs.
 public struct Transcript: Sendable,
+                          Copyable,
                           Equatable,
                           SendableMetatype,
                           BidirectionalCollection,
