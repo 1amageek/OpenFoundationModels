@@ -55,7 +55,7 @@ public struct Transcript: Sendable,
 }
 
 extension Transcript {
-    public enum Entry: Sendable, Identifiable, CustomStringConvertible {
+    public enum Entry: Sendable, SendableMetatype, Identifiable, Equatable, CustomStringConvertible {
         public typealias ID = String
         
         case instructions(Transcript.Instructions)
@@ -97,9 +97,9 @@ extension Transcript {
 }
 
 extension Transcript {
-    public enum Segment: Sendable, Identifiable {
+    public enum Segment: Sendable, SendableMetatype, Identifiable {
         public typealias ID = String
-        
+
         case text(TextSegment)
         case structure(StructuredSegment)
         
@@ -113,9 +113,9 @@ extension Transcript {
         }
     }
     
-    public struct TextSegment: Sendable, Identifiable {
+    public struct TextSegment: Sendable, SendableMetatype, Identifiable {
         public typealias ID = String
-        
+
         public var id: String
         public var content: String
         
@@ -125,9 +125,9 @@ extension Transcript {
         }
     }
     
-    public struct StructuredSegment: Sendable, Identifiable {
+    public struct StructuredSegment: Sendable, SendableMetatype, Identifiable {
         public typealias ID = String
-        
+
         public var id: String
         public var source: String
         public var content: GeneratedContent
@@ -141,9 +141,9 @@ extension Transcript {
 }
 
 extension Transcript {
-    public struct Prompt: Sendable, Identifiable {
+    public struct Prompt: Sendable, SendableMetatype, Identifiable {
         public typealias ID = String
-        
+
         public var id: String
         public var segments: [Transcript.Segment]
         public var options: GenerationOptions
@@ -157,9 +157,9 @@ extension Transcript {
         }
     }
     
-    public struct Response: Sendable, Identifiable {
+    public struct Response: Sendable, SendableMetatype, Identifiable {
         public typealias ID = String
-        
+
         public var id: String
         public var assetIDs: [String]
         public var segments: [Transcript.Segment]
@@ -171,9 +171,9 @@ extension Transcript {
         }
     }
     
-    public struct Instructions: Sendable, Identifiable {
+    public struct Instructions: Sendable, SendableMetatype, Identifiable {
         public typealias ID = String
-        
+
         public var id: String
         public var segments: [Transcript.Segment]
         public var toolDefinitions: [Transcript.ToolDefinition]
@@ -185,9 +185,9 @@ extension Transcript {
         }
     }
     
-    public struct ToolCall: Sendable, Identifiable {
+    public struct ToolCall: Sendable, SendableMetatype, Identifiable {
         public typealias ID = String
-        
+
         public var id: String
         public var toolName: String
         public var arguments: GeneratedContent
@@ -199,9 +199,9 @@ extension Transcript {
         }
     }
     
-    public struct ToolCalls: Sendable, Identifiable {
+    public struct ToolCalls: Sendable, SendableMetatype, Identifiable {
         public typealias ID = String
-        
+
         public var id: String
         package var calls: [ToolCall]
         
@@ -211,11 +211,11 @@ extension Transcript {
         }
     }
     
-    public struct ToolDefinition: Sendable {
+    public struct ToolDefinition: Sendable, SendableMetatype {
         public var name: String
-        
+
         public var description: String
-        
+
         public var parameters: GenerationSchema
         
         public init(name: String, description: String, parameters: GenerationSchema) {
@@ -231,9 +231,9 @@ extension Transcript {
         }
     }
     
-    public struct ToolOutput: Sendable, Identifiable {
+    public struct ToolOutput: Sendable, SendableMetatype, Identifiable {
         public typealias ID = String
-        
+
         public var id: String
         public var toolName: String
         public var segments: [Transcript.Segment]
@@ -245,11 +245,11 @@ extension Transcript {
         }
     }
     
-    public struct ResponseFormat: Sendable {
+    public struct ResponseFormat: Sendable, SendableMetatype {
         public var name: String
-        
+
         package var type: String?
-        
+
         package var schema: GenerationSchema?
         
         public init(schema: GenerationSchema) {
@@ -267,7 +267,8 @@ extension Transcript {
 }
 
 
-extension Transcript.Entry: Equatable {
+// MARK: - Equatable Implementations
+extension Transcript.Entry {
     public static func ==(lhs: Transcript.Entry, rhs: Transcript.Entry) -> Bool {
         switch (lhs, rhs) {
         case (.instructions(let l), .instructions(let r)):
