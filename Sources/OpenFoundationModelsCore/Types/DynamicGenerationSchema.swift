@@ -2,7 +2,7 @@
 import Foundation
 
 
-public struct DynamicGenerationSchema: Sendable {
+public struct DynamicGenerationSchema: Sendable, SendableMetatype {
     
     internal let name: String
     
@@ -80,7 +80,7 @@ public struct DynamicGenerationSchema: Sendable {
         self.schemaType = schemaType
     }
     
-    public struct Property: Sendable {
+    public struct Property: Sendable, SendableMetatype {
         internal let name: String
         
         internal let description: String?

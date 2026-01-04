@@ -1,6 +1,6 @@
 import Foundation
 
-public struct GenerationSchema: Sendable, Codable, CustomDebugStringConvertible {
+public struct GenerationSchema: Sendable, SendableMetatype, Codable, CustomDebugStringConvertible {
     internal let schemaType: SchemaType
     private let _description: String?
     
@@ -743,7 +743,7 @@ extension GenerationSchema.SchemaType {
 }
 
 extension GenerationSchema {
-    public struct Property: Sendable {
+    public struct Property: Sendable, SendableMetatype {
         internal let name: String
         
         internal let type: any Generable.Type
@@ -1037,7 +1037,7 @@ internal struct AnyCodable: Codable {
 }
 
 extension GenerationSchema {
-    public enum SchemaError: Error, LocalizedError {
+    public enum SchemaError: Error, LocalizedError, Sendable, SendableMetatype {
         case duplicateProperty(schema: String, property: String, context: Context)
         
         case duplicateType(schema: String?, type: String, context: Context)
