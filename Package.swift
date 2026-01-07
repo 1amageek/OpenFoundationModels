@@ -1,4 +1,3 @@
-
 // swift-tools-version: 6.2
 
 import PackageDescription
@@ -27,8 +26,8 @@ let package = Package(
             targets: ["OpenFoundationModelsExtra"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "600.0.0"),
-        .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.0.0"),
+        .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "602.0.0"),
+        .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.1.1"),
     ],
     targets: [
         .target(
