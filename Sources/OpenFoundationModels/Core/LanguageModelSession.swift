@@ -179,7 +179,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 )
                 
             default:
-                throw GenerationError.unexpectedEntryType(
+                throw GenerationError.decodingFailure(
                     GenerationError.Context(
                         debugDescription: "Unexpected entry type: \(entry)"
                     )
@@ -187,8 +187,8 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
             }
         }
     }
-    
-    
+
+
     @discardableResult
     nonisolated(nonsending) public final func respond(
         to prompt: String,
@@ -294,7 +294,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 )
                 
             default:
-                throw GenerationError.unexpectedEntryType(
+                throw GenerationError.decodingFailure(
                     GenerationError.Context(
                         debugDescription: "Unexpected entry type: \(entry)"
                     )
@@ -302,8 +302,8 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
             }
         }
     }
-    
-    
+
+
     @discardableResult
     nonisolated(nonsending) public final func respond<Content: Generable>(
         to prompt: String,
@@ -411,7 +411,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 )
                 
             default:
-                throw GenerationError.unexpectedEntryType(
+                throw GenerationError.decodingFailure(
                     GenerationError.Context(
                         debugDescription: "Unexpected entry type: \(entry)"
                     )
@@ -419,8 +419,8 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
             }
         }
     }
-    
-    
+
+
     public final func streamResponse(
         to prompt: String,
         options: GenerationOptions = GenerationOptions()
@@ -534,7 +534,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                             return
                             
                         default:
-                            continuation.finish(throwing: GenerationError.unexpectedEntryType(
+                            continuation.finish(throwing: GenerationError.decodingFailure(
                                 GenerationError.Context(
                                     debugDescription: "Unexpected entry type during streaming: \(finalEntry)"
                                 )
@@ -545,11 +545,27 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 }
             }
         }
-        
+
         return ResponseStream(stream: stream)
     }
-    
-    
+
+
+    /// Produces a response stream to a prompt and schema.
+    ///
+    /// Consider using the default value of `true` for `includeSchemaInPrompt`.
+    /// The exception to the rule is when the model has knowledge about the expected response format, either
+    /// because it has been trained on it, or because it has seen exhaustive examples during this session.
+    ///
+    /// - Important: If running in the background, use the non-streaming
+    /// ``LanguageModelSession/respond(to:options:)`` method to
+    /// reduce the likelihood of encountering ``LanguageModelSession/GenerationError/rateLimited(_:)`` errors.
+    ///
+    /// - Parameters:
+    ///   - prompt: A prompt for the model to respond to.
+    ///   - schema: A schema to guide the output with.
+    ///   - includeSchemaInPrompt: Inject the schema into the prompt to bias the model.
+    ///   - options: Options that control how tokens are sampled from the distribution the model produces.
+    /// - Returns: A response stream that produces ``GeneratedContent`` containing the fields and values defined in the schema.
     public final func streamResponse(
         to prompt: String,
         schema: GenerationSchema,
@@ -557,26 +573,28 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         options: GenerationOptions = GenerationOptions()
     ) -> sending ResponseStream<GeneratedContent> {
         return streamResponse(
-            to: Prompt(prompt),
             schema: schema,
             includeSchemaInPrompt: includeSchemaInPrompt,
             options: options
-        )
+        ) { Prompt(prompt) }
     }
-    
-    public final func streamResponse(
-        to prompt: Prompt,
-        schema: GenerationSchema,
-        includeSchemaInPrompt: Bool = true,
-        options: GenerationOptions = GenerationOptions()
-    ) -> sending ResponseStream<GeneratedContent> {
-        return streamResponse(
-            schema: schema,
-            includeSchemaInPrompt: includeSchemaInPrompt,
-            options: options
-        ) { prompt }
-    }
-    
+
+    /// Produces a response stream to a prompt and schema.
+    ///
+    /// Consider using the default value of `true` for `includeSchemaInPrompt`.
+    /// The exception to the rule is when the model has knowledge about the expected response format, either
+    /// because it has been trained on it, or because it has seen exhaustive examples during this session.
+    ///
+    /// - Important: If running in the background, use the non-streaming
+    /// ``LanguageModelSession/respond(to:options:)`` method to
+    /// reduce the likelihood of encountering ``LanguageModelSession/GenerationError/rateLimited(_:)`` errors.
+    ///
+    /// - Parameters:
+    ///   - schema: A schema to guide the output with.
+    ///   - includeSchemaInPrompt: Inject the schema into the prompt to bias the model.
+    ///   - options: Options that control how tokens are sampled from the distribution the model produces.
+    ///   - prompt: A prompt for the model to respond to.
+    /// - Returns: A response stream that produces ``GeneratedContent`` containing the fields and values defined in the schema.
     public final func streamResponse(
         schema: GenerationSchema,
         includeSchemaInPrompt: Bool = true,
@@ -678,7 +696,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                             return
 
                         default:
-                            continuation.finish(throwing: GenerationError.unexpectedEntryType(
+                            continuation.finish(throwing: GenerationError.decodingFailure(
                                 GenerationError.Context(
                                     debugDescription: "Unexpected entry type during streaming: \(finalEntry)"
                                 )
@@ -692,8 +710,8 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
 
         return ResponseStream(stream: stream)
     }
-    
-    
+
+
     public final func streamResponse<Content: Generable>(
         to prompt: String,
         generating type: Content.Type = Content.self,
@@ -827,7 +845,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                             return
 
                         default:
-                            continuation.finish(throwing: GenerationError.unexpectedEntryType(
+                            continuation.finish(throwing: GenerationError.decodingFailure(
                                 GenerationError.Context(
                                     debugDescription: "Unexpected entry type during streaming: \(finalEntry)"
                                 )
@@ -841,8 +859,8 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
 
         return ResponseStream(stream: stream)
     }
-    
-    
+
+
     // MARK: - Tool Execution
     
     private func executeAllToolCalls(_ toolCalls: Transcript.ToolCalls) async throws {
@@ -870,26 +888,21 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
     private func executeToolCall(_ toolCall: Transcript.ToolCall) async throws -> String {
         // Find the tool instance from available tools
         guard let tool = self.tools.first(where: { $0.name == toolCall.toolName }) else {
-            throw GenerationError.toolNotFound(
-                toolCall.toolName,
+            throw GenerationError.decodingFailure(
                 GenerationError.Context(
                     debugDescription: "Tool '\(toolCall.toolName)' not found in available tools"
                 )
             )
         }
-        
+
         do {
             // Use a helper method that can handle the existential type
             return try await executeToolWithHelper(tool, arguments: toolCall.arguments)
-            
+
+        } catch let error as ToolCallError {
+            throw error
         } catch {
-            throw GenerationError.toolExecutionFailed(
-                toolCall.toolName,
-                error,
-                GenerationError.Context(
-                    debugDescription: "Failed to execute tool '\(toolCall.toolName)': \(error.localizedDescription)"
-                )
-            )
+            throw ToolCallError(tool: tool, underlyingError: error)
         }
     }
     
@@ -932,6 +945,17 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         return schema.debugDescription
     }
     
+    /// Logs and serializes a feedback attachment that can be submitted to Apple.
+    ///
+    /// This method creates a structured feedback attachment containing the session's transcript
+    /// and any provided feedback information. The attachment can be saved to a file and submitted
+    /// to Apple using Feedback Assistant.
+    ///
+    /// - Parameters:
+    ///   - sentiment: An optional sentiment rating about the model's output (positive, negative, or neutral).
+    ///   - issues: An array of specific issues identified with the model's response. Defaults to an empty array.
+    ///   - desiredOutput: An optional transcript entry showing what the desired output should have been.
+    /// - Returns: A `Data` object containing the JSON-encoded feedback attachment that can be submitted to Feedback Assistant.
     @discardableResult
     public final func logFeedbackAttachment(
         sentiment: LanguageModelFeedback.Sentiment?,
@@ -939,89 +963,175 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         desiredOutput: Transcript.Entry? = nil
     ) -> Data {
         var feedbackData: [String: Any] = [:]
-        
+
         if let sentiment = sentiment {
             feedbackData["sentiment"] = String(describing: sentiment)
         }
-        
+
         feedbackData["issues"] = issues.map { issue in
             [
                 "category": String(describing: issue.category),
                 "explanation": issue.explanation ?? ""
             ]
         }
-        
+
         if let desiredOutput = desiredOutput {
             feedbackData["desiredOutput"] = String(describing: desiredOutput)
         }
-        
+
         feedbackData["transcript"] = transcript.entries.map { String(describing: $0) }
-        
+
         if let data = try? JSONSerialization.data(withJSONObject: feedbackData, options: .prettyPrinted) {
             return data
         }
-        
+
         return Data()
+    }
+
+    /// Logs and serializes a feedback attachment with a desired response text.
+    ///
+    /// - Parameters:
+    ///   - sentiment: An optional sentiment rating about the model's output.
+    ///   - issues: An array of specific issues identified with the model's response.
+    ///   - desiredResponseText: An optional string showing what the desired response text should have been.
+    /// - Returns: A `Data` object containing the JSON-encoded feedback attachment.
+    @discardableResult
+    public final func logFeedbackAttachment(
+        sentiment: LanguageModelFeedback.Sentiment?,
+        issues: [LanguageModelFeedback.Issue] = [],
+        desiredResponseText: String?
+    ) -> Data {
+        let desiredOutput: Transcript.Entry?
+        if let text = desiredResponseText {
+            let textSegment = Transcript.TextSegment(id: UUID().uuidString, content: text)
+            let segment = Transcript.Segment.text(textSegment)
+            let response = Transcript.Response(id: UUID().uuidString, assetIDs: [], segments: [segment])
+            desiredOutput = .response(response)
+        } else {
+            desiredOutput = nil
+        }
+        return logFeedbackAttachment(sentiment: sentiment, issues: issues, desiredOutput: desiredOutput)
+    }
+
+    /// Logs and serializes a feedback attachment with a desired response content.
+    ///
+    /// - Parameters:
+    ///   - sentiment: An optional sentiment rating about the model's output.
+    ///   - issues: An array of specific issues identified with the model's response.
+    ///   - desiredResponseContent: An optional content conforming to `ConvertibleToGeneratedContent` showing what the desired response should have been.
+    /// - Returns: A `Data` object containing the JSON-encoded feedback attachment.
+    @discardableResult
+    public final func logFeedbackAttachment(
+        sentiment: LanguageModelFeedback.Sentiment?,
+        issues: [LanguageModelFeedback.Issue] = [],
+        desiredResponseContent: (any ConvertibleToGeneratedContent)?
+    ) -> Data {
+        let desiredOutput: Transcript.Entry?
+        if let content = desiredResponseContent {
+            let structuredSegment = Transcript.StructuredSegment(
+                id: UUID().uuidString,
+                source: String(describing: type(of: content)),
+                content: content.generatedContent
+            )
+            let segment = Transcript.Segment.structure(structuredSegment)
+            let response = Transcript.Response(id: UUID().uuidString, assetIDs: [], segments: [segment])
+            desiredOutput = .response(response)
+        } else {
+            desiredOutput = nil
+        }
+        return logFeedbackAttachment(sentiment: sentiment, issues: issues, desiredOutput: desiredOutput)
     }
 }
 
 
 extension LanguageModelSession {
-    
-    public struct ResponseStream<Content>: AsyncSequence where Content: Generable {
-        
+
+    /// An async sequence of snapshots of partially generated content.
+    public struct ResponseStream<Content> where Content: Generable {
+
+        /// A snapshot of partially generated content.
         public struct Snapshot {
+
+            /// The content of the response.
             public var content: Content.PartiallyGenerated
-            
+
+            /// The raw content of the response.
+            ///
+            /// When `Content` is `GeneratedContent`, this is the same as `content`.
             public var rawContent: GeneratedContent
         }
-        
-        public typealias Element = Snapshot
-        
-        public struct AsyncIterator: AsyncIteratorProtocol, @unchecked Sendable {
-            private var iterator: AsyncThrowingStream<Snapshot, Error>.AsyncIterator
-            
-            init(stream: AsyncThrowingStream<Snapshot, Error>) {
-                self.iterator = stream.makeAsyncIterator()
-            }
-            
-            public mutating func next(isolation actor: isolated (any Actor)? = #isolation) async throws -> Snapshot? {
-                return try await iterator.next()
-            }
-        }
-        
-        private let stream: AsyncThrowingStream<Snapshot, Error>
-        
-        init(stream: AsyncThrowingStream<Snapshot, Error>) {
+
+        internal let stream: AsyncThrowingStream<Snapshot, Error>
+
+        internal init(stream: AsyncThrowingStream<Snapshot, Error>) {
             self.stream = stream
         }
-        
-        public func makeAsyncIterator() -> AsyncIterator {
-            return AsyncIterator(stream: stream)
+    }
+}
+
+extension LanguageModelSession.ResponseStream: AsyncSequence {
+
+    /// The type of element produced by this asynchronous sequence.
+    public typealias Element = Snapshot
+
+    /// The type of asynchronous iterator that produces elements of this
+    /// asynchronous sequence.
+    public struct AsyncIterator: AsyncIteratorProtocol, @unchecked Sendable {
+        private var iterator: AsyncThrowingStream<Snapshot, Error>.AsyncIterator
+
+        internal init(stream: AsyncThrowingStream<Snapshot, Error>) {
+            self.iterator = stream.makeAsyncIterator()
         }
-        
-        nonisolated(nonsending) public func collect() async throws -> sending Response<Content> {
-            var finalSnapshot: Snapshot?
-            let allEntries = ArraySlice<Transcript.Entry>()
-            
-            for try await snapshot in self {
-                finalSnapshot = snapshot
-            }
-            
-            guard let snapshot = finalSnapshot else {
-                let context = GenerationError.Context(debugDescription: "Stream completed without any content")
-                throw GenerationError.decodingFailure(context)
-            }
-            
-            // Convert from PartiallyGenerated to full Content
-            let content = try Content(snapshot.rawContent)
-            
-            return Response(
-                content: content,
-                rawContent: snapshot.rawContent,
-                transcriptEntries: allEntries
-            )
+
+        /// Asynchronously advances to the next element and returns it, or ends the
+        /// sequence if there is no next element.
+        ///
+        /// - Returns: The next element, if it exists, or `nil` to signal the end of
+        ///   the sequence.
+        public mutating func next(isolation actor: isolated (any Actor)? = #isolation) async throws -> Snapshot? {
+            return try await iterator.next()
         }
+
+        public typealias Element = Snapshot
+    }
+
+    /// Creates the asynchronous iterator that produces elements of this
+    /// asynchronous sequence.
+    ///
+    /// - Returns: An instance of the `AsyncIterator` type used to produce
+    /// elements of the asynchronous sequence.
+    public func makeAsyncIterator() -> AsyncIterator {
+        return AsyncIterator(stream: stream)
+    }
+
+    /// The result from a streaming response, after it completes.
+    ///
+    /// If the streaming response was finished successfully before calling
+    /// `collect()`, this method `Response` returns immediately.
+    ///
+    /// If the streaming response was finished with an error before calling
+    /// `collect()`, this method propagates that error.
+    nonisolated(nonsending) public func collect() async throws -> sending LanguageModelSession.Response<Content> {
+        var finalSnapshot: Snapshot?
+        let allEntries = ArraySlice<Transcript.Entry>()
+
+        for try await snapshot in self {
+            finalSnapshot = snapshot
+        }
+
+        guard let snapshot = finalSnapshot else {
+            let context = LanguageModelSession.GenerationError.Context(debugDescription: "Stream completed without any content")
+            throw LanguageModelSession.GenerationError.decodingFailure(context)
+        }
+
+        // Convert from PartiallyGenerated to full Content
+        let content = try Content(snapshot.rawContent)
+
+        return LanguageModelSession.Response(
+            content: content,
+            rawContent: snapshot.rawContent,
+            transcriptEntries: allEntries
+        )
     }
 }
 
@@ -1031,22 +1141,36 @@ extension LanguageModelSession {
 extension LanguageModelSession {
     
     public enum GenerationError: Error, LocalizedError, Sendable {
-        
+
+        /// The context in which the error occurred.
         public struct Context: Sendable {
+
+            /// A debug description to help developers diagnose issues during development.
+            ///
+            /// This string is not localized and is not appropriate for display to end users.
             public let debugDescription: String
-            
+
+            /// Creates a context.
+            ///
+            /// - Parameters:
+            ///   - debugDescription: The debug description to help developers diagnose issues during development.
             public init(debugDescription: String) {
                 self.debugDescription = debugDescription
             }
         }
-        
+
+        /// A refusal produced by a language model.
+        ///
+        /// Refusal errors indicate that the model chose not to respond to a prompt. To make the model
+        /// explain why it refused, catch the refusal error and access one of its explanation properties.
         public struct Refusal: Sendable {
             private let transcriptEntries: [Transcript.Entry]
-            
+
             public init(transcriptEntries: [Transcript.Entry]) {
                 self.transcriptEntries = transcriptEntries
             }
-            
+
+            /// An explanation for why the model refused to respond.
             public var explanation: Response<String> {
                 get async throws {
                     return Response(
@@ -1056,7 +1180,8 @@ extension LanguageModelSession {
                     )
                 }
             }
-            
+
+            /// A stream containing an explanation about why the model refused to respond.
             public var explanationStream: ResponseStream<String> {
                 typealias StringSnapshot = ResponseStream<String>.Snapshot
                 let stream = AsyncThrowingStream<StringSnapshot, Error> { continuation in
@@ -1065,31 +1190,63 @@ extension LanguageModelSession {
                 return ResponseStream<String>(stream: stream)
             }
         }
-        
+
+        /// An error that signals the session reached its context window size limit.
+        ///
+        /// This error occurs when you use the available tokens for the context window of 4,096 tokens. The
+        /// token count includes instructions, prompts, and outputs for a session instance. A single token
+        /// corresponds to approximately three to four characters in languages like English, Spanish, or
+        /// German, and one token per character in languages like Japanese, Chinese, and Korean.
+        ///
+        /// Start a new session when you exceed the content window size, and try again using a shorter
+        /// prompt or shorter output length.
         case exceededContextWindowSize(Context)
-        
+
+        /// An error that indicates the assets required for the session are unavailable.
+        ///
+        /// This may happen if you forget to check model availability to begin with,
+        /// or if the model assets are deleted. This can happen if the user disables
+        /// AppleIntelligence while your app is running.
+        ///
+        /// You may be able to recover from this error by retrying later after the
+        /// device has freed up enough space to redownload model assets.
         case assetsUnavailable(Context)
-        
+
+        /// An error that indicates the system's safety guardrails are triggered by content in a
+        /// prompt or the response generated by the model.
         case guardrailViolation(Context)
-        
+
+        /// An error that indicates a generation guide with an unsupported pattern was used.
         case unsupportedGuide(Context)
-        
+
+        /// An error that indicates an error that occurs if the model is prompted to respond in a language
+        /// that it does not support.
         case unsupportedLanguageOrLocale(Context)
-        
+
+        /// An error that indicates the session failed to deserialize a valid generable type from model output.
+        ///
+        /// This can happen if generation was terminated early.
         case decodingFailure(Context)
-        
+
+        /// An error that indicates your session has been rate limited.
+        ///
+        /// This error will only happen if your app is running in the background
+        /// and exceeds the system defined rate limit.
         case rateLimited(Context)
-        
+
+        /// An error that happens if you attempt to make a session respond to a
+        /// second prompt while it's still responding to the first one.
         case concurrentRequests(Context)
-        
+
+        /// An error indicating that the model refused to answer.
+        ///
+        /// This error can happen for prompts that do not violate any guardrail policy, but
+        /// the model isn't able to provide the kind of response you requested. You can
+        /// choose to handle this error by showing a predetermined message of your choice,
+        /// or you can use the `Refusal` to generate an explanation from the model itself.
         case refusal(Refusal, Context)
-        
-        case toolNotFound(String, Context)
-        
-        case toolExecutionFailed(String, Error, Context)
-        
-        case unexpectedEntryType(Context)
-        
+
+        /// A string representation of the error description.
         public var errorDescription: String? {
             switch self {
             case .exceededContextWindowSize(let context):
@@ -1110,15 +1267,10 @@ extension LanguageModelSession {
                 return "Concurrent requests: \(context.debugDescription)"
             case .refusal(_, let context):
                 return "Model refusal: \(context.debugDescription)"
-            case .toolNotFound(let toolName, let context):
-                return "Tool not found: '\(toolName)' - \(context.debugDescription)"
-            case .toolExecutionFailed(let toolName, let error, let context):
-                return "Tool execution failed: '\(toolName)' - \(error.localizedDescription) - \(context.debugDescription)"
-            case .unexpectedEntryType(let context):
-                return "Unexpected entry type: \(context.debugDescription)"
             }
         }
-        
+
+        /// A string representation of the recovery suggestion.
         public var recoverySuggestion: String? {
             switch self {
             case .exceededContextWindowSize:
@@ -1139,15 +1291,10 @@ extension LanguageModelSession {
                 return "Wait for the current request to complete before making another."
             case .refusal:
                 return "Modify your request to comply with model guidelines."
-            case .toolNotFound:
-                return "Ensure the tool is included in the session's tools array."
-            case .toolExecutionFailed:
-                return "Check the tool arguments and implementation for errors."
-            case .unexpectedEntryType:
-                return "This is likely an internal error - please report if persistent."
             }
         }
-        
+
+        /// A string representation of the failure reason.
         public var failureReason: String? {
             return errorDescription
         }

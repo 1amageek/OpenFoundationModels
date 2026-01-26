@@ -40,5 +40,9 @@
     "additionalDirectories": [
       "/Users/1amageek/Desktop/OpenFoundationModels-Claude"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "chrome-devtools"
+  ],
+  "enableAllProjectMcpServers": true
 }

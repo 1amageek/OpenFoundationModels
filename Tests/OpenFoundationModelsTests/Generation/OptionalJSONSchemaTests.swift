@@ -40,6 +40,15 @@ fileprivate struct TestEncodingStruct {
     var optionalField: String?
 }
 
+@Generable
+fileprivate struct TestWithGuides {
+    @Guide(description: "Score between 0 and 100", .minimum(0), .maximum(100))
+    var optionalScore: Int?
+
+    @Guide(description: "Required name")
+    var requiredName: String
+}
+
 @Suite("Optional JSON Schema Generation Tests")
 struct OptionalJSONSchemaTests {
     
@@ -185,7 +194,9 @@ struct OptionalJSONSchemaTests {
                         .generic(type: String.self, guides: []),
                         .generic(type: Int.self, guides: [])
                     ]),
-                    isOptional: true
+                    isOptional: true,
+                    guides: [],
+                    regexPatterns: []
                 )
             ]),
             description: "Test complex optional"
@@ -251,16 +262,16 @@ struct OptionalJSONSchemaTests {
     @Test("JSON Schema encoding preserves null-allowing types")
     func jsonSchemaEncodingPreservesNullTypes() throws {
         let schema = TestEncodingStruct.generationSchema
-        
+
         // Encode to JSON
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let jsonData = try encoder.encode(schema)
-        
+
         // Decode back to verify structure
         let decoder = JSONDecoder()
         let decodedDict = try decoder.decode([String: AnyCodable].self, from: jsonData)
-        
+
         // Navigate to the type field
         if let properties = decodedDict["properties"]?.value as? [String: Any],
            let optionalField = properties["optionalField"] as? [String: Any],
@@ -274,6 +285,58 @@ struct OptionalJSONSchemaTests {
             }
         } else {
             Issue.record("Could not navigate to optionalField type in encoded JSON")
+        }
+    }
+
+    @Test("@Generable macro with @Guide on optional property generates correct schema")
+    func generableMacroWithGuideOnOptional() throws {
+        let schema = TestWithGuides.generationSchema
+        let jsonSchema = schema.toSchemaDictionary()
+
+        print("TestWithGuides Schema:")
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        if let data = try? encoder.encode(schema),
+           let json = String(data: data, encoding: .utf8) {
+            print(json)
+        }
+
+        guard let properties = jsonSchema["properties"] as? [String: Any] else {
+            Issue.record("Properties not found")
+            return
+        }
+
+        // Check optionalScore has guides applied and allows null
+        if let scoreProp = properties["optionalScore"] as? [String: Any] {
+            // Check minimum/maximum are applied
+            #expect(scoreProp["minimum"] as? Int == 0, "optionalScore should have minimum 0")
+            #expect(scoreProp["maximum"] as? Int == 100, "optionalScore should have maximum 100")
+
+            // Check type allows null
+            if let typeArray = scoreProp["type"] as? [String] {
+                #expect(typeArray.contains("integer"), "optionalScore should have integer type")
+                #expect(typeArray.contains("null"), "optionalScore should allow null")
+            } else {
+                Issue.record("optionalScore type should be an array")
+            }
+        } else {
+            Issue.record("optionalScore property not found")
+        }
+
+        // Check requiredName is required and doesn't allow null
+        if let nameProp = properties["requiredName"] as? [String: Any],
+           let nameType = nameProp["type"] as? String {
+            #expect(nameType == "string", "requiredName should have string type")
+        } else {
+            Issue.record("requiredName property not correctly formatted")
+        }
+
+        // Check required array
+        if let required = jsonSchema["required"] as? [String] {
+            #expect(required.contains("requiredName"), "requiredName should be required")
+            #expect(!required.contains("optionalScore"), "optionalScore should NOT be required")
+        } else {
+            Issue.record("required array not found")
         }
     }
 }

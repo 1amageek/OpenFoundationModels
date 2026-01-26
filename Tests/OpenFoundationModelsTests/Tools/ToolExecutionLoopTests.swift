@@ -239,25 +239,26 @@ struct ToolExecutionLoopTests {
     }
     
     // MARK: - Error Handling Tests
-    
+
     @Test("Tool not found error")
     func toolNotFoundError() async throws {
         let unknownCall = createToolCall(toolName: "UnknownTool", arguments: "test")
         let toolCallsEntry = createToolCallsEntry(calls: [unknownCall])
-        
+
         let mockModel = MockLanguageModel(responses: [toolCallsEntry])
         let session = LanguageModelSession(
             model: mockModel,
             tools: [WeatherTool()], // UnknownTool is not included
             instructions: "You are a helpful assistant"
         )
-        
+
         do {
             let _ = try await session.respond(to: "Use unknown tool")
             Issue.record("Expected error to be thrown")
         } catch let error as LanguageModelSession.GenerationError {
-            if case .toolNotFound(let toolName, _) = error {
-                #expect(toolName == "UnknownTool")
+            // Tool not found results in decodingFailure
+            if case .decodingFailure(let context) = error {
+                #expect(context.debugDescription.contains("UnknownTool"))
             } else {
                 Issue.record("Wrong error type: \(error)")
             }
@@ -265,33 +266,31 @@ struct ToolExecutionLoopTests {
             Issue.record("Unexpected error type: \(error)")
         }
     }
-    
+
     @Test("Tool execution failure error")
     func toolExecutionFailureError() async throws {
         let failingCall = createToolCall(toolName: "FailingTool", arguments: "test")
         let toolCallsEntry = createToolCallsEntry(calls: [failingCall])
-        
+
         let mockModel = MockLanguageModel(responses: [toolCallsEntry])
         let session = LanguageModelSession(
             model: mockModel,
             tools: [FailingTool()],
             instructions: "You are a helpful assistant"
         )
-        
+
         do {
             let _ = try await session.respond(to: "Use failing tool")
             Issue.record("Expected error to be thrown")
-        } catch let error as LanguageModelSession.GenerationError {
-            if case .toolExecutionFailed(let toolName, _, _) = error {
-                #expect(toolName == "FailingTool")
-            } else {
-                Issue.record("Wrong error type: \(error)")
-            }
+        } catch let error as LanguageModelSession.ToolCallError {
+            // Tool execution failure results in ToolCallError
+            #expect(error.tool.name == "FailingTool")
+            #expect(error.underlyingError is NSError)
         } catch {
             Issue.record("Unexpected error type: \(error)")
         }
     }
-    
+
     @Test("Unexpected entry type error")
     func unexpectedEntryTypeError() async throws {
         let instructionsEntry = Transcript.Entry.instructions(
@@ -301,20 +300,21 @@ struct ToolExecutionLoopTests {
                 toolDefinitions: []
             )
         )
-        
+
         let mockModel = MockLanguageModel(responses: [instructionsEntry])
         let session = LanguageModelSession(
             model: mockModel,
             tools: [],
             instructions: "You are a helpful assistant"
         )
-        
+
         do {
             let _ = try await session.respond(to: "Test prompt")
             Issue.record("Expected error to be thrown")
         } catch let error as LanguageModelSession.GenerationError {
-            if case .unexpectedEntryType(_) = error {
-                // Expected error
+            // Unexpected entry type results in decodingFailure
+            if case .decodingFailure(let context) = error {
+                #expect(context.debugDescription.contains("Unexpected entry type"))
             } else {
                 Issue.record("Wrong error type: \(error)")
             }

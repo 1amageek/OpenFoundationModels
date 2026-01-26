@@ -19,6 +19,17 @@ public struct GenerationSchema: Sendable, SendableMetatype, Codable, CustomDebug
         let description: String?
         let type: SchemaType
         let isOptional: Bool
+        let guides: [AnyGenerationGuide]
+        let regexPatterns: [String]
+
+        init(name: String, description: String?, type: SchemaType, isOptional: Bool, guides: [AnyGenerationGuide] = [], regexPatterns: [String] = []) {
+            self.name = name
+            self.description = description
+            self.type = type
+            self.isOptional = isOptional
+            self.guides = guides
+            self.regexPatterns = regexPatterns
+        }
     }
     
     internal var type: String {
@@ -178,12 +189,14 @@ public struct GenerationSchema: Sendable, SendableMetatype, Codable, CustomDebug
                 // This ensures arrays and other complex types are handled correctly
                 // prop.type is already defined as any Generable.Type in the Property struct
                 let propertySchemaType: SchemaType = prop.type.generationSchema.schemaType
-                
+
                 return PropertyInfo(
                     name: prop.name,
                     description: prop.description,
                     type: propertySchemaType,
-                    isOptional: SchemaType.isOptionalType(prop.type)
+                    isOptional: SchemaType.isOptionalType(prop.type),
+                    guides: prop.guides,
+                    regexPatterns: prop.regexPatterns
                 )
             }
             self.schemaType = .object(properties: propInfos)
@@ -616,7 +629,17 @@ extension GenerationSchema.SchemaType {
                         propSchema.removeValue(forKey: "description")
                         propSchema["description"] = property.description
                     }
-                    
+
+                    // Apply guides from PropertyInfo
+                    for guide in property.guides {
+                        guide.applyToSchema(&propSchema)
+                    }
+
+                    // Apply regex patterns from PropertyInfo
+                    if let lastPattern = property.regexPatterns.last {
+                        propSchema["pattern"] = lastPattern
+                    }
+
                     // If property is optional, modify schema to allow null
                     if property.isOptional {
                         if let baseType = propSchema["type"] as? String {
@@ -634,9 +657,9 @@ extension GenerationSchema.SchemaType {
                             }
                         }
                     }
-                    
+
                     props[property.name] = propSchema
-                    
+
                     // Check if the property is optional using PropertyInfo's isOptional field
                     if !property.isOptional {
                         required.append(property.name)
@@ -770,8 +793,39 @@ extension GenerationSchema {
             self.regexPatterns = guides.map { String(describing: $0) }
             self.guides = []
         }
-        
-        
+
+        /// Create an optional property that contains a generable type.
+        ///
+        /// - Parameters:
+        ///   - name: The property's name.
+        ///   - description: A natural language description of what content
+        ///     should be generated for this property.
+        ///   - type: The type this property represents.
+        ///   - guides: A list of guides to apply to this property.
+        public init<Value>(name: String, description: String? = nil, type: Value?.Type, guides: [GenerationGuide<Value>] = []) where Value: Generable {
+            self.name = name
+            self.description = description
+            self.type = Optional<Value>.self
+            self.regexPatterns = []
+            self.guides = guides.map(AnyGenerationGuide.init)
+        }
+
+        /// Create an optional property that contains a string type.
+        ///
+        /// - Parameters:
+        ///   - name: The property's name.
+        ///   - description: A natural language description of what content
+        ///     should be generated for this property.
+        ///   - type: The type this property represents.
+        ///   - guides: An array of regexes to be applied to this string. If there're multiple regexes in the array, only the last one will be applied.
+        public init<RegexOutput>(name: String, description: String? = nil, type: String?.Type, guides: [Regex<RegexOutput>] = []) {
+            self.name = name
+            self.description = description
+            self.type = Optional<String>.self
+            self.regexPatterns = guides.map { String(describing: $0) }
+            self.guides = []
+        }
+
         internal init(
             name: String,
             description: String?,

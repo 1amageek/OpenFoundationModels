@@ -125,16 +125,19 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                     
                     for arg in Array(arguments.dropFirst()) {
                         let argText = arg.expression.description
-                        
-                        if argText.contains(".pattern(") {
-                            let patternRegex = #/\.pattern\(\"([^\"]*)\"\)/#
-                            if let match = argText.firstMatch(of: patternRegex) {
+
+                        if argText.contains(".pattern(") || argText.contains("pattern(") {
+                            // Try to match .pattern("...") with quoted string
+                            let quotedPatternRegex = #/\.?pattern\(\"([^\"]*)\"\)/#
+                            if let match = argText.firstMatch(of: quotedPatternRegex) {
                                 pattern = String(match.1)
-                            }
-                        } else if argText.contains("pattern(") {
-                            let patternRegex = #/pattern\(\"([^\"]*)\"\)/#
-                            if let match = argText.firstMatch(of: patternRegex) {
-                                pattern = String(match.1)
+                            } else {
+                                // Try to match .pattern(/.../) with regex literal
+                                let regexLiteralRegex = #/\.?pattern\(\/(.*)\/\)/#
+                                if let match = argText.firstMatch(of: regexLiteralRegex) {
+                                    // Escape backslashes for use in string literal
+                                    pattern = String(match.1).replacingOccurrences(of: "\\", with: "\\\\")
+                                }
                             }
                         } else {
                             guides.append(argText)
@@ -481,9 +484,11 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
     private static func generateGenerationSchemaProperty(structName: String, description: String?, properties: [PropertyInfo]) -> DeclSyntax {
         let propertyDefinitions = properties.map { prop in
             let descriptionParam = prop.guideDescription.map { "description: \"\($0)\"" } ?? "description: nil"
-            
+
             let typeParam: String
             let isOptional = prop.type.hasSuffix("?")
+            let baseType = isOptional ? String(prop.type.dropLast()) : prop.type
+
             switch prop.type {
             case "String":
                 typeParam = "String.self"
@@ -512,21 +517,57 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                     typeParam = "\(prop.type).self"
                 }
             }
-            
-            var guides: [String] = []
-            if let pattern = prop.pattern {
-                guides.append("try! Regex(\"\(pattern)\")")
+
+            // Check if this is a String type with regex pattern
+            let isStringType = baseType == "String"
+            let hasPattern = prop.pattern != nil
+
+            if isStringType && hasPattern {
+                // Use regex-based initializer for String/String? with pattern
+                let regexParam = "try! Regex(\"\(prop.pattern!)\")"
+                return """
+                    GenerationSchema.Property(
+                        name: "\(prop.name)",
+                        \(descriptionParam),
+                        type: \(typeParam),
+                        guides: [\(regexParam)]
+                    )
+                """
+            } else {
+                // Use GenerationGuide-based initializer
+                var guides: [String] = []
+
+                // Add guides from @Guide attribute (e.g., .minimum(0), .maximum(100))
+                guides.append(contentsOf: prop.guides)
+
+                // For Optional types, we need explicit type annotation on guides to disambiguate
+                // between init<Value>(type: Value.Type) and init<Value>(type: Value?.Type)
+                let guidesParam: String
+                if guides.isEmpty {
+                    if isOptional {
+                        // Explicit type annotation for disambiguation
+                        guidesParam = "[] as [GenerationGuide<\(baseType)>]"
+                    } else {
+                        guidesParam = "[]"
+                    }
+                } else {
+                    if isOptional {
+                        // Explicit type annotation for disambiguation with non-empty guides
+                        guidesParam = "[\(guides.joined(separator: ", "))] as [GenerationGuide<\(baseType)>]"
+                    } else {
+                        guidesParam = "[\(guides.joined(separator: ", "))]"
+                    }
+                }
+
+                return """
+                    GenerationSchema.Property(
+                        name: "\(prop.name)",
+                        \(descriptionParam),
+                        type: \(typeParam),
+                        guides: \(guidesParam)
+                    )
+                """
             }
-            let guidesParam = guides.isEmpty ? "[]" : "[\(guides.joined(separator: ", "))]"
-            
-            return """
-                GenerationSchema.Property(
-                    name: "\(prop.name)",
-                    \(descriptionParam),
-                    type: \(typeParam),
-                    guides: \(guidesParam)
-                )
-            """
         }
         
         let propertiesArray = propertyDefinitions.isEmpty ? "[]" : """
