@@ -762,7 +762,6 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
 
                     // Process streaming entries
                     do {
-                        
                         var jsonBuffer: String = ""
                         for try await entry in entryStream {
                             currentEntry = entry
@@ -774,12 +773,9 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                                     if case .structure(let structuredSegment) = segment {
                                         accumulatedContent = structuredSegment.content
                                     } else if case .text(let textSegment) = segment {
-//                                        
-                                        jsonBuffer = jsonBuffer + textSegment.content
-                                
+                                        jsonBuffer += textSegment.content
                                         // Try to parse as JSON
                                         accumulatedContent = try? GeneratedContent(json: jsonBuffer)
-
                                         if accumulatedContent == nil {
                                             accumulatedContent = GeneratedContent(textSegment.content)
                                         }

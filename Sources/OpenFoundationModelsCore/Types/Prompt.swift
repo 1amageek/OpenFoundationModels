@@ -2,7 +2,7 @@ import Foundation
 
 public struct Prompt: Sendable, Copyable, SendableMetatype, PromptRepresentable {
 
-    public let content: String
+    package let content: String
 
     public init(_ content: String) {
         self.content = content
