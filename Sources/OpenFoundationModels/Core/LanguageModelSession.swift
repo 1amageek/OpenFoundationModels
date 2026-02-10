@@ -866,25 +866,77 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
     // MARK: - Tool Execution
     
     private func executeAllToolCalls(_ toolCalls: Transcript.ToolCalls) async throws {
-        for toolCall in toolCalls {
-            let output = try await executeToolCall(toolCall)
-            
-            // Add tool output to transcript
-            let outputEntry = Transcript.Entry.toolOutput(
-                Transcript.ToolOutput(
-                    id: UUID().uuidString,
-                    toolName: toolCall.toolName,
-                    segments: [.text(Transcript.TextSegment(
-                        id: UUID().uuidString,
-                        content: output
-                    ))]
-                )
-            )
-            
-            var entries = _transcript.entries
-            entries.append(outputEntry)
-            _transcript = Transcript(entries: entries)
+        let callsArray = Array(toolCalls)
+
+        // Single tool call: sequential execution (backward compatible)
+        guard callsArray.count > 1 else {
+            for toolCall in callsArray {
+                let output = try await executeToolCall(toolCall)
+                appendToolOutput(toolCall: toolCall, output: output)
+            }
+            return
         }
+
+        // Multiple tool calls: parallel execution with best-effort collection
+        let results = await withTaskGroup(
+            of: (Int, Transcript.ToolCall, Result<String, Error>).self
+        ) { group in
+            for (index, toolCall) in callsArray.enumerated() {
+                group.addTask {
+                    do {
+                        let output = try await self.executeToolCall(toolCall)
+                        return (index, toolCall, .success(output))
+                    } catch {
+                        return (index, toolCall, .failure(error))
+                    }
+                }
+            }
+            var collected: [(Int, Transcript.ToolCall, Result<String, Error>)] = []
+            for await result in group {
+                collected.append(result)
+            }
+            return collected
+        }
+
+        // Sort by original order
+        let sorted = results.sorted { $0.0 < $1.0 }
+
+        // Check if all tools failed
+        let failures = sorted.compactMap { (_, _, result) -> Error? in
+            if case .failure(let error) = result { return error }
+            return nil
+        }
+
+        if failures.count == sorted.count {
+            throw failures[0]
+        }
+
+        // Append results to transcript (success = normal output, failure = error message)
+        for (_, toolCall, result) in sorted {
+            switch result {
+            case .success(let output):
+                appendToolOutput(toolCall: toolCall, output: output)
+            case .failure(let error):
+                let errorMessage = "[Tool Error] \(toolCall.toolName): \(error.localizedDescription)"
+                appendToolOutput(toolCall: toolCall, output: errorMessage)
+            }
+        }
+    }
+
+    private func appendToolOutput(toolCall: Transcript.ToolCall, output: String) {
+        let outputEntry = Transcript.Entry.toolOutput(
+            Transcript.ToolOutput(
+                id: UUID().uuidString,
+                toolName: toolCall.toolName,
+                segments: [.text(Transcript.TextSegment(
+                    id: UUID().uuidString,
+                    content: output
+                ))]
+            )
+        )
+        var entries = _transcript.entries
+        entries.append(outputEntry)
+        _transcript = Transcript(entries: entries)
     }
     
     private func executeToolCall(_ toolCall: Transcript.ToolCall) async throws -> String {
