@@ -20,7 +20,7 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             let properties = extractGuidedProperties(from: structDecl)
             
             return [
-                generateRawContentProperty(),  // Add property to store original GeneratedContent
+                generateRawContentProperty(),
                 generateInitFromGeneratedContent(structName: structName, properties: properties),
                 generateGeneratedContentProperty(structName: structName, description: description, properties: properties),
                 generateGenerationSchemaProperty(structName: structName, description: description, properties: properties),
@@ -228,10 +228,10 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
     
     private static func generateRawContentProperty() -> DeclSyntax {
         return DeclSyntax(stringLiteral: """
-        private let _rawGeneratedContent: GeneratedContent
+        private var _rawGeneratedContent: GeneratedContent? = nil
         """)
     }
-    
+
     private static func generateInitFromGeneratedContent(structName: String, properties: [PropertyInfo]) -> DeclSyntax {
         let propertyExtractions = properties.map { prop in
             generatePropertyExtraction(propertyName: prop.name, propertyType: prop.type)
@@ -242,7 +242,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             return DeclSyntax(stringLiteral: """
             public init(_ generatedContent: GeneratedContent) throws {
                 self._rawGeneratedContent = generatedContent
-                
                 _ = try generatedContent.properties()  // Validate structure even if empty
             }
             """)
@@ -250,9 +249,8 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             return DeclSyntax(stringLiteral: """
             public init(_ generatedContent: GeneratedContent) throws {
                 self._rawGeneratedContent = generatedContent
-                
                 let properties = try generatedContent.properties()
-                
+
                 \(propertyExtractions)
             }
             """)
@@ -590,7 +588,7 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
     private static func generateAsPartiallyGeneratedMethod(structName: String) -> DeclSyntax {
         return DeclSyntax(stringLiteral: """
         public func asPartiallyGenerated() -> PartiallyGenerated {
-            return try! PartiallyGenerated(self._rawGeneratedContent)
+            return try! PartiallyGenerated(self._rawGeneratedContent ?? self.generatedContent)
         }
         """)
     }
