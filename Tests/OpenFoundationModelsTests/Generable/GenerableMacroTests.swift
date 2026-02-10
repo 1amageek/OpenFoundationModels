@@ -42,6 +42,16 @@ enum TestColor: Equatable {
     case blue
 }
 
+@Generable
+struct TestCustomInitStruct {
+    @Guide(description: "名前")
+    var name: String
+
+    init(name: String) {
+        self.name = name
+    }
+}
+
 @Suite("Generable Macro Tests", .tags(.generable, .macros))
 struct GenerableMacroTests {
     
@@ -152,6 +162,32 @@ struct GenerableMacroTests {
     }
     
     
+    @Test("@Generable struct with user-defined custom init")
+    func generableStructWithCustomInit() throws {
+        // Custom init works
+        let obj = TestCustomInitStruct(name: "Alice")
+        #expect(obj.name == "Alice")
+
+        // generatedContent round-trip
+        let content = obj.generatedContent
+        let restored = try TestCustomInitStruct(content)
+        #expect(restored.name == "Alice")
+
+        // Init from JSON
+        let json = try GeneratedContent(json: "{\"name\": \"Bob\"}")
+        let fromJson = try TestCustomInitStruct(json)
+        #expect(fromJson.name == "Bob")
+
+        // asPartiallyGenerated from custom init
+        let partial = obj.asPartiallyGenerated()
+        #expect(partial.name == "Alice")
+
+        // asPartiallyGenerated from GeneratedContent init with empty JSON
+        let empty = try TestCustomInitStruct(GeneratedContent(json: "{}"))
+        let emptyPartial = empty.asPartiallyGenerated()
+        #expect(emptyPartial.name == nil)
+    }
+
     @Test("@Generable macro generates init from GeneratedContent for simple enum")
     func generableMacroEnumInitFromGeneratedContentSimple() throws {
         let redContent = GeneratedContent("red")
