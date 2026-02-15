@@ -502,6 +502,33 @@ This design ensures:
 - **Complete Context**: Every request includes full conversation history
 - **Clear Responsibilities**: Session manages Transcript, Model generates responses
 
+## Differences from Apple Foundation Models
+
+### Image Segment Support (OpenFoundationModels Extension)
+
+OpenFoundationModels extends Apple's `Transcript.Segment` with `.image(ImageSegment)` for Vision Language Model (VLM) support. **This is not part of Apple's Foundation Models API.**
+
+| | Apple FoundationModels | OpenFoundationModels |
+|---|---|---|
+| `.text(TextSegment)` | Yes | Yes |
+| `.structure(StructuredSegment)` | Yes | Yes |
+| `.image(ImageSegment)` | No | **Yes (Extension)** |
+
+`ImageSegment` supports two source types:
+- `.base64(data:mediaType:)` — Inline base64-encoded image data with MIME type
+- `.url(URL)` — Remote image URL reference
+
+```swift
+let prompt = Transcript.Prompt(segments: [
+    .image(Transcript.ImageSegment(source: .base64(
+        data: imageData.base64EncodedString(),
+        mediaType: "image/png"
+    ))),
+    .text(Transcript.TextSegment(content: "Describe this image."))
+])
+let response = try await session.respond(to: prompt)
+```
+
 ## Development
 
 ### Build

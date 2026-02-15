@@ -166,6 +166,8 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                         return textSegment.content
                     case .structure(let structuredSegment):
                         return structuredSegment.content.text
+                    case .image:
+                        return nil
                     }
                 }.joined()
                 
@@ -188,6 +190,66 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         }
     }
 
+
+    @discardableResult
+    nonisolated(nonsending) public final func respond(
+        to prompt: Transcript.Prompt
+    ) async throws -> Response<String> {
+        _isResponding = true
+        defer { _isResponding = false }
+
+        // Add prompt directly to transcript
+        let promptEntry = Transcript.Entry.prompt(prompt)
+        var entries = _transcript.entries
+        entries.append(promptEntry)
+        _transcript = Transcript(entries: entries)
+
+        // Tool execution loop - continue until we get a response entry
+        while true {
+            let entry = try await model.generate(
+                transcript: _transcript,
+                options: prompt.options
+            )
+
+            var transcriptEntries = _transcript.entries
+            transcriptEntries.append(entry)
+            _transcript = Transcript(entries: transcriptEntries)
+
+            switch entry {
+            case .toolCalls(let toolCalls):
+                try await executeAllToolCalls(toolCalls)
+                continue
+
+            case .response(let response):
+                let content = response.segments.compactMap { segment -> String? in
+                    switch segment {
+                    case .text(let textSegment):
+                        return textSegment.content
+                    case .structure(let structuredSegment):
+                        return structuredSegment.content.text
+                    case .image:
+                        return nil
+                    }
+                }.joined()
+
+                let recentEntries = Array(_transcript.entries.suffix(2))
+                let entriesSlice = ArraySlice(recentEntries)
+
+                return Response(
+                    content: content,
+                    rawContent: GeneratedContent(content),
+                    transcriptEntries: entriesSlice
+                )
+
+            default:
+                throw GenerationError.decodingFailure(
+                    GenerationError.Context(
+                        debugDescription: "Unexpected entry type: \(entry)"
+                    )
+                )
+            }
+        }
+    }
 
     @discardableResult
     nonisolated(nonsending) public final func respond(
@@ -483,6 +545,8 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                                     accumulatedContent += textSegment.content
                                 case .structure(let structuredSegment):
                                     accumulatedContent += structuredSegment.content.text
+                                case .image:
+                                    break
                                 }
                             }
                             

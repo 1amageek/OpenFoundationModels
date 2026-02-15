@@ -185,32 +185,43 @@ private struct SegmentCoding: Codable {
     enum SegmentType: String, Codable {
         case text
         case structure
+        case image
     }
-    
+
     let type: SegmentType
     let id: String
     let content: String?
     let source: String?
     let generatedContent: GeneratedContent?
-    
+    let imageSource: ImageSourceCoding?
+
     init(from segment: Transcript.Segment) throws {
         self.id = segment.id
-        
+
         switch segment {
         case .text(let textSegment):
             self.type = .text
             self.content = textSegment.content
             self.source = nil
             self.generatedContent = nil
-            
+            self.imageSource = nil
+
         case .structure(let structuredSegment):
             self.type = .structure
             self.content = nil
             self.source = structuredSegment.source
             self.generatedContent = structuredSegment.content
+            self.imageSource = nil
+
+        case .image(let imageSegment):
+            self.type = .image
+            self.content = nil
+            self.source = nil
+            self.generatedContent = nil
+            self.imageSource = ImageSourceCoding(from: imageSegment.source)
         }
     }
-    
+
     func toSegment() throws -> Transcript.Segment {
         switch type {
         case .text:
@@ -221,7 +232,7 @@ private struct SegmentCoding: Codable {
                 ))
             }
             return .text(Transcript.TextSegment(id: id, content: content))
-            
+
         case .structure:
             guard let source = source, let generatedContent = generatedContent else {
                 throw DecodingError.dataCorrupted(DecodingError.Context(
@@ -234,6 +245,66 @@ private struct SegmentCoding: Codable {
                 source: source,
                 content: generatedContent
             ))
+
+        case .image:
+            guard let imageSource = imageSource else {
+                throw DecodingError.dataCorrupted(DecodingError.Context(
+                    codingPath: [],
+                    debugDescription: "Missing imageSource for image segment"
+                ))
+            }
+            return .image(Transcript.ImageSegment(
+                id: id,
+                source: try imageSource.toImageSource()
+            ))
+        }
+    }
+}
+
+private struct ImageSourceCoding: Codable {
+    enum SourceType: String, Codable {
+        case base64
+        case url
+    }
+
+    let type: SourceType
+    let data: String?
+    let mediaType: String?
+    let url: URL?
+
+    init(from source: Transcript.ImageSegment.ImageSource) {
+        switch source {
+        case .base64(let data, let mediaType):
+            self.type = .base64
+            self.data = data
+            self.mediaType = mediaType
+            self.url = nil
+        case .url(let url):
+            self.type = .url
+            self.data = nil
+            self.mediaType = nil
+            self.url = url
+        }
+    }
+
+    func toImageSource() throws -> Transcript.ImageSegment.ImageSource {
+        switch type {
+        case .base64:
+            guard let data = data, let mediaType = mediaType else {
+                throw DecodingError.dataCorrupted(DecodingError.Context(
+                    codingPath: [],
+                    debugDescription: "Missing data or mediaType for base64 image source"
+                ))
+            }
+            return .base64(data: data, mediaType: mediaType)
+        case .url:
+            guard let url = url else {
+                throw DecodingError.dataCorrupted(DecodingError.Context(
+                    codingPath: [],
+                    debugDescription: "Missing url for url image source"
+                ))
+            }
+            return .url(url)
         }
     }
 }

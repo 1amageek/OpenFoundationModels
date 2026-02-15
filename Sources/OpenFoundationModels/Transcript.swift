@@ -102,13 +102,16 @@ extension Transcript {
 
         case text(TextSegment)
         case structure(StructuredSegment)
-        
+        case image(ImageSegment)
+
         public var id: String {
             switch self {
             case .text(let textSegment):
                 return textSegment.id
             case .structure(let structuredSegment):
                 return structuredSegment.id
+            case .image(let imageSegment):
+                return imageSegment.id
             }
         }
     }
@@ -131,11 +134,28 @@ extension Transcript {
         public var id: String
         public var source: String
         public var content: GeneratedContent
-        
+
         public init(id: String = UUID().uuidString, source: String, content: GeneratedContent) {
             self.id = id
             self.source = source
             self.content = content
+        }
+    }
+
+    public struct ImageSegment: Sendable, SendableMetatype, Identifiable {
+        public typealias ID = String
+
+        public var id: String
+        public var source: ImageSource
+
+        public enum ImageSource: Sendable {
+            case base64(data: String, mediaType: String)
+            case url(URL)
+        }
+
+        public init(id: String = UUID().uuidString, source: ImageSource) {
+            self.id = id
+            self.source = source
         }
     }
 }
@@ -294,6 +314,27 @@ extension Transcript.Segment: Equatable {
             return l == r
         case (.structure(let l), .structure(let r)):
             return l == r
+        case (.image(let l), .image(let r)):
+            return l == r
+        default:
+            return false
+        }
+    }
+}
+
+extension Transcript.ImageSegment: Equatable {
+    public static func ==(lhs: Transcript.ImageSegment, rhs: Transcript.ImageSegment) -> Bool {
+        return lhs.id == rhs.id && lhs.source == rhs.source
+    }
+}
+
+extension Transcript.ImageSegment.ImageSource: Equatable {
+    public static func ==(lhs: Transcript.ImageSegment.ImageSource, rhs: Transcript.ImageSegment.ImageSource) -> Bool {
+        switch (lhs, rhs) {
+        case (.base64(let lData, let lType), .base64(let rData, let rType)):
+            return lData == rData && lType == rType
+        case (.url(let l), .url(let r)):
+            return l == r
         default:
             return false
         }
@@ -399,6 +440,19 @@ extension Transcript.Segment: CustomStringConvertible {
             return segment.description
         case .structure(let segment):
             return segment.description
+        case .image(let segment):
+            return segment.description
+        }
+    }
+}
+
+extension Transcript.ImageSegment: CustomStringConvertible {
+    public var description: String {
+        switch source {
+        case .base64(_, let mediaType):
+            return "Image(base64, \(mediaType))"
+        case .url(let url):
+            return "Image(\(url.absoluteString))"
         }
     }
 }
