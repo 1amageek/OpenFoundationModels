@@ -50,31 +50,19 @@ let session = LanguageModelSession(model: model) {
 
 ## Quick Start
 
-Get started with OpenFoundationModels in minutes:
-
-### Try Sample Applications
-
-```bash
-# Clone and run sample chat applications
-git clone https://github.com/1amageek/OpenFoundationModels-Samples.git
-cd OpenFoundationModels-Samples
-
-# Option 1: On-device chat (no setup required)
-swift run foundation-chat
-
-# Option 2: OpenAI-powered chat
-export OPENAI_API_KEY="your_api_key_here"
-swift run openai-chat
-```
+Get started with [AnyFoundationModels](https://github.com/1amageek/AnyFoundationModels):
 
 ### Basic Usage
 
 ```swift
 import OpenFoundationModels
-import OpenFoundationModelsOpenAI  // Choose your provider
+import ClaudeFoundationModels  // Or ResponseFoundationModels, OllamaFoundationModels, MLXFoundationModels
 
 // Create a model from any provider
-let model = OpenAILanguageModel(apiKey: "your-key")
+let model = ClaudeLanguageModel(
+    configuration: ClaudeConfiguration(apiKey: "sk-..."),
+    modelName: "claude-sonnet-4-5-20250929"
+)
 
 // Apple-compatible API works with any backend
 let session = LanguageModelSession(model: model) {
@@ -85,19 +73,6 @@ let response = try await session.respond {
     Prompt("Hello, OpenFoundationModels!")
 }
 print(response.content)
-```
-
-### With OpenAI
-
-```swift
-import OpenFoundationModels
-import OpenFoundationModelsOpenAI
-
-let provider = OpenAIProvider(apiKey: "your_key")
-let session = LanguageModelSession(model: provider.gpt4o)
-let response = try await session.respond {
-    Prompt("Explain Swift concurrency")
-}
 ```
 
 ## Key Features
@@ -112,33 +87,49 @@ let response = try await session.respond {
 
 ## Installation
 
-### Swift Package Manager
+### Recommended: AnyFoundationModels (All-in-One)
+
+[**AnyFoundationModels**](https://github.com/1amageek/AnyFoundationModels) is the recommended way to use OpenFoundationModels with LLM providers. It bundles the core framework and all backends (Claude, OpenAI, Ollama, MLX) in a single package with trait-gated compilation.
 
 ```swift
 // Package.swift
 dependencies: [
-    // Core framework
-    .package(url: "https://github.com/1amageek/OpenFoundationModels.git", from: "1.0.0"),
+    .package(url: "https://github.com/1amageek/AnyFoundationModels.git", branch: "main"),
+]
 
-    // Choose your provider(s):
-    .package(url: "https://github.com/1amageek/OpenFoundationModels-OpenAI.git", from: "1.0.0"),  // OpenAI
-    .package(url: "https://github.com/1amageek/OpenFoundationModels-MLX.git", from: "1.0.0"),    // Local MLX
+// Enable only the backends you need via traits:
+targets: [
+    .executableTarget(
+        name: "MyApp",
+        dependencies: [
+            .product(name: "OpenFoundationModels", package: "AnyFoundationModels"),
+            .product(name: "ClaudeFoundationModels", package: "AnyFoundationModels",
+                     condition: .when(traits: ["Claude"])),
+            .product(name: "ResponseFoundationModels", package: "AnyFoundationModels",
+                     condition: .when(traits: ["Response"])),
+            .product(name: "OllamaFoundationModels", package: "AnyFoundationModels",
+                     condition: .when(traits: ["Ollama"])),
+            .product(name: "MLXFoundationModels", package: "AnyFoundationModels",
+                     condition: .when(traits: ["MLX"])),
+        ]
+    )
 ]
 ```
 
-### Try Sample Apps (No Setup Required)
-
 ```bash
-# Clone and run sample applications
-git clone https://github.com/1amageek/OpenFoundationModels-Samples.git
-cd OpenFoundationModels-Samples
+# Build with the backends you need
+swift build --traits Claude,Response,Ollama
+```
 
-# Option 1: On-device chat (no API key needed)
-swift run foundation-chat
+### Core Framework Only
 
-# Option 2: OpenAI-powered chat
-export OPENAI_API_KEY="your_api_key_here"
-swift run openai-chat
+If you only need the core framework (protocols, macros, session management) without any provider backends:
+
+```swift
+// Package.swift
+dependencies: [
+    .package(url: "https://github.com/1amageek/OpenFoundationModels.git", from: "1.0.0"),
+]
 ```
 
 ## Usage
@@ -351,20 +342,21 @@ let review = try await session.respond(to: prompt, schema: schema)
 import OpenFoundationModels
 
 // Same API, different providers - all using Transcript-based interface
-#if canImport(FoundationModels)
-import FoundationModels
-let model = SystemLanguageModel.default              // Apple (on-device)
-#else
-import OpenFoundationModelsOpenAI
-let model = OpenAILanguageModel(apiKey: key)         // OpenAI
-// import OpenFoundationModelsMLX
-// let model = MLXLanguageModel()                    // MLX (local)
-#endif
+// Use AnyFoundationModels to access all backends
+import ClaudeFoundationModels
+let claude = ClaudeLanguageModel(
+    configuration: ClaudeConfiguration(apiKey: "sk-..."),
+    modelName: "claude-sonnet-4-5-20250929"
+)
 
-let session = LanguageModelSession(model: model)
+import OllamaFoundationModels
+let ollama = OllamaLanguageModel(
+    configuration: OllamaConfiguration(),
+    modelName: "llama3.2"
+)
 
 // Write once, run with any provider
-// Each provider receives the full Transcript and interprets it appropriately
+let session = LanguageModelSession(model: claude)  // Or ollama, or any LanguageModel
 let response = try await session.respond {
     Prompt("Explain quantum computing")
 }
@@ -382,9 +374,6 @@ let analysis = try await session.respond(
 ) {
     Prompt("Analyze this code: \(codeSnippet)")
 }
-
-// Providers implement the simple LanguageModel protocol
-// They receive Transcript and return responses - implementation details are provider-specific
 ```
 
 ## Real-World Use Cases
@@ -551,37 +540,29 @@ swift package generate-documentation
 
 ## Ecosystem
 
-OpenFoundationModels provides a complete ecosystem with core framework, provider integrations, and sample applications:
+### Recommended: AnyFoundationModels
 
-### 🏗️ Core Framework
-- **[OpenFoundationModels](https://github.com/1amageek/OpenFoundationModels)** - Apple Foundation Models compatible core framework
-- 100% API compatibility with Apple's official specification
-- 328 tests passing with comprehensive coverage
+**[AnyFoundationModels](https://github.com/1amageek/AnyFoundationModels)** is the unified package that bundles the core framework and all provider backends with trait-gated compilation. This is the recommended way to use OpenFoundationModels in your projects.
 
-### 🔗 Provider Integrations
-- **[OpenFoundationModels-OpenAI](https://github.com/1amageek/OpenFoundationModels-OpenAI)** ✅ **Complete**
-  - Full GPT model support (GPT-4o, GPT-4o Mini, GPT-4 Turbo, o1, o1-pro, o3, o3-pro, o4-mini)
-  - Streaming and multimodal capabilities
-  - Production-ready with rate limiting and error handling
+| Backend | Trait | Description |
+|---------|-------|-------------|
+| `ClaudeFoundationModels` | `Claude` | Anthropic Claude API |
+| `ResponseFoundationModels` | `Response` | OpenAI Responses API |
+| `OllamaFoundationModels` | `Ollama` | Ollama local server |
+| `MLXFoundationModels` | `MLX` | Apple MLX on-device inference |
 
-- **[OpenFoundationModels-MLX](https://github.com/1amageek/OpenFoundationModels-MLX)** ✅ **Complete**
-  - Local LLM inference using Apple MLX framework
-  - Optimized for Apple Silicon (M1/M2/M3/M4)
-  - No API key required - fully on-device
+### Deprecated Provider Packages
 
-### 📱 Sample Applications
-- **[OpenFoundationModels-Samples](https://github.com/1amageek/OpenFoundationModels-Samples)** ✅ **Complete**
-  - `foundation-chat`: On-device chat using Apple's SystemLanguageModel
-  - `openai-chat`: Cloud-based chat using OpenAI models
+> **Warning**: The following standalone provider packages are **deprecated**. Please migrate to [AnyFoundationModels](https://github.com/1amageek/AnyFoundationModels).
+
+- ~~[OpenFoundationModels-OpenAI](https://github.com/1amageek/OpenFoundationModels-OpenAI)~~ → Use `ResponseFoundationModels` from AnyFoundationModels
+- ~~[OpenFoundationModels-Claude](https://github.com/1amageek/OpenFoundationModels-Claude)~~ → Use `ClaudeFoundationModels` from AnyFoundationModels
+- ~~[OpenFoundationModels-MLX](https://github.com/1amageek/OpenFoundationModels-MLX)~~ → Use `MLXFoundationModels` from AnyFoundationModels
+- ~~[OpenFoundationModels-Ollama](https://github.com/1amageek/OpenFoundationModels-Ollama)~~ → Use `OllamaFoundationModels` from AnyFoundationModels
+
+### Sample Applications
+- **[OpenFoundationModels-Samples](https://github.com/1amageek/OpenFoundationModels-Samples)**
   - Interactive CLI applications with full streaming support
-
-### 🔮 Planned Integrations
-Provider adapters can be added for:
-- **Anthropic** (Claude 3 Haiku, Sonnet, Opus, etc.)
-- **Google** (Gemini Pro, Ultra, etc.)
-- **Ollama** (Local models via Ollama)
-- **Azure OpenAI Service**
-- **AWS Bedrock**
 
 ## Why Choose OpenFoundationModels?
 
@@ -635,17 +616,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Related Projects
 
-### Official OpenFoundationModels Extensions
-
-- **[OpenFoundationModels-OpenAI](https://github.com/1amageek/OpenFoundationModels-OpenAI)** - Complete OpenAI provider integration
-- **[OpenFoundationModels-MLX](https://github.com/1amageek/OpenFoundationModels-MLX)** - Local LLM with Apple MLX framework
+- **[AnyFoundationModels](https://github.com/1amageek/AnyFoundationModels)** - Unified package with all provider backends (Recommended)
 - **[OpenFoundationModels-Samples](https://github.com/1amageek/OpenFoundationModels-Samples)** - Sample chat applications and demos
 
 ### Community Swift AI Projects
 
-- [Swift OpenAI](https://github.com/MacPaw/OpenAI) - OpenAI API client
 - [MLX Swift](https://github.com/ml-explore/mlx-swift) - Apple's MLX framework for Swift
-- [Ollama Swift](https://github.com/kevinhermawan/OllamaKit) - Ollama client for Swift
 
 ---
 
