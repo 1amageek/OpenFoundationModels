@@ -82,15 +82,15 @@ extension Transcript {
         public var description: String {
             switch self {
             case .instructions(let instructions):
-                return "Instructions: \(instructions.id)"
+                return instructions.description
             case .prompt(let prompt):
-                return "Prompt: \(prompt.id)"
+                return prompt.description
             case .response(let response):
-                return "Response: \(response.id)"
+                return response.description
             case .toolCalls(let toolCalls):
-                return "Tool Calls: \(toolCalls.id)"
+                return toolCalls.description
             case .toolOutput(let toolOutput):
-                return "Tool Output: \(toolOutput.id)"
+                return toolOutput.description
             }
         }
     }

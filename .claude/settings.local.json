@@ -34,15 +34,22 @@
       "Bash(sort:*)",
       "Bash(jq:*)",
       "Bash(/usr/bin/xcrun swift build:*)",
-      "Bash(/usr/bin/xcrun swift package resolve:*)"
+      "Bash(/usr/bin/xcrun swift package resolve:*)",
+      "mcp__deepwiki__read_wiki_structure",
+      "WebFetch(domain:api.github.com)",
+      "Bash(wc:*)",
+      "Bash(curl:*)",
+      "WebFetch(domain:platform.openai.com)",
+      "WebFetch(domain:community.openai.com)",
+      "WebFetch(domain:theswiftdev.com)"
     ],
     "deny": [],
     "additionalDirectories": [
       "/Users/1amageek/Desktop/OpenFoundationModels-Claude"
     ]
   },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "chrome-devtools"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }
