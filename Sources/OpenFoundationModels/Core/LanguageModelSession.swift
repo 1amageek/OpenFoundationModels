@@ -48,7 +48,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
             var instructionContent = instructions.content
             
             // Add tool schemas to the instructions
-            let toolInstructions = generateToolInstructions(for: tools)
+            let toolInstructions = formatToolInstructions(for: tools)
             if !toolInstructions.isEmpty {
                 instructionContent += toolInstructions
             }
@@ -1030,23 +1030,30 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         return output.promptRepresentation.content
     }
     
-    private func generateToolInstructions(for tools: [any Tool]) -> String {
+    private func formatToolInstructions(for tools: [any Tool]) -> String {
         guard !tools.isEmpty else { return "" }
-        
-        var instructions = "\n\n## Available Tools\n"
-        
+
+        var sections: [String] = []
+        sections.append("")
+        sections.append("In this environment you have access to a set of tools you can use to answer the user's question.")
+        sections.append("")
+        sections.append("Check that all the required parameters for each tool call are provided or can reasonably be inferred from context. IF there are no relevant tools or there are missing values for required parameters, ask the user to supply these values; otherwise proceed with the tool calls. If the user provides a specific value for a parameter, make sure to use that value EXACTLY.")
+        sections.append("")
+
         for tool in tools {
-            instructions += "\n### Tool: \(tool.name)\n"
-            instructions += "Description: \(tool.description)\n"
-            
+            var toolSection = "## \(tool.name)\n\n"
+            toolSection += tool.description
+
             if tool.includesSchemaInInstructions {
-                instructions += "Parameters:\n```json\n"
-                instructions += formatJSONSchema(tool.parameters)
-                instructions += "\n```\n"
+                toolSection += "\n\n```json\n"
+                toolSection += formatJSONSchema(tool.parameters)
+                toolSection += "\n```"
             }
+
+            sections.append(toolSection)
         }
-        
-        return instructions
+
+        return sections.joined(separator: "\n\n")
     }
     
     private func formatJSONSchema(_ schema: GenerationSchema) -> String {

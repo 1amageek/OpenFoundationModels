@@ -41,7 +41,8 @@
       "Bash(curl:*)",
       "WebFetch(domain:platform.openai.com)",
       "WebFetch(domain:community.openai.com)",
-      "WebFetch(domain:theswiftdev.com)"
+      "WebFetch(domain:theswiftdev.com)",
+      "Bash(gh release create:*)"
     ],
     "deny": [],
     "additionalDirectories": [
