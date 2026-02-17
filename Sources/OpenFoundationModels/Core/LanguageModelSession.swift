@@ -502,115 +502,15 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         @PromptBuilder prompt: () throws -> Prompt
     ) rethrows -> sending ResponseStream<String> {
         let promptValue = try prompt()
-        let promptText = promptValue.content
-        
-        let promptEntry = Transcript.Entry.prompt(
-            Transcript.Prompt(
-                id: UUID().uuidString,
-                segments: [.text(Transcript.TextSegment(id: UUID().uuidString, content: promptText))],
-                options: options,
-                responseFormat: nil
-            )
+        appendPromptEntry(
+            promptText: promptValue.content,
+            options: options,
+            responseFormat: nil
         )
-        var entries = _transcript.entries
-        entries.append(promptEntry)
-        _transcript = Transcript(entries: entries)
-        
-        let stream = AsyncThrowingStream<ResponseStream<String>.Snapshot, Error> { continuation in
-            Task {
-                _isResponding = true
-                defer { _isResponding = false }
-                
-                var accumulatedContent = ""
-                
-                // Tool execution loop - continue until we get a response entry
-                while true {
-                    let entryStream = model.stream(
-                        transcript: _transcript,
-                        options: options
-                    )
-                    var currentEntry: Transcript.Entry?
-                    
-                    // Process streaming entries
-                    do {
-                        for try await entry in entryStream {
-                            currentEntry = entry
-
-                            switch entry {
-                        case .response(let response):
-                            // Extract text from response segments and yield
-                            for segment in response.segments {
-                                switch segment {
-                                case .text(let textSegment):
-                                    accumulatedContent += textSegment.content
-                                case .structure(let structuredSegment):
-                                    accumulatedContent += structuredSegment.content.text
-                                case .image:
-                                    break
-                                }
-                            }
-                            
-                            let snapshot = ResponseStream<String>.Snapshot(
-                                content: accumulatedContent,
-                                rawContent: GeneratedContent(accumulatedContent)
-                            )
-                            continuation.yield(snapshot)
-                            
-                        case .toolCalls:
-                            // For toolCalls, optionally yield intermediate state
-                            let snapshot = ResponseStream<String>.Snapshot(
-                                content: accumulatedContent,
-                                rawContent: GeneratedContent(accumulatedContent)
-                            )
-                            continuation.yield(snapshot)
-                            
-                            default:
-                                // Other entries are stored but not yielded
-                                break
-                            }
-                        }
-                    } catch {
-                        // Forward stream errors
-                        continuation.finish(throwing: error)
-                        return
-                    }
-                    
-                    // Add entry to transcript and handle based on type
-                    if let finalEntry = currentEntry {
-                        var transcriptEntries = _transcript.entries
-                        transcriptEntries.append(finalEntry)
-                        _transcript = Transcript(entries: transcriptEntries)
-                        
-                        switch finalEntry {
-                        case .toolCalls(let toolCalls):
-                            // Execute tools and continue loop
-                            do {
-                                try await executeAllToolCalls(toolCalls)
-                                continue // Continue to next iteration
-                            } catch {
-                                continuation.finish(throwing: error)
-                                return
-                            }
-                            
-                        case .response:
-                            // Final response received - end streaming
-                            continuation.finish()
-                            return
-                            
-                        default:
-                            continuation.finish(throwing: GenerationError.decodingFailure(
-                                GenerationError.Context(
-                                    debugDescription: "Unexpected entry type during streaming: \(finalEntry)"
-                                )
-                            ))
-                            return
-                        }
-                    }
-                }
-            }
-        }
-
-        return ResponseStream(stream: stream)
+        return makeStreamingResponseStream(
+            options: options,
+            strategy: TextStreamAggregationStrategy()
+        )
     }
 
 
@@ -666,113 +566,15 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         @PromptBuilder prompt: () throws -> Prompt
     ) rethrows -> sending ResponseStream<GeneratedContent> {
         let promptValue = try prompt()
-        let promptText = promptValue.content
-
-        // Add prompt to transcript (outside the loop, done once)
-        let promptEntry = Transcript.Entry.prompt(
-            Transcript.Prompt(
-                id: UUID().uuidString,
-                segments: [.text(Transcript.TextSegment(id: UUID().uuidString, content: promptText))],
-                options: options,
-                responseFormat: includeSchemaInPrompt ? Transcript.ResponseFormat(schema: schema) : nil
-            )
+        appendPromptEntry(
+            promptText: promptValue.content,
+            options: options,
+            responseFormat: includeSchemaInPrompt ? Transcript.ResponseFormat(schema: schema) : nil
         )
-        var entries = _transcript.entries
-        entries.append(promptEntry)
-        _transcript = Transcript(entries: entries)
-
-        let stream = AsyncThrowingStream<ResponseStream<GeneratedContent>.Snapshot, Error> { continuation in
-            Task {
-                _isResponding = true
-                defer { _isResponding = false }
-
-                var accumulatedContent: GeneratedContent?
-
-                // Tool execution loop - continue until we get a response entry
-                while true {
-                    let entryStream = model.stream(
-                        transcript: _transcript,
-                        options: options
-                    )
-                    var currentEntry: Transcript.Entry?
-
-                    // Process streaming entries
-                    do {
-                        for try await entry in entryStream {
-                            currentEntry = entry
-
-                            switch entry {
-                            case .response(let response):
-                                // Extract structured content from response
-                                for segment in response.segments {
-                                    if case .structure(let structuredSegment) = segment {
-                                        accumulatedContent = structuredSegment.content
-                                    } else if case .text(let textSegment) = segment {
-                                        // Try to parse as JSON or use as is
-                                        accumulatedContent = try? GeneratedContent(json: textSegment.content)
-                                        if accumulatedContent == nil {
-                                            accumulatedContent = GeneratedContent(textSegment.content)
-                                        }
-                                    }
-                                }
-
-                                if let content = accumulatedContent {
-                                    let snapshot = ResponseStream<GeneratedContent>.Snapshot(
-                                        content: content,
-                                        rawContent: content
-                                    )
-                                    continuation.yield(snapshot)
-                                }
-
-                            case .toolCalls:
-                                // Tool calls will be handled after stream ends
-                                break
-
-                            default:
-                                break
-                            }
-                        }
-                    } catch {
-                        continuation.finish(throwing: error)
-                        return
-                    }
-
-                    // Add entry to transcript and handle based on type
-                    if let finalEntry = currentEntry {
-                        var transcriptEntries = _transcript.entries
-                        transcriptEntries.append(finalEntry)
-                        _transcript = Transcript(entries: transcriptEntries)
-
-                        switch finalEntry {
-                        case .toolCalls(let toolCalls):
-                            // Execute tools and continue loop
-                            do {
-                                try await executeAllToolCalls(toolCalls)
-                                continue // Continue to next iteration
-                            } catch {
-                                continuation.finish(throwing: error)
-                                return
-                            }
-
-                        case .response:
-                            // Final response received - end streaming
-                            continuation.finish()
-                            return
-
-                        default:
-                            continuation.finish(throwing: GenerationError.decodingFailure(
-                                GenerationError.Context(
-                                    debugDescription: "Unexpected entry type during streaming: \(finalEntry)"
-                                )
-                            ))
-                            return
-                        }
-                    }
-                }
-            }
-        }
-
-        return ResponseStream(stream: stream)
+        return makeStreamingResponseStream(
+            options: options,
+            strategy: GeneratedContentStreamAggregationStrategy()
+        )
     }
 
 
@@ -810,77 +612,169 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         @PromptBuilder prompt: () throws -> Prompt
     ) rethrows -> sending ResponseStream<Content> {
         let promptValue = try prompt()
-        let promptText = promptValue.content
-
-        typealias PartialContent = Content.PartiallyGenerated
-
-        // Add prompt to transcript (outside the loop, done once)
-        let promptEntry = Transcript.Entry.prompt(
-            Transcript.Prompt(
-                id: UUID().uuidString,
-                segments: [.text(Transcript.TextSegment(id: UUID().uuidString, content: promptText))],
-                options: options,
-                responseFormat: includeSchemaInPrompt ? Transcript.ResponseFormat(type: Content.self) : nil
-            )
+        appendPromptEntry(
+            promptText: promptValue.content,
+            options: options,
+            responseFormat: includeSchemaInPrompt ? Transcript.ResponseFormat(type: Content.self) : nil
         )
-        var entries = _transcript.entries
-        entries.append(promptEntry)
-        _transcript = Transcript(entries: entries)
+        return makeStreamingResponseStream(
+            options: options,
+            strategy: GenerableStreamAggregationStrategy<Content>()
+        )
+    }
 
-        let stream = AsyncThrowingStream<ResponseStream<Content>.Snapshot, Error> { continuation in
+    private protocol StreamAggregationStrategy: Sendable {
+        associatedtype OutputContent: Generable
+
+        mutating func makeSnapshot(for entry: Transcript.Entry) -> ResponseStream<OutputContent>.Snapshot?
+        mutating func transcriptEntry(for finalEntry: Transcript.Entry) -> Transcript.Entry
+    }
+
+    private struct TextStreamAggregationStrategy: StreamAggregationStrategy {
+        typealias OutputContent = String
+
+        private var accumulatedContent = ""
+
+        mutating func makeSnapshot(for entry: Transcript.Entry) -> ResponseStream<String>.Snapshot? {
+            switch entry {
+            case .response(let response):
+                for segment in response.segments {
+                    switch segment {
+                    case .text(let textSegment):
+                        accumulatedContent += textSegment.content
+                    case .structure(let structuredSegment):
+                        accumulatedContent += structuredSegment.content.text
+                    case .image:
+                        break
+                    }
+                }
+                return ResponseStream<String>.Snapshot(
+                    content: accumulatedContent,
+                    rawContent: GeneratedContent(accumulatedContent)
+                )
+            case .toolCalls:
+                // Keep yielding the latest accumulated text so UIs can refresh status.
+                return ResponseStream<String>.Snapshot(
+                    content: accumulatedContent,
+                    rawContent: GeneratedContent(accumulatedContent)
+                )
+            default:
+                return nil
+            }
+        }
+
+        mutating func transcriptEntry(for finalEntry: Transcript.Entry) -> Transcript.Entry {
+            guard case .response = finalEntry else { return finalEntry }
+            return LanguageModelSession.makeTextResponseEntry(content: accumulatedContent)
+        }
+    }
+
+    private struct StructuredStreamAccumulator: Sendable {
+        private(set) var accumulatedContent: GeneratedContent?
+        private var jsonBuffer = ""
+
+        mutating func ingest(_ response: Transcript.Response) {
+            for segment in response.segments {
+                switch segment {
+                case .structure(let structuredSegment):
+                    accumulatedContent = structuredSegment.content
+                    jsonBuffer = ""
+                case .text(let textSegment):
+                    ingestTextSegment(textSegment.content)
+                case .image:
+                    break
+                }
+            }
+        }
+
+        private mutating func ingestTextSegment(_ text: String) {
+            jsonBuffer += text
+            do {
+                accumulatedContent = try GeneratedContent(json: jsonBuffer)
+            } catch {
+                // Keep partial textual state while JSON is still incomplete.
+                accumulatedContent = GeneratedContent(jsonBuffer)
+            }
+        }
+    }
+
+    private struct GeneratedContentStreamAggregationStrategy: StreamAggregationStrategy {
+        typealias OutputContent = GeneratedContent
+
+        private var accumulator = StructuredStreamAccumulator()
+
+        mutating func makeSnapshot(for entry: Transcript.Entry) -> ResponseStream<GeneratedContent>.Snapshot? {
+            guard case .response(let response) = entry else { return nil }
+            accumulator.ingest(response)
+            guard let content = accumulator.accumulatedContent else { return nil }
+            return ResponseStream<GeneratedContent>.Snapshot(
+                content: content,
+                rawContent: content
+            )
+        }
+
+        mutating func transcriptEntry(for finalEntry: Transcript.Entry) -> Transcript.Entry {
+            guard case .response = finalEntry,
+                  let content = accumulator.accumulatedContent else {
+                return finalEntry
+            }
+            return LanguageModelSession.makeStructuredResponseEntry(content: content)
+        }
+    }
+
+    private struct GenerableStreamAggregationStrategy<Content: Generable>: StreamAggregationStrategy {
+        typealias OutputContent = Content
+
+        private var accumulator = StructuredStreamAccumulator()
+
+        mutating func makeSnapshot(for entry: Transcript.Entry) -> ResponseStream<Content>.Snapshot? {
+            guard case .response(let response) = entry else { return nil }
+            accumulator.ingest(response)
+            guard let generatedContent = accumulator.accumulatedContent else { return nil }
+
+            do {
+                let partial = try Content.PartiallyGenerated(generatedContent)
+                return ResponseStream<Content>.Snapshot(
+                    content: partial,
+                    rawContent: generatedContent
+                )
+            } catch {
+                return nil
+            }
+        }
+
+        mutating func transcriptEntry(for finalEntry: Transcript.Entry) -> Transcript.Entry {
+            guard case .response = finalEntry,
+                  let content = accumulator.accumulatedContent else {
+                return finalEntry
+            }
+            return LanguageModelSession.makeStructuredResponseEntry(content: content)
+        }
+    }
+
+    private func makeStreamingResponseStream<Strategy: StreamAggregationStrategy>(
+        options: GenerationOptions,
+        strategy initialStrategy: Strategy
+    ) -> ResponseStream<Strategy.OutputContent> {
+        let stream = AsyncThrowingStream<ResponseStream<Strategy.OutputContent>.Snapshot, Error> { continuation in
             Task {
                 _isResponding = true
                 defer { _isResponding = false }
 
-                var accumulatedContent: GeneratedContent?
+                var strategy = initialStrategy
 
-                // Tool execution loop - continue until we get a response entry
                 while true {
                     let entryStream = model.stream(
                         transcript: _transcript,
                         options: options
                     )
-                    var currentEntry: Transcript.Entry?
+                    var finalEntry: Transcript.Entry?
 
-                    // Process streaming entries
                     do {
-                        var jsonBuffer: String = ""
                         for try await entry in entryStream {
-                            currentEntry = entry
-
-                            switch entry {
-                            case .response(let response):
-                                // Extract structured content from response
-                                for segment in response.segments {
-                                    if case .structure(let structuredSegment) = segment {
-                                        accumulatedContent = structuredSegment.content
-                                    } else if case .text(let textSegment) = segment {
-                                        jsonBuffer += textSegment.content
-                                        // Try to parse as JSON
-                                        accumulatedContent = try? GeneratedContent(json: jsonBuffer)
-                                        if accumulatedContent == nil {
-                                            accumulatedContent = GeneratedContent(textSegment.content)
-                                        }
-                                    }
-                                }
-
-                                if let generatedContent = accumulatedContent {
-                                    // Try to parse as PartialContent and yield
-                                    if let partialData = try? PartialContent(generatedContent) {
-                                        let snapshot = ResponseStream<Content>.Snapshot(
-                                            content: partialData,
-                                            rawContent: generatedContent
-                                        )
-                                        continuation.yield(snapshot)
-                                    }
-                                }
-
-                            case .toolCalls:
-                                // Tool calls will be handled after stream ends
-                                break
-
-                            default:
-                                break
+                            finalEntry = entry
+                            if let snapshot = strategy.makeSnapshot(for: entry) {
+                                continuation.yield(snapshot)
                             }
                         }
                     } catch {
@@ -888,42 +782,69 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                         return
                     }
 
-                    // Add entry to transcript and handle based on type
-                    if let finalEntry = currentEntry {
-                        var transcriptEntries = _transcript.entries
-                        transcriptEntries.append(finalEntry)
-                        _transcript = Transcript(entries: transcriptEntries)
+                    guard let finalEntry else {
+                        continuation.finish(throwing: makeStreamingError(
+                            "Model stream ended without entries"
+                        ))
+                        return
+                    }
 
-                        switch finalEntry {
-                        case .toolCalls(let toolCalls):
-                            // Execute tools and continue loop
-                            do {
-                                try await executeAllToolCalls(toolCalls)
-                                continue // Continue to next iteration
-                            } catch {
-                                continuation.finish(throwing: error)
-                                return
-                            }
+                    let entryForTranscript = strategy.transcriptEntry(for: finalEntry)
+                    appendTranscriptEntry(entryForTranscript)
 
-                        case .response:
-                            // Final response received - end streaming
-                            continuation.finish()
-                            return
-
-                        default:
-                            continuation.finish(throwing: GenerationError.decodingFailure(
-                                GenerationError.Context(
-                                    debugDescription: "Unexpected entry type during streaming: \(finalEntry)"
-                                )
-                            ))
+                    switch entryForTranscript {
+                    case .toolCalls(let toolCalls):
+                        do {
+                            try await executeAllToolCalls(toolCalls)
+                            continue
+                        } catch {
+                            continuation.finish(throwing: error)
                             return
                         }
+                    case .response:
+                        continuation.finish()
+                        return
+                    default:
+                        continuation.finish(throwing: makeStreamingError(
+                            "Unexpected entry type during streaming: \(entryForTranscript)"
+                        ))
+                        return
                     }
                 }
             }
         }
 
         return ResponseStream(stream: stream)
+    }
+
+    private func appendPromptEntry(
+        promptText: String,
+        options: GenerationOptions,
+        responseFormat: Transcript.ResponseFormat?
+    ) {
+        let promptEntry = Transcript.Entry.prompt(
+            Transcript.Prompt(
+                id: UUID().uuidString,
+                segments: [.text(Transcript.TextSegment(id: UUID().uuidString, content: promptText))],
+                options: options,
+                responseFormat: responseFormat
+            )
+        )
+        appendTranscriptEntry(promptEntry)
+    }
+
+    private func appendTranscriptEntry(_ entry: Transcript.Entry) {
+        var entries = _transcript.entries
+        entries.append(entry)
+        _transcript = Transcript(entries: entries)
+    }
+
+    private func makeStreamingError(_ debugDescription: String) -> GenerationError {
+        return .decodingFailure(
+            GenerationError.Context(
+                debugDescription: debugDescription
+            )
+        )
     }
 
 
@@ -1001,6 +922,36 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         var entries = _transcript.entries
         entries.append(outputEntry)
         _transcript = Transcript(entries: entries)
+    }
+
+    private static func makeTextResponseEntry(content: String) -> Transcript.Entry {
+        return .response(
+            Transcript.Response(
+                id: UUID().uuidString,
+                assetIDs: [],
+                segments: [
+                    .text(Transcript.TextSegment(id: UUID().uuidString, content: content))
+                ]
+            )
+        )
+    }
+
+    private static func makeStructuredResponseEntry(content: GeneratedContent) -> Transcript.Entry {
+        return .response(
+            Transcript.Response(
+                id: UUID().uuidString,
+                assetIDs: [],
+                segments: [
+                    .structure(
+                        Transcript.StructuredSegment(
+                            id: UUID().uuidString,
+                            source: "generated",
+                            content: content
+                        )
+                    )
+                ]
+            )
+        )
     }
     
     private func executeToolCall(_ toolCall: Transcript.ToolCall) async throws -> String {
