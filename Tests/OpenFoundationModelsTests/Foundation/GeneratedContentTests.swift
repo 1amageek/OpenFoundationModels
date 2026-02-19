@@ -145,7 +145,7 @@ struct GeneratedContentTests {
         let content = GeneratedContent("Instruction content")
         let instructions = content.instructionsRepresentation
         
-        #expect(instructions.content == "Instruction content")
+        #expect(instructions.content == "\"Instruction content\"")
     }
     
     @Test("GeneratedContent PartiallyGenerated")
@@ -579,8 +579,8 @@ struct GeneratedContentTests {
             #expect(Bool(false), "Expected string kind for unclosed string")
         }
         
-        // jsonString should return the original partial raw
-        #expect(content.jsonString == #""hello wor"#)
+        // jsonString should return rebuilt JSON from parsed structure
+        #expect(content.jsonString == #""hello wor""#)
     }
     
     @Test("GeneratedContent with closed top-level string")
@@ -618,8 +618,8 @@ struct GeneratedContentTests {
         let idea = try TestIdea(content)
         #expect(idea.title == "A story of")
         
-        // jsonString should return the original partial
-        #expect(content.jsonString == #"{"title": "A story of"#)
+        // jsonString should return rebuilt JSON from parsed structure
+        #expect(content.jsonString == #"{"title": "A story of"}"#)
     }
     
     @Test("GeneratedContent fragments are complete")

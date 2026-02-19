@@ -48,23 +48,13 @@ public struct GeneratedContent: Sendable, Copyable, SendableMetatype, Equatable,
     public var isComplete: Bool { storage.isComplete }
 
     public var jsonString: String {
-        if let raw = storage.partialRaw { return raw }
-        do { return try toJSONString() } catch { return stringValue }
+        asJSONValue().spacedJSON()
     }
 
     public var generatedContent: GeneratedContent { self }
 
     public var debugDescription: String {
-        switch kind {
-        case .null: return "GeneratedContent(null)"
-        case .bool(let b): return "GeneratedContent(\(b))"
-        case .number(let d): return "GeneratedContent(\(d))"
-        case .string(let s): return "GeneratedContent(\"\(s)\")"
-        case .array(let a): return "GeneratedContent([" + a.map { $0.debugDescription }.joined(separator: ", ") + "])"
-        case .structure(let props, _):
-            let body = props.keys.sorted().map { "\($0): \(props[$0]!.debugDescription)" }.joined(separator: ", ")
-            return "GeneratedContent({" + body + "})"
-        }
+        asJSONValue().compactJSON()
     }
 
 
@@ -215,53 +205,11 @@ public struct GeneratedContent: Sendable, Copyable, SendableMetatype, Equatable,
         switch kind {
         case .null: return "null"
         case .bool(let b): return b ? "true" : "false"
-        case .number(let d): 
-            if d.truncatingRemainder(dividingBy: 1) == 0 && d >= Double(Int.min) && d <= Double(Int.max) {
-                return String(Int(d))
-            } else {
-                return String(d)
-            }
+        case .number(let d): return JSONValue.formatNumber(d)
         case .string(let s): return s
         case .array(let arr): return arr.map { $0.stringValue }.joined(separator: ", ")
         case .structure(let props, _): return "{" + props.keys.sorted().map { "\($0): \(props[$0]!.stringValue)" }.joined(separator: ", ") + "}"
         }
-    }
-
-    private func toJSONString() throws -> String {
-        func toAny(_ v: JSONValue) -> Any {
-            switch v {
-            case .null: return NSNull()
-            case .bool(let b): return b
-            case .number(let d): return d
-            case .string(let s): return s
-            case .array(let arr): return arr.map { toAny($0) }
-            case .object(let dict, let ordered):
-                // Respect orderedKeys to maintain order
-                var m: [String: Any] = [:]
-                let keys = ordered.isEmpty ? Array(dict.keys) : ordered
-                for k in keys { 
-                    if let v = dict[k] { 
-                        m[k] = toAny(v) 
-                    }
-                }
-                return m
-            }
-        }
-        
-        let v = asJSONValue()
-        let anyValue = toAny(v)
-        
-        // Use fragmentsAllowed for primitive values
-        let options: JSONSerialization.WritingOptions
-        switch v {
-        case .array, .object:
-            options = [.prettyPrinted]
-        default:
-            options = [.fragmentsAllowed]
-        }
-        
-        let data = try JSONSerialization.data(withJSONObject: anyValue, options: options)
-        return String(data: data, encoding: .utf8) ?? "{}"
     }
 }
 
@@ -273,6 +221,75 @@ fileprivate enum JSONValue: Sendable, Equatable {
     case string(String)
     case array([JSONValue])
     case object([String: JSONValue], orderedKeys: [String])
+
+    /// Compact JSON — no spaces after `:` and `,`.
+    func compactJSON() -> String {
+        switch self {
+        case .null: return "null"
+        case .bool(let b): return b ? "true" : "false"
+        case .number(let d): return Self.formatNumber(d)
+        case .string(let s): return "\"" + Self.escape(s) + "\""
+        case .array(let arr):
+            return "[" + arr.map { $0.compactJSON() }.joined(separator: ",") + "]"
+        case .object(let dict, let ordered):
+            let keys = ordered.isEmpty ? Array(dict.keys) : ordered
+            let pairs = keys.compactMap { key -> String? in
+                guard let value = dict[key] else { return nil }
+                return "\"" + Self.escape(key) + "\":" + value.compactJSON()
+            }
+            return "{" + pairs.joined(separator: ",") + "}"
+        }
+    }
+
+    /// Spaced JSON — single space after `:` and `,`, respects `orderedKeys`.
+    func spacedJSON() -> String {
+        switch self {
+        case .null: return "null"
+        case .bool(let b): return b ? "true" : "false"
+        case .number(let d): return Self.formatNumber(d)
+        case .string(let s): return "\"" + Self.escape(s) + "\""
+        case .array(let arr):
+            return "[" + arr.map { $0.spacedJSON() }.joined(separator: ", ") + "]"
+        case .object(let dict, let ordered):
+            let keys = ordered.isEmpty ? Array(dict.keys) : ordered
+            let pairs = keys.compactMap { key -> String? in
+                guard let value = dict[key] else { return nil }
+                return "\"" + Self.escape(key) + "\": " + value.spacedJSON()
+            }
+            return "{" + pairs.joined(separator: ", ") + "}"
+        }
+    }
+
+    static func formatNumber(_ d: Double) -> String {
+        if d.truncatingRemainder(dividingBy: 1) == 0,
+           d >= Double(Int.min), d <= Double(Int.max) {
+            return String(Int(d))
+        }
+        return String(d)
+    }
+
+    static func escape(_ s: String) -> String {
+        var out = ""
+        out.reserveCapacity(s.count)
+        for c in s.unicodeScalars {
+            switch c {
+            case "\"": out += "\\\""
+            case "\\": out += "\\\\"
+            case "\n": out += "\\n"
+            case "\r": out += "\\r"
+            case "\t": out += "\\t"
+            case "\u{08}": out += "\\b"
+            case "\u{0C}": out += "\\f"
+            default:
+                if c.value < 0x20 {
+                    out += String(format: "\\u%04x", c.value)
+                } else {
+                    out += String(c)
+                }
+            }
+        }
+        return out
+    }
 }
 
 extension GeneratedContent {

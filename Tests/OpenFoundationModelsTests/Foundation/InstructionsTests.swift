@@ -45,7 +45,7 @@ struct InstructionsTests {
         let content = GeneratedContent("Generated instructions")
         let instructions = content.instructionsRepresentation
         
-        #expect(instructions.content == "Generated instructions")
+        #expect(instructions.content == "\"Generated instructions\"")
     }
     
     
@@ -86,7 +86,7 @@ struct InstructionsTests {
         }
         
         let instructions = buildInstructions()
-        let expected = "Static instruction\nDynamic content\nAnother static instruction"
+        let expected = "Static instruction\n\"Dynamic content\"\nAnother static instruction"
         #expect(instructions.content == expected)
     }
     

@@ -16,27 +16,25 @@ extension String: PromptRepresentable {
 
 extension Array: InstructionsRepresentable where Element: InstructionsRepresentable {
     public var instructionsRepresentation: Instructions {
-        let parts = self.map { $0.instructionsRepresentation }
-        let combinedText = parts.map { $0.content }.joined(separator: "\n")
-        return Instructions(combinedText)
+        let components = self.flatMap { $0.instructionsRepresentation.components }
+        return Instructions(components: components)
     }
 }
 
 extension Array: PromptRepresentable where Element: PromptRepresentable {
     public var promptRepresentation: Prompt {
-        let parts = self.map { $0.promptRepresentation }
-        let combinedText = parts.map { $0.content }.joined(separator: "\n")
-        return Prompt(combinedText)
+        let components = self.flatMap { $0.promptRepresentation.components }
+        return Prompt(components: components)
     }
 }
 
 extension GeneratedContent {
     public var instructionsRepresentation: Instructions {
-        return Instructions(self.text)
+        return Instructions(self.jsonString)
     }
-    
+
     public var promptRepresentation: Prompt {
-        return Prompt(self.text)
+        return Prompt(self.jsonString)
     }
 }
 
