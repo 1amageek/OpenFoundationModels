@@ -18,8 +18,8 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
             let description = extractDescription(from: node)
             
             let properties = extractGuidedProperties(from: structDecl)
-            
-            return [
+
+            var members: [DeclSyntax] = [
                 generateRawContentProperty(),
                 generateInitFromGeneratedContent(structName: structName, properties: properties),
                 generateGeneratedContentProperty(structName: structName, description: description, properties: properties),
@@ -29,6 +29,22 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                 generateInstructionsRepresentationProperty(),
                 generatePromptRepresentationProperty()
             ]
+
+            // Generate CodingKeys to exclude _rawGeneratedContent from Codable encoding,
+            // but only if the user hasn't already declared their own CodingKeys
+            // and the struct has at least one property (empty enum is invalid).
+            if !properties.isEmpty && !hasCodingKeys(in: structDecl) {
+                members.append(generateCodingKeys(properties: properties))
+            }
+
+            // Generate memberwise init to compensate for the compiler no longer
+            // synthesizing one (because the macro adds init(_ generatedContent:)).
+            // Skip if the user already declared their own init.
+            if !properties.isEmpty && !hasUserDefinedInit(in: structDecl) {
+                members.append(generateMemberwiseInit(properties: properties))
+            }
+
+            return members
         } else if let enumDecl = declaration.as(EnumDeclSyntax.self) {
             let enumName = enumDecl.name.text
             let description = extractDescription(from: node)
@@ -95,15 +111,17 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                 
                 let propertyName = identifier.identifier.text
                 let propertyType = binding.typeAnnotation?.type.description ?? "String"
-                
+                let defaultValue = binding.initializer?.value.description.trimmingCharacters(in: .whitespaces)
+
                 let guideInfo = extractGuideInfo(from: varDecl.attributes)
-                
+
                 properties.append(PropertyInfo(
                     name: propertyName,
                     type: propertyType,
                     guideDescription: guideInfo.description,
                     guides: guideInfo.guides,
-                    pattern: guideInfo.pattern
+                    pattern: guideInfo.pattern,
+                    defaultValue: defaultValue
                 ))
             }
         }
@@ -226,6 +244,61 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         }
     }
     
+    /// Check if the struct already declares a user-written initializer
+    /// (excluding the macro-generated `init(_ generatedContent:)`).
+    private static func hasUserDefinedInit(in structDecl: StructDeclSyntax) -> Bool {
+        structDecl.memberBlock.members.contains { member in
+            member.decl.is(InitializerDeclSyntax.self)
+        }
+    }
+
+    /// Generate a memberwise initializer so that adding `@Generable` does not
+    /// remove the compiler-synthesized memberwise init.
+    /// The access level matches Swift's synthesized memberwise init:
+    /// - `public` struct → `internal` init (no explicit modifier)
+    /// - `internal` / default struct → `internal` init
+    private static func generateMemberwiseInit(properties: [PropertyInfo]) -> DeclSyntax {
+        let params = properties.map { prop in
+            if let defaultValue = prop.defaultValue {
+                return "\(prop.name): \(prop.type) = \(defaultValue)"
+            } else if prop.type.hasSuffix("?") {
+                return "\(prop.name): \(prop.type) = nil"
+            } else {
+                return "\(prop.name): \(prop.type)"
+            }
+        }.joined(separator: ", ")
+
+        let assignments = properties.map { "self.\($0.name) = \($0.name)" }
+            .joined(separator: "\n            ")
+
+        return DeclSyntax(stringLiteral: """
+        init(\(params)) {
+            \(assignments)
+        }
+        """)
+    }
+
+    /// Check if the struct already declares a CodingKeys enum.
+    private static func hasCodingKeys(in structDecl: StructDeclSyntax) -> Bool {
+        structDecl.memberBlock.members.contains { member in
+            if let enumDecl = member.decl.as(EnumDeclSyntax.self) {
+                return enumDecl.name.text == "CodingKeys"
+            }
+            return false
+        }
+    }
+
+    /// Generate a CodingKeys enum that includes only user-declared properties,
+    /// excluding the macro-injected `_rawGeneratedContent`.
+    private static func generateCodingKeys(properties: [PropertyInfo]) -> DeclSyntax {
+        let cases = properties.map { "case \($0.name)" }.joined(separator: "\n        ")
+        return DeclSyntax(stringLiteral: """
+        enum CodingKeys: String, CodingKey {
+            \(cases)
+        }
+        """)
+    }
+
     private static func generateRawContentProperty() -> DeclSyntax {
         return DeclSyntax(stringLiteral: """
         private var _rawGeneratedContent: GeneratedContent? = nil
@@ -1035,6 +1108,8 @@ struct PropertyInfo {
     let guideDescription: String?
     let guides: [String]
     let pattern: String?
+    /// The default value expression if present (e.g. `0`, `""`, `nil`).
+    let defaultValue: String?
 }
 
 struct EnumCaseInfo {
