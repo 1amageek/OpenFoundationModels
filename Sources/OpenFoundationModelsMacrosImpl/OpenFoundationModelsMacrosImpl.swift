@@ -25,9 +25,7 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                 generateGeneratedContentProperty(structName: structName, description: description, properties: properties),
                 generateGenerationSchemaProperty(structName: structName, description: description, properties: properties),
                 generatePartiallyGeneratedStruct(structName: structName, properties: properties),
-                generateAsPartiallyGeneratedMethod(structName: structName),
-                generateInstructionsRepresentationProperty(),
-                generatePromptRepresentationProperty()
+                generateAsPartiallyGeneratedMethod(structName: structName)
             ]
 
             // Generate CodingKeys to exclude _rawGeneratedContent from Codable encoding,
@@ -55,9 +53,7 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
                 generateEnumInitFromGeneratedContent(enumName: enumName, cases: cases),
                 generateEnumGeneratedContentProperty(enumName: enumName, description: description, cases: cases),
                 generateEnumGenerationSchemaProperty(enumName: enumName, description: description, cases: cases),
-                generateAsPartiallyGeneratedMethodForEnum(enumName: enumName),
-                generateInstructionsRepresentationProperty(),
-                generatePromptRepresentationProperty()
+                generateAsPartiallyGeneratedMethodForEnum(enumName: enumName)
             ]
         } else {
             throw MacroError.notApplicableToType
@@ -711,21 +707,6 @@ public struct GenerableMacro: MemberMacro, ExtensionMacro {
         """)
     }
     
-    private static func generateInstructionsRepresentationProperty() -> DeclSyntax {
-        return DeclSyntax(stringLiteral: """
-        public var instructionsRepresentation: Instructions {
-            return Instructions(self.generatedContent.text)
-        }
-        """)
-    }
-    
-    private static func generatePromptRepresentationProperty() -> DeclSyntax {
-        return DeclSyntax(stringLiteral: """
-        public var promptRepresentation: Prompt {
-            return Prompt(self.generatedContent.text)
-        }
-        """)
-    }
     
     
     private static func extractEnumCases(from enumDecl: EnumDeclSyntax) -> [EnumCaseInfo] {
