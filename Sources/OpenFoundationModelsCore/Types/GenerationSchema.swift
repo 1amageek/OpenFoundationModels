@@ -257,7 +257,7 @@ public struct GenerationSchema: Sendable, SendableMetatype, Codable, CustomDebug
         }
     }
     
-    internal func toSchemaDictionary(asRootSchema: Bool = false) -> [String: Any] {
+    package func toSchemaDictionary(asRootSchema: Bool = false) -> [String: Any] {
         var schema = schemaType.toJSONSchema(description: _description)
         
         // Add $schema field for root schemas
