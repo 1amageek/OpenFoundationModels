@@ -28,6 +28,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "602.0.0"),
         .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.1.1"),
+        .package(url: "https://github.com/mattt/JSONSchema.git", from: "1.0.0"),
     ],
     targets: [
         .target(
@@ -62,7 +63,10 @@ let package = Package(
         
         .target(
             name: "OpenFoundationModelsExtra",
-            dependencies: ["OpenFoundationModels"]
+            dependencies: [
+                "OpenFoundationModels",
+                .product(name: "JSONSchema", package: "JSONSchema"),
+            ]
         ),
         
         .testTarget(
