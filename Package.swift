@@ -72,6 +72,15 @@ let package = Package(
         .testTarget(
             name: "OpenFoundationModelsTests",
             dependencies: ["OpenFoundationModels"]
+        ),
+
+        .testTarget(
+            name: "OpenFoundationModelsExtraTests",
+            dependencies: [
+                "OpenFoundationModelsExtra",
+                "OpenFoundationModels",
+                "OpenFoundationModelsMacros",
+            ]
         )
     ]
 )
