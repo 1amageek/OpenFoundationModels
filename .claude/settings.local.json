@@ -42,7 +42,12 @@
       "WebFetch(domain:platform.openai.com)",
       "WebFetch(domain:community.openai.com)",
       "WebFetch(domain:theswiftdev.com)",
-      "Bash(gh release create:*)"
+      "Bash(gh release create:*)",
+      "Bash(git push:*)",
+      "Bash(gh repo list:*)",
+      "Bash(gh repo view:*)",
+      "Bash(gh api:*)",
+      "Bash(gh repo edit:*)"
     ],
     "deny": [],
     "additionalDirectories": [
