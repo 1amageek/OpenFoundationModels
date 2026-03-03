@@ -112,4 +112,53 @@ struct GeneratedContentJSONValueTests {
         #expect(user["name"] != nil)
         #expect(user["age"] != nil)
     }
+
+    @Test("JSONValue to GeneratedContent: array")
+    func jsonValueArray() throws {
+        let value: JSONValue = .array([.int(1), .int(2), .int(3)])
+        let content = try GeneratedContent(jsonValue: value)
+        let elems = try content.elements()
+        #expect(elems.count == 3)
+    }
+
+    @Test("JSONValue to GeneratedContent: null")
+    func jsonValueNull() throws {
+        let content = try GeneratedContent(jsonValue: .null)
+        #expect(content.jsonString == "null")
+    }
+
+    @Test("toJSONValue: integer numbers output as int not double")
+    func integerOutputFormat() {
+        let content = GeneratedContent(kind: .number(100.0))
+        #expect(content.jsonString == "100")
+        let value = content.toJSONValue()
+        if case .int(let i) = value {
+            #expect(i == 100)
+        } else {
+            Issue.record("Expected .int(100), got \(value)")
+        }
+    }
+
+    @Test("toJSONValue: string with special characters")
+    func specialCharacters() throws {
+        let content = GeneratedContent(kind: .string("hello\nworld\t!"))
+        let value = content.toJSONValue()
+        guard case .string(let s) = value else {
+            Issue.record("Expected .string"); return
+        }
+        #expect(s == "hello\nworld\t!")
+        let restored = try GeneratedContent(jsonValue: value)
+        #expect(restored.jsonString == content.jsonString)
+    }
+
+    @Test("toJSONValue on JSON-parsed content")
+    func fromParsedJSON() throws {
+        let content = try GeneratedContent(json: #"{"score": 99, "pass": true}"#)
+        let value = content.toJSONValue()
+        guard case .object(let dict) = value else {
+            Issue.record("Expected .object"); return
+        }
+        #expect(dict["score"] == .int(99))
+        #expect(dict["pass"] == .bool(true))
+    }
 }

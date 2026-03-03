@@ -50,6 +50,16 @@ struct TranscriptExtractionTests {
         #expect(Transcript.extractText(from: []) == "")
     }
 
+    @Test("extractText: structured segment outputs jsonString")
+    func extractTextStructured() {
+        let content = GeneratedContent(properties: ["key": "value"])
+        let seg = Transcript.StructuredSegment(source: "tool", content: content)
+        let segments: [Transcript.Segment] = [.structure(seg)]
+        let result = Transcript.extractText(from: segments)
+        #expect(result.contains("key"))
+        #expect(result.contains("value"))
+    }
+
     // MARK: - extractOptions
 
     @Test("extractOptions: returns options from latest prompt")
@@ -99,6 +109,34 @@ struct TranscriptExtractionTests {
     @Test("extractToolDefinitions: returns nil on empty transcript")
     func extractToolDefinitionsEmpty() {
         #expect(Transcript.extractToolDefinitions(from: Transcript()) == nil)
+    }
+
+    @Test("extractToolDefinitions: skips empty-tool instructions, finds latest non-empty")
+    func extractToolDefinitionsMostRecent() {
+        let schema = GenerationSchema(type: String.self, description: "arg", properties: [])
+        let tool1 = Transcript.ToolDefinition(name: "tool1", description: "first", parameters: schema)
+        let tool2 = Transcript.ToolDefinition(name: "tool2", description: "second", parameters: schema)
+        let i1 = Transcript.Instructions(segments: [], toolDefinitions: [tool1])
+        let i2 = Transcript.Instructions(segments: [], toolDefinitions: [])       // empty — should be skipped
+        let i3 = Transcript.Instructions(segments: [], toolDefinitions: [tool2])
+        let transcript = Transcript(entries: [.instructions(i1), .instructions(i2), .instructions(i3)])
+        // reversed search: i3 is last but empty guard skips i2, finds i3
+        let extracted = Transcript.extractToolDefinitions(from: transcript)
+        #expect(extracted?.first?.name == "tool2")
+    }
+
+    @Test("extractToolDefinitions: multiple tools returned")
+    func extractToolDefinitionsMultiple() {
+        let schema = GenerationSchema(type: String.self, description: "arg", properties: [])
+        let tools = [
+            Transcript.ToolDefinition(name: "a", description: "A", parameters: schema),
+            Transcript.ToolDefinition(name: "b", description: "B", parameters: schema),
+            Transcript.ToolDefinition(name: "c", description: "C", parameters: schema),
+        ]
+        let instructions = Transcript.Instructions(segments: [], toolDefinitions: tools)
+        let transcript = Transcript(entries: [.instructions(instructions)])
+        let extracted = Transcript.extractToolDefinitions(from: transcript)
+        #expect(extracted?.count == 3)
     }
 
     // MARK: - extractResponseSchema
