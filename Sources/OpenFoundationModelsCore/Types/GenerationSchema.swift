@@ -3,6 +3,7 @@ import Foundation
 public struct GenerationSchema: Sendable, SendableMetatype, Codable, CustomDebugStringConvertible {
     internal let schemaType: SchemaType
     private let _description: String?
+    private let _typeName: String?
     
     // MARK: - Nested Types
     
@@ -54,7 +55,8 @@ public struct GenerationSchema: Sendable, SendableMetatype, Codable, CustomDebug
         anyOf: [GenerationSchema] = []
     ) {
         self._description = description
-        
+        self._typeName = nil
+
         if type == "object" {
             let propInfos = (properties ?? [:]).map { (name, schema) in
                 return PropertyInfo(
@@ -93,15 +95,17 @@ public struct GenerationSchema: Sendable, SendableMetatype, Codable, CustomDebug
     ) {
         self.schemaType = schemaType
         self._description = description
+        self._typeName = nil
     }
-    
-    
+
+
     public init(root: DynamicGenerationSchema, dependencies: [DynamicGenerationSchema]) throws {
         self._description = root.description
-        
+        self._typeName = nil
+
         // Create dependency map for easier lookup
         let dependencyMap = Dictionary(uniqueKeysWithValues: dependencies.map { ($0.name, $0) })
-        
+
         // Fully resolve all references at initialization
         self.schemaType = try Self.resolve(root.schemaType, dependencies: dependencyMap)
     }
@@ -176,8 +180,9 @@ public struct GenerationSchema: Sendable, SendableMetatype, Codable, CustomDebug
         }
         self.schemaType = .anyOf(schemas)
         self._description = description
+        self._typeName = String(describing: type)
     }
-    
+
     public init(type: any Generable.Type, description: String? = nil, properties: [GenerationSchema.Property]) {
         // Check if this is a standard primitive type with empty properties
         if properties.isEmpty {
@@ -202,8 +207,9 @@ public struct GenerationSchema: Sendable, SendableMetatype, Codable, CustomDebug
             self.schemaType = .object(properties: propInfos)
         }
         self._description = description
+        self._typeName = String(describing: type)
     }
-    
+
     public init(type: any Generable.Type, description: String? = nil, anyOf types: [any Generable.Type]) {
         // For union types, create schemas for each type
         let schemas = types.map { genType in
@@ -211,11 +217,18 @@ public struct GenerationSchema: Sendable, SendableMetatype, Codable, CustomDebug
         }
         self.schemaType = .anyOf(schemas)
         self._description = description
+        self._typeName = String(describing: type)
     }
     
     
     
     
+    package var typeName: String? {
+        if let name = _typeName { return name }
+        if case .generic(let type, _) = schemaType { return String(describing: type) }
+        return nil
+    }
+
     public var debugDescription: String {
         switch schemaType {
         case .object(let properties):
@@ -941,6 +954,7 @@ extension GenerationSchema {
         }
         
         self._description = dict["description"] as? String
+        self._typeName = nil
     }
     
     // Helper method to parse properties from JSON Schema (unified)

@@ -187,7 +187,7 @@ struct JSONBufferStreamingTests {
         }
 
         // Parser may return partial content for incomplete JSON
-        let content = try? GeneratedContent(json: buffer)
+        let _ = try? GeneratedContent(json: buffer)
         // This verifies the parser doesn't crash on incomplete input
         #expect(buffer == "{\"incomplete\": \"value")
     }

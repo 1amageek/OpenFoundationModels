@@ -271,13 +271,13 @@ extension Transcript {
         package var type: String?
 
         package var schema: GenerationSchema?
-        
+
         public init(schema: GenerationSchema) {
-            self.name = "schema-based"
+            self.name = schema.typeName ?? String(describing: schema)
             self.type = nil
             self.schema = schema
         }
-        
+
         public init<Content>(type: Content.Type) where Content: Generable {
             self.name = String(describing: type)
             self.type = String(describing: type)
@@ -465,55 +465,63 @@ extension Transcript.TextSegment: CustomStringConvertible {
 
 extension Transcript.StructuredSegment: CustomStringConvertible {
     public var description: String {
-        return "StructuredSegment(source: \(source), content: \(content.debugDescription))"
+        return content.debugDescription
     }
 }
 
 extension Transcript.Instructions: CustomStringConvertible {
     public var description: String {
-        let segmentTexts = segments.map { $0.description }.joined(separator: " ")
-        let toolCount = toolDefinitions.count
-        return "Instructions: \(segmentTexts) (Tools: \(toolCount))"
+        let segmentText = segments.map { $0.description }.joined(separator: "\n")
+        return "(Instructions) \(segmentText)"
     }
 }
 
 extension Transcript.Prompt: CustomStringConvertible {
     public var description: String {
-        let segmentTexts = segments.map { $0.description }.joined(separator: " ")
-        return "Prompt: \(segmentTexts)"
+        let segmentText = segments.map { $0.description }.joined(separator: "\n")
+        let formatText = responseFormat.map { $0.description } ?? "<nil>"
+        return "(Prompt) \(segmentText)\nResponse Format: \(formatText)"
     }
 }
 
 extension Transcript.ResponseFormat: CustomStringConvertible {
     public var description: String {
-        return "ResponseFormat(name: \(name))"
+        guard let schema,
+              let data = try? JSONSerialization.data(
+                withJSONObject: schema.toSchemaDictionary(),
+                options: [.prettyPrinted, .sortedKeys]
+              ),
+              let str = String(data: data, encoding: .utf8) else {
+            return name
+        }
+        return str
     }
 }
 
 extension Transcript.ToolCalls: CustomStringConvertible {
     public var description: String {
-        let callDescriptions = calls.map { $0.description }.joined(separator: ", ")
-        return "ToolCalls: [\(callDescriptions)]"
+        let callText = calls.map { $0.description }.joined(separator: "\n")
+        return "(ToolCalls) \(callText)"
     }
 }
 
 extension Transcript.ToolCall: CustomStringConvertible {
     public var description: String {
-        return "\(toolName)(\(arguments.debugDescription))"
+        return "\(toolName): \(arguments.debugDescription)"
     }
 }
 
 extension Transcript.ToolOutput: CustomStringConvertible {
     public var description: String {
-        let segmentTexts = segments.map { $0.description }.joined(separator: " ")
-        return "ToolOutput(\(toolName)): \(segmentTexts)"
+        let segmentText = segments.map { $0.description }.joined(separator: "\n")
+        return "(ToolOutput \(toolName)) \(segmentText)"
     }
 }
 
 extension Transcript.Response: CustomStringConvertible {
     public var description: String {
-        let segmentTexts = segments.map { $0.description }.joined(separator: " ")
-        return "Response: \(segmentTexts)"
+        let segmentText = segments.map { $0.description }.joined(separator: "\n")
+        return "(Response) \(segmentText)"
     }
 }
 

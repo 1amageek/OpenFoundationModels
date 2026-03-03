@@ -95,7 +95,7 @@ struct TranscriptCodableTests {
         if case .prompt(let decodedPrompt) = decodedTranscript.entries[0] {
             #expect(decodedPrompt.id == "prompt1")
             #expect(decodedPrompt.responseFormat != nil)
-            #expect(decodedPrompt.responseFormat?.name == "schema-based")
+            #expect(decodedPrompt.responseFormat?.name == String(describing: TestTranscriptUserProfile.self))
             
             // Verify schema is preserved
             let decodedSchema = decodedPrompt.responseFormat?.schema
@@ -427,7 +427,7 @@ struct TranscriptCodableTests {
         }
         
         if case .prompt(let p2) = decodedTranscript.entries[1] {
-            #expect(p2.responseFormat?.name == "schema-based")
+            #expect(p2.responseFormat?.name == String(describing: TestTranscriptUserProfile.self))
             #expect(p2.responseFormat?.schema != nil)
         }
         
