@@ -2,6 +2,7 @@
 import Foundation
 import Testing
 @testable import OpenFoundationModels
+@testable import OpenFoundationModelsCore
 
 @Suite("Generated Content Tests", .tags(.foundation))
 struct GeneratedContentTests {
@@ -145,7 +146,10 @@ struct GeneratedContentTests {
         let content = GeneratedContent("Instruction content")
         let instructions = content.instructionsRepresentation
         
-        #expect(instructions.content == "\"Instruction content\"")
+        guard case .text(let t) = instructions.components.first else {
+            Issue.record("Expected text component"); return
+        }
+        #expect(t.value == "\"Instruction content\"")
     }
     
     @Test("GeneratedContent PartiallyGenerated")

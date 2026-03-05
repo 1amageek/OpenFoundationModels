@@ -10,20 +10,24 @@ public struct Instructions: Sendable, Copyable, SendableMetatype, InstructionsRe
         }
     }
 
+    package struct Image: Sendable, Equatable {
+        package enum Source: Sendable, Equatable {
+            case base64(data: String, mediaType: String)
+            case url(URL)
+        }
+        package let source: Source
+
+        package init(source: Source) {
+            self.source = source
+        }
+    }
+
     package enum Component: Sendable, Equatable {
         case text(Text)
+        case image(Image)
     }
 
     package let components: [Component]
-
-    package var content: String {
-        components.map { component in
-            switch component {
-            case .text(let text):
-                return text.value
-            }
-        }.joined(separator: "\n")
-    }
 
     public init(_ content: String) {
         self.components = [.text(Text(value: content))]

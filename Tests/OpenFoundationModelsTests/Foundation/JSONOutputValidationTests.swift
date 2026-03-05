@@ -2,6 +2,19 @@
 import Foundation
 import Testing
 @testable import OpenFoundationModels
+@testable import OpenFoundationModelsCore
+
+// MARK: - Helpers
+
+private func textValue(of prompt: Prompt) -> String {
+    guard case .text(let t) = prompt.components.first else { return "" }
+    return t.value
+}
+
+private func textValue(of instructions: Instructions) -> String {
+    guard case .text(let t) = instructions.components.first else { return "" }
+    return t.value
+}
 
 // MARK: - Test-local @Generable types
 
@@ -85,8 +98,6 @@ func assertValidJSON(_ string: String, sourceLocation: SourceLocation = #_source
 @Suite("GeneratedContent JSON Output Validation", .tags(.foundation))
 struct GeneratedContentJSONOutputTests {
 
-    // MARK: null
-
     @Test("null kind produces valid JSON")
     func nullKindJSON() {
         let content = GeneratedContent(kind: .null)
@@ -94,8 +105,6 @@ struct GeneratedContentJSONOutputTests {
         assertValidJSON(content.debugDescription)
         assertValidJSON(String(describing: content.debugDescription))
     }
-
-    // MARK: bool
 
     @Test("bool(true) produces valid JSON")
     func boolTrueJSON() {
@@ -110,8 +119,6 @@ struct GeneratedContentJSONOutputTests {
         assertValidJSON(content.jsonString)
         assertValidJSON(content.debugDescription)
     }
-
-    // MARK: number
 
     @Test("number(integer) produces valid JSON")
     func numberIntegerJSON() {
@@ -141,8 +148,6 @@ struct GeneratedContentJSONOutputTests {
         assertValidJSON(content.debugDescription)
     }
 
-    // MARK: string
-
     @Test("string produces valid JSON")
     func stringJSON() {
         let content = GeneratedContent(kind: .string("hello"))
@@ -170,8 +175,6 @@ struct GeneratedContentJSONOutputTests {
         assertValidJSON(content.jsonString)
         assertValidJSON(content.debugDescription)
     }
-
-    // MARK: array
 
     @Test("empty array produces valid JSON")
     func emptyArrayJSON() {
@@ -211,8 +214,6 @@ struct GeneratedContentJSONOutputTests {
         assertValidJSON(content.jsonString)
         assertValidJSON(content.debugDescription)
     }
-
-    // MARK: structure
 
     @Test("empty structure produces valid JSON")
     func emptyStructureJSON() {
@@ -275,7 +276,7 @@ struct GenerableStructJSONOutputTests {
         let json = #"{"name": "Alice", "age": 30}"#
         let content = try GeneratedContent(json: json)
         let person = try JSONTestPerson(content)
-        assertValidJSON(person.promptRepresentation.content)
+        assertValidJSON(textValue(of: person.promptRepresentation))
     }
 
     @Test("basic struct instructionsRepresentation is valid JSON")
@@ -283,7 +284,7 @@ struct GenerableStructJSONOutputTests {
         let json = #"{"name": "Alice", "age": 30}"#
         let content = try GeneratedContent(json: json)
         let person = try JSONTestPerson(content)
-        assertValidJSON(person.instructionsRepresentation.content)
+        assertValidJSON(textValue(of: person.instructionsRepresentation))
     }
 
     @Test("Double properties produce valid JSON")
@@ -292,8 +293,8 @@ struct GenerableStructJSONOutputTests {
         let content = try GeneratedContent(json: json)
         let point = try JSONTestPoint(content)
         assertValidJSON(point.generatedContent.jsonString)
-        assertValidJSON(point.promptRepresentation.content)
-        assertValidJSON(point.instructionsRepresentation.content)
+        assertValidJSON(textValue(of: point.promptRepresentation))
+        assertValidJSON(textValue(of: point.instructionsRepresentation))
     }
 
     @Test("@Guide annotated struct produces valid JSON")
@@ -302,8 +303,8 @@ struct GenerableStructJSONOutputTests {
         let content = try GeneratedContent(json: json)
         let product = try JSONTestProduct(content)
         assertValidJSON(product.generatedContent.jsonString)
-        assertValidJSON(product.promptRepresentation.content)
-        assertValidJSON(product.instructionsRepresentation.content)
+        assertValidJSON(textValue(of: product.promptRepresentation))
+        assertValidJSON(textValue(of: product.instructionsRepresentation))
     }
 
     @Test("nested struct produces valid JSON")
@@ -321,8 +322,8 @@ struct GenerableStructJSONOutputTests {
         let content = try GeneratedContent(json: json)
         let company = try JSONTestCompany(content)
         assertValidJSON(company.generatedContent.jsonString)
-        assertValidJSON(company.promptRepresentation.content)
-        assertValidJSON(company.instructionsRepresentation.content)
+        assertValidJSON(textValue(of: company.promptRepresentation))
+        assertValidJSON(textValue(of: company.instructionsRepresentation))
     }
 
     @Test("optional properties produce valid JSON when present")
@@ -331,8 +332,8 @@ struct GenerableStructJSONOutputTests {
         let content = try GeneratedContent(json: json)
         let fields = try JSONTestOptionalFields(content)
         assertValidJSON(fields.generatedContent.jsonString)
-        assertValidJSON(fields.promptRepresentation.content)
-        assertValidJSON(fields.instructionsRepresentation.content)
+        assertValidJSON(textValue(of: fields.promptRepresentation))
+        assertValidJSON(textValue(of: fields.instructionsRepresentation))
     }
 
     @Test("optional properties produce valid JSON when absent")
@@ -341,8 +342,8 @@ struct GenerableStructJSONOutputTests {
         let content = try GeneratedContent(json: json)
         let fields = try JSONTestOptionalFields(content)
         assertValidJSON(fields.generatedContent.jsonString)
-        assertValidJSON(fields.promptRepresentation.content)
-        assertValidJSON(fields.instructionsRepresentation.content)
+        assertValidJSON(textValue(of: fields.promptRepresentation))
+        assertValidJSON(textValue(of: fields.instructionsRepresentation))
     }
 }
 
@@ -356,7 +357,7 @@ struct GenerableEnumJSONOutputTests {
         let json = #""active""#
         let content = try GeneratedContent(json: json)
         let status = try JSONTestStatus(content)
-        assertValidJSON(status.promptRepresentation.content)
+        assertValidJSON(textValue(of: status.promptRepresentation))
     }
 
     @Test("enum case produces valid JSON for instructionsRepresentation")
@@ -364,7 +365,7 @@ struct GenerableEnumJSONOutputTests {
         let json = #""inactive""#
         let content = try GeneratedContent(json: json)
         let status = try JSONTestStatus(content)
-        assertValidJSON(status.instructionsRepresentation.content)
+        assertValidJSON(textValue(of: status.instructionsRepresentation))
     }
 
     @Test("enum generatedContent.jsonString is valid JSON")
@@ -387,8 +388,8 @@ struct ConvertibleToGeneratedContentDefaultTests {
         let content = try GeneratedContent(json: json)
         let person = try JSONTestPerson(content)
         let jsonString = person.generatedContent.jsonString
-        let promptContent = person.promptRepresentation.content
-        #expect(promptContent == jsonString)
+        let promptText = textValue(of: person.promptRepresentation)
+        #expect(promptText == jsonString)
     }
 
     @Test("instructionsRepresentation matches jsonString")
@@ -397,8 +398,8 @@ struct ConvertibleToGeneratedContentDefaultTests {
         let content = try GeneratedContent(json: json)
         let person = try JSONTestPerson(content)
         let jsonString = person.generatedContent.jsonString
-        let instructionsContent = person.instructionsRepresentation.content
-        #expect(instructionsContent == jsonString)
+        let instructionsText = textValue(of: person.instructionsRepresentation)
+        #expect(instructionsText == jsonString)
     }
 
     @Test("promptRepresentation and instructionsRepresentation are consistent")
@@ -412,10 +413,10 @@ struct ConvertibleToGeneratedContentDefaultTests {
         """
         let content = try GeneratedContent(json: json)
         let company = try JSONTestCompany(content)
-        let promptContent = company.promptRepresentation.content
-        let instructionsContent = company.instructionsRepresentation.content
-        #expect(promptContent == instructionsContent)
-        assertValidJSON(promptContent)
+        let promptText = textValue(of: company.promptRepresentation)
+        let instructionsText = textValue(of: company.instructionsRepresentation)
+        #expect(promptText == instructionsText)
+        assertValidJSON(promptText)
     }
 }
 
@@ -424,15 +425,13 @@ struct ConvertibleToGeneratedContentDefaultTests {
 @Suite("ProtocolExtensions JSON Output Validation", .tags(.foundation))
 struct ProtocolExtensionsJSONOutputTests {
 
-    // MARK: GeneratedContent extensions
-
     @Test("GeneratedContent.promptRepresentation produces valid JSON for structure")
     func generatedContentStructurePromptJSON() {
         let content = GeneratedContent(properties: [
             "key": "value",
             "count": 10,
         ])
-        assertValidJSON(content.promptRepresentation.content)
+        assertValidJSON(textValue(of: content.promptRepresentation))
     }
 
     @Test("GeneratedContent.instructionsRepresentation produces valid JSON for structure")
@@ -441,92 +440,81 @@ struct ProtocolExtensionsJSONOutputTests {
             "key": "value",
             "count": 10,
         ])
-        assertValidJSON(content.instructionsRepresentation.content)
+        assertValidJSON(textValue(of: content.instructionsRepresentation))
     }
 
     @Test("GeneratedContent.promptRepresentation produces valid JSON for array")
     func generatedContentArrayPromptJSON() {
         let content = GeneratedContent(elements: ["a", "b", "c"])
-        assertValidJSON(content.promptRepresentation.content)
+        assertValidJSON(textValue(of: content.promptRepresentation))
     }
 
     @Test("GeneratedContent.promptRepresentation produces valid JSON for scalar")
     func generatedContentScalarPromptJSON() {
-        let stringContent = GeneratedContent(kind: .string("hello"))
-        assertValidJSON(stringContent.promptRepresentation.content)
-
-        let numberContent = GeneratedContent(kind: .number(42))
-        assertValidJSON(numberContent.promptRepresentation.content)
-
-        let boolContent = GeneratedContent(kind: .bool(true))
-        assertValidJSON(boolContent.promptRepresentation.content)
-
-        let nullContent = GeneratedContent(kind: .null)
-        assertValidJSON(nullContent.promptRepresentation.content)
+        assertValidJSON(textValue(of: GeneratedContent(kind: .string("hello")).promptRepresentation))
+        assertValidJSON(textValue(of: GeneratedContent(kind: .number(42)).promptRepresentation))
+        assertValidJSON(textValue(of: GeneratedContent(kind: .bool(true)).promptRepresentation))
+        assertValidJSON(textValue(of: GeneratedContent(kind: .null).promptRepresentation))
     }
-
-    // MARK: Standard type extensions
 
     @Test("Bool promptRepresentation is valid JSON fragment")
     func boolPromptJSON() {
-        assertValidJSON(true.promptRepresentation.content)
-        assertValidJSON(false.promptRepresentation.content)
+        assertValidJSON(textValue(of: true.promptRepresentation))
+        assertValidJSON(textValue(of: false.promptRepresentation))
     }
 
     @Test("Bool instructionsRepresentation is valid JSON fragment")
     func boolInstructionsJSON() {
-        assertValidJSON(true.instructionsRepresentation.content)
-        assertValidJSON(false.instructionsRepresentation.content)
+        assertValidJSON(textValue(of: true.instructionsRepresentation))
+        assertValidJSON(textValue(of: false.instructionsRepresentation))
     }
 
     @Test("Int promptRepresentation is valid JSON fragment")
     func intPromptJSON() {
-        assertValidJSON(42.promptRepresentation.content)
-        assertValidJSON(0.promptRepresentation.content)
-        assertValidJSON((-1).promptRepresentation.content)
+        assertValidJSON(textValue(of: 42.promptRepresentation))
+        assertValidJSON(textValue(of: 0.promptRepresentation))
+        assertValidJSON(textValue(of: (-1).promptRepresentation))
     }
 
     @Test("Int instructionsRepresentation is valid JSON fragment")
     func intInstructionsJSON() {
-        assertValidJSON(42.instructionsRepresentation.content)
+        assertValidJSON(textValue(of: 42.instructionsRepresentation))
     }
 
     @Test("Double promptRepresentation is valid JSON fragment")
     func doublePromptJSON() {
-        assertValidJSON(3.14.promptRepresentation.content)
-        assertValidJSON(0.0.promptRepresentation.content)
+        assertValidJSON(textValue(of: 3.14.promptRepresentation))
+        assertValidJSON(textValue(of: 0.0.promptRepresentation))
     }
 
     @Test("Double instructionsRepresentation is valid JSON fragment")
     func doubleInstructionsJSON() {
-        assertValidJSON(3.14.instructionsRepresentation.content)
+        assertValidJSON(textValue(of: 3.14.instructionsRepresentation))
     }
 
     @Test("Float promptRepresentation is valid JSON fragment")
     func floatPromptJSON() {
-        assertValidJSON(Float(2.5).promptRepresentation.content)
+        assertValidJSON(textValue(of: Float(2.5).promptRepresentation))
     }
 
     @Test("Decimal promptRepresentation is valid JSON fragment")
     func decimalPromptJSON() {
-        assertValidJSON(Decimal(123.456).promptRepresentation.content)
+        assertValidJSON(textValue(of: Decimal(123.456).promptRepresentation))
     }
 
-    // MARK: String — not JSON (plain text), verify it doesn't crash
-
-    @Test("String promptRepresentation produces string content")
+    @Test("String promptRepresentation produces single text component")
     func stringPromptContent() {
         let value = "hello world"
-        #expect(value.promptRepresentation.content == "hello world")
+        let prompt = value.promptRepresentation
+        #expect(prompt.components == [.text(Prompt.Text(value: "hello world"))])
     }
 
-    @Test("String instructionsRepresentation produces string content")
+    @Test("String instructionsRepresentation produces single text component")
     func stringInstructionsContent() {
         let value = "hello world"
-        #expect(value.instructionsRepresentation.content == "hello world")
+        let instructions = value.instructionsRepresentation
+        #expect(instructions.components == [.text(Instructions.Text(value: "hello world"))])
     }
-
-    // MARK: Comprehensive round-trip: GeneratedContent → jsonString → JSONSerialization
 
     @Test("deeply nested structure round-trips through valid JSON")
     func deeplyNestedRoundTrip() throws {
@@ -546,7 +534,6 @@ struct ProtocolExtensionsJSONOutputTests {
         let jsonString = outer.jsonString
         assertValidJSON(jsonString)
 
-        // Verify round-trip through JSONSerialization
         let data = try #require(jsonString.data(using: .utf8))
         let parsed = try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
         let dict = try #require(parsed as? [String: Any])
@@ -563,6 +550,6 @@ struct ProtocolExtensionsJSONOutputTests {
         ])
         assertValidJSON(content.jsonString)
         assertValidJSON(content.debugDescription)
-        assertValidJSON(content.promptRepresentation.content)
+        assertValidJSON(textValue(of: content.promptRepresentation))
     }
 }

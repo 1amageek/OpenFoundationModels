@@ -1,483 +1,397 @@
 import Foundation
 import OpenFoundationModelsCore
 
+// MARK: - Transcript: Codable
+
 extension Transcript: Codable {
-    private enum CodingKeys: String, CodingKey {
+
+    private enum TopLevelKeys: String, CodingKey {
+        case type, version, transcript
+    }
+
+    private enum TranscriptKeys: String, CodingKey {
         case entries
     }
-    
+
     public init(from decoder: any Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        
-        var decodedEntries: [Entry] = []
-        var entriesContainer = try container.nestedUnkeyedContainer(forKey: .entries)
-        
-        while !entriesContainer.isAtEnd {
-            let entry = try entriesContainer.decode(EntryCoding.self)
-            decodedEntries.append(try entry.toEntry())
+        let top = try decoder.container(keyedBy: TopLevelKeys.self)
+        let inner = try top.nestedContainer(keyedBy: TranscriptKeys.self, forKey: .transcript)
+        var unkeyedEntries = try inner.nestedUnkeyedContainer(forKey: .entries)
+        var decoded: [Entry] = []
+        while !unkeyedEntries.isAtEnd {
+            let coding = try unkeyedEntries.decode(EntryCoding.self)
+            decoded.append(try coding.toEntry())
         }
-        
-        self.init(entries: decodedEntries)
+        self.init(entries: decoded)
     }
-    
+
     public func encode(to encoder: any Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        
-        var entriesContainer = container.nestedUnkeyedContainer(forKey: .entries)
+        var top = encoder.container(keyedBy: TopLevelKeys.self)
+        try top.encode("FoundationModels.Transcript", forKey: .type)
+        try top.encode(1, forKey: .version)
+        var inner = top.nestedContainer(keyedBy: TranscriptKeys.self, forKey: .transcript)
+        var unkeyedEntries = inner.nestedUnkeyedContainer(forKey: .entries)
         for entry in entries {
-            let entryCoding = try EntryCoding(from: entry)
-            try entriesContainer.encode(entryCoding)
+            try unkeyedEntries.encode(EntryCoding(entry))
         }
     }
 }
+
+// MARK: - Entry
 
 private struct EntryCoding: Codable {
-    enum EntryType: String, Codable {
+
+    private enum Role: String, Codable {
         case instructions
-        case prompt
+        case user
         case response
-        case toolCalls
-        case toolOutput
+        case tool
     }
-    
-    let type: EntryType
+
+    private enum CodingKeys: String, CodingKey {
+        case id, role
+        case contents, options, responseFormat
+        case tools
+        case toolCalls
+        case assets
+        case toolName, toolCallID
+    }
+
+    // Shared
     let id: String
-    let segments: [SegmentCoding]?
-    let toolDefinitions: [ToolDefinitionCoding]?
-    let assetIDs: [String]?
+    private let role: Role
+
+    // instructions / user / tool / response(model)
+    let contents: [SegmentCoding]?
+
+    // user (prompt)
     let options: GenerationOptionsCoding?
     let responseFormat: ResponseFormatCoding?
-    let calls: [ToolCallCoding]?
+
+    // instructions
+    let tools: [ToolDefinitionCoding]?
+
+    // response(toolCalls)
+    let toolCalls: [ToolCallCoding]?
+
+    // response(model)
+    let assets: [String]?
+
+    // tool (toolOutput)
     let toolName: String?
-    
-    init(from entry: Transcript.Entry) throws {
-        self.id = entry.id
-        
+    let toolCallID: String?
+
+    // MARK: Encode
+
+    init(_ entry: Transcript.Entry) throws {
+        id = entry.id
         switch entry {
-        case .instructions(let instructions):
-            self.type = .instructions
-            self.segments = try instructions.segments.map { try SegmentCoding(from: $0) }
-            self.toolDefinitions = try instructions.toolDefinitions.map { try ToolDefinitionCoding(from: $0) }
-            self.assetIDs = nil
-            self.options = nil
-            self.responseFormat = nil
-            self.calls = nil
-            self.toolName = nil
-            
-        case .prompt(let prompt):
-            self.type = .prompt
-            self.segments = try prompt.segments.map { try SegmentCoding(from: $0) }
-            self.toolDefinitions = nil
-            self.assetIDs = nil
-            self.options = GenerationOptionsCoding(from: prompt.options)
-            self.responseFormat = prompt.responseFormat.map { ResponseFormatCoding(from: $0) }
-            self.calls = nil
-            self.toolName = nil
-            
-        case .response(let response):
-            self.type = .response
-            self.segments = try response.segments.map { try SegmentCoding(from: $0) }
-            self.toolDefinitions = nil
-            self.assetIDs = response.assetIDs
-            self.options = nil
-            self.responseFormat = nil
-            self.calls = nil
-            self.toolName = nil
-            
-        case .toolCalls(let toolCalls):
-            self.type = .toolCalls
-            self.segments = nil
-            self.toolDefinitions = nil
-            self.assetIDs = nil
-            self.options = nil
-            self.responseFormat = nil
-            self.calls = try toolCalls.calls.map { try ToolCallCoding(from: $0) }
-            self.toolName = nil
-            
-        case .toolOutput(let toolOutput):
-            self.type = .toolOutput
-            self.segments = try toolOutput.segments.map { try SegmentCoding(from: $0) }
-            self.toolDefinitions = nil
-            self.assetIDs = nil
-            self.options = nil
-            self.responseFormat = nil
-            self.calls = nil
-            self.toolName = toolOutput.toolName
+        case .instructions(let instr):
+            role = .instructions
+            contents = try instr.segments.map(SegmentCoding.init)
+            tools = instr.toolDefinitions.isEmpty ? nil : instr.toolDefinitions.map(ToolDefinitionCoding.init)
+            options = nil; responseFormat = nil; toolCalls = nil; assets = nil; toolName = nil; toolCallID = nil
+
+        case .prompt(let p):
+            role = .user
+            contents = try p.segments.map(SegmentCoding.init)
+            options = GenerationOptionsCoding(p.options)
+            responseFormat = p.responseFormat.map(ResponseFormatCoding.init)
+            tools = nil; toolCalls = nil; assets = nil; toolName = nil; toolCallID = nil
+
+        case .toolCalls(let tc):
+            role = .response
+            toolCalls = try tc.calls.map(ToolCallCoding.init)
+            contents = nil; options = nil; responseFormat = nil; tools = nil; assets = nil; toolName = nil; toolCallID = nil
+
+        case .toolOutput(let to):
+            role = .tool
+            toolName = to.toolName
+            toolCallID = to.id
+            contents = try to.segments.map(SegmentCoding.init)
+            options = nil; responseFormat = nil; tools = nil; toolCalls = nil; assets = nil
+
+        case .response(let r):
+            role = .response
+            assets = r.assetIDs
+            contents = try r.segments.map(SegmentCoding.init)
+            options = nil; responseFormat = nil; tools = nil; toolCalls = nil; toolName = nil; toolCallID = nil
         }
     }
-    
+
+    // MARK: Decode
+
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        role = try c.decode(Role.self, forKey: .role)
+        contents = try c.decodeIfPresent([SegmentCoding].self, forKey: .contents)
+        options = try c.decodeIfPresent(GenerationOptionsCoding.self, forKey: .options)
+        responseFormat = try c.decodeIfPresent(ResponseFormatCoding.self, forKey: .responseFormat)
+        tools = try c.decodeIfPresent([ToolDefinitionCoding].self, forKey: .tools)
+        toolCalls = try c.decodeIfPresent([ToolCallCoding].self, forKey: .toolCalls)
+        assets = try c.decodeIfPresent([String].self, forKey: .assets)
+        toolName = try c.decodeIfPresent(String.self, forKey: .toolName)
+        toolCallID = try c.decodeIfPresent(String.self, forKey: .toolCallID)
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(role, forKey: .role)
+        try c.encodeIfPresent(contents, forKey: .contents)
+        try c.encodeIfPresent(options, forKey: .options)
+        try c.encodeIfPresent(responseFormat, forKey: .responseFormat)
+        try c.encodeIfPresent(tools, forKey: .tools)
+        try c.encodeIfPresent(toolCalls, forKey: .toolCalls)
+        try c.encodeIfPresent(assets, forKey: .assets)
+        try c.encodeIfPresent(toolName, forKey: .toolName)
+        try c.encodeIfPresent(toolCallID, forKey: .toolCallID)
+    }
+
     func toEntry() throws -> Transcript.Entry {
-        switch type {
+        switch role {
         case .instructions:
-            guard let segments = segments, let toolDefinitions = toolDefinitions else {
-                throw DecodingError.dataCorrupted(DecodingError.Context(
-                    codingPath: [],
-                    debugDescription: "Missing segments or toolDefinitions for instructions"
-                ))
-            }
-            let decodedSegments = try segments.map { try $0.toSegment() }
-            let decodedToolDefinitions = try toolDefinitions.map { try $0.toToolDefinition() }
-            return .instructions(Transcript.Instructions(
-                id: id,
-                segments: decodedSegments,
-                toolDefinitions: decodedToolDefinitions
-            ))
-            
-        case .prompt:
-            guard let segments = segments, let options = options else {
-                throw DecodingError.dataCorrupted(DecodingError.Context(
-                    codingPath: [],
-                    debugDescription: "Missing segments or options for prompt"
-                ))
-            }
-            let decodedSegments = try segments.map { try $0.toSegment() }
-            let decodedOptions = try options.toGenerationOptions()
-            let decodedResponseFormat = try responseFormat?.toResponseFormat()
-            return .prompt(Transcript.Prompt(
-                id: id,
-                segments: decodedSegments,
-                options: decodedOptions,
-                responseFormat: decodedResponseFormat
-            ))
-            
+            let segs = try (contents ?? []).map { try $0.toSegment() }
+            let toolDefs = (tools ?? []).map { $0.toToolDefinition() }
+            return .instructions(Transcript.Instructions(id: id, segments: segs, toolDefinitions: toolDefs))
+
+        case .user:
+            let segs = try (contents ?? []).map { try $0.toSegment() }
+            let opts = try options?.toGenerationOptions() ?? GenerationOptions()
+            let fmt = try responseFormat?.toResponseFormat()
+            return .prompt(Transcript.Prompt(id: id, segments: segs, options: opts, responseFormat: fmt))
+
         case .response:
-            guard let segments = segments, let assetIDs = assetIDs else {
-                throw DecodingError.dataCorrupted(DecodingError.Context(
-                    codingPath: [],
-                    debugDescription: "Missing segments or assetIDs for response"
-                ))
+            if let calls = toolCalls {
+                let decoded = try calls.map { try $0.toToolCall() }
+                return .toolCalls(Transcript.ToolCalls(id: id, decoded))
+            } else {
+                let segs = try (contents ?? []).map { try $0.toSegment() }
+                return .response(Transcript.Response(id: id, assetIDs: assets ?? [], segments: segs))
             }
-            let decodedSegments = try segments.map { try $0.toSegment() }
-            return .response(Transcript.Response(
-                id: id,
-                assetIDs: assetIDs,
-                segments: decodedSegments
-            ))
-            
-        case .toolCalls:
-            guard let calls = calls else {
-                throw DecodingError.dataCorrupted(DecodingError.Context(
-                    codingPath: [],
-                    debugDescription: "Missing calls for toolCalls"
-                ))
+
+        case .tool:
+            guard let name = toolName else {
+                throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "toolOutput missing toolName"))
             }
-            let decodedCalls = try calls.map { try $0.toToolCall() }
-            return .toolCalls(Transcript.ToolCalls(id: id, decodedCalls))
-            
-        case .toolOutput:
-            guard let segments = segments, let toolName = toolName else {
-                throw DecodingError.dataCorrupted(DecodingError.Context(
-                    codingPath: [],
-                    debugDescription: "Missing segments or toolName for toolOutput"
-                ))
-            }
-            let decodedSegments = try segments.map { try $0.toSegment() }
-            return .toolOutput(Transcript.ToolOutput(
-                id: id,
-                toolName: toolName,
-                segments: decodedSegments
-            ))
+            let segs = try (contents ?? []).map { try $0.toSegment() }
+            return .toolOutput(Transcript.ToolOutput(id: id, toolName: name, segments: segs))
         }
     }
 }
+
+// MARK: - Segment
 
 private struct SegmentCoding: Codable {
-    enum SegmentType: String, Codable {
-        case text
-        case structure
-        case image
+
+    private enum SegmentType: String, Codable {
+        case text, structure, image
     }
 
-    let type: SegmentType
-    let id: String
-    let content: String?
-    let source: String?
-    let generatedContent: GeneratedContent?
-    let imageSource: ImageSourceCoding?
-
-    init(from segment: Transcript.Segment) throws {
-        self.id = segment.id
-
-        switch segment {
-        case .text(let textSegment):
-            self.type = .text
-            self.content = textSegment.content
-            self.source = nil
-            self.generatedContent = nil
-            self.imageSource = nil
-
-        case .structure(let structuredSegment):
-            self.type = .structure
-            self.content = nil
-            self.source = structuredSegment.source
-            self.generatedContent = structuredSegment.content
-            self.imageSource = nil
-
-        case .image(let imageSegment):
-            self.type = .image
-            self.content = nil
-            self.source = nil
-            self.generatedContent = nil
-            self.imageSource = ImageSourceCoding(from: imageSegment.source)
-        }
+    private enum CodingKeys: String, CodingKey {
+        case id, type, text, structure, image
     }
 
-    func toSegment() throws -> Transcript.Segment {
+    private enum StructureKeys: String, CodingKey {
+        case content, source
+    }
+
+    private enum ImageKeys: String, CodingKey {
+        case sourceType, data, mediaType, url
+    }
+
+    let segment: Transcript.Segment
+
+    init(_ segment: Transcript.Segment) throws {
+        self.segment = segment
+    }
+
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let id = try c.decode(String.self, forKey: .id)
+        let type = try c.decode(SegmentType.self, forKey: .type)
         switch type {
         case .text:
-            guard let content = content else {
-                throw DecodingError.dataCorrupted(DecodingError.Context(
-                    codingPath: [],
-                    debugDescription: "Missing content for text segment"
-                ))
-            }
-            return .text(Transcript.TextSegment(id: id, content: content))
+            let text = try c.decode(String.self, forKey: .text)
+            segment = .text(Transcript.TextSegment(id: id, content: text))
 
         case .structure:
-            guard let source = source, let generatedContent = generatedContent else {
-                throw DecodingError.dataCorrupted(DecodingError.Context(
-                    codingPath: [],
-                    debugDescription: "Missing source or generatedContent for structured segment"
-                ))
-            }
-            return .structure(Transcript.StructuredSegment(
-                id: id,
-                source: source,
-                content: generatedContent
-            ))
+            let nested = try c.nestedContainer(keyedBy: StructureKeys.self, forKey: .structure)
+            let source = try nested.decode(String.self, forKey: .source)
+            let content = try nested.decode(GeneratedContent.self, forKey: .content)
+            segment = .structure(Transcript.StructuredSegment(id: id, source: source, content: content))
 
         case .image:
-            guard let imageSource = imageSource else {
-                throw DecodingError.dataCorrupted(DecodingError.Context(
-                    codingPath: [],
-                    debugDescription: "Missing imageSource for image segment"
-                ))
+            let nested = try c.nestedContainer(keyedBy: ImageKeys.self, forKey: .image)
+            let sourceType = try nested.decode(String.self, forKey: .sourceType)
+            if sourceType == "base64" {
+                let data = try nested.decode(String.self, forKey: .data)
+                let mediaType = try nested.decode(String.self, forKey: .mediaType)
+                segment = .image(Transcript.ImageSegment(id: id, source: .base64(data: data, mediaType: mediaType)))
+            } else {
+                let url = try nested.decode(URL.self, forKey: .url)
+                segment = .image(Transcript.ImageSegment(id: id, source: .url(url)))
             }
-            return .image(Transcript.ImageSegment(
-                id: id,
-                source: try imageSource.toImageSource()
-            ))
         }
     }
+
+    func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(segment.id, forKey: .id)
+        switch segment {
+        case .text(let t):
+            try c.encode(SegmentType.text, forKey: .type)
+            try c.encode(t.content, forKey: .text)
+
+        case .structure(let s):
+            try c.encode(SegmentType.structure, forKey: .type)
+            var nested = c.nestedContainer(keyedBy: StructureKeys.self, forKey: .structure)
+            try nested.encode(s.source, forKey: .source)
+            try nested.encode(s.content, forKey: .content)
+
+        case .image(let img):
+            try c.encode(SegmentType.image, forKey: .type)
+            var nested = c.nestedContainer(keyedBy: ImageKeys.self, forKey: .image)
+            switch img.source {
+            case .base64(let data, let mediaType):
+                try nested.encode("base64", forKey: .sourceType)
+                try nested.encode(data, forKey: .data)
+                try nested.encode(mediaType, forKey: .mediaType)
+            case .url(let url):
+                try nested.encode("url", forKey: .sourceType)
+                try nested.encode(url, forKey: .url)
+            }
+        }
+    }
+
+    func toSegment() throws -> Transcript.Segment { segment }
 }
 
-private struct ImageSourceCoding: Codable {
-    enum SourceType: String, Codable {
-        case base64
-        case url
+// MARK: - Tool Definition
+
+private struct ToolDefinitionCoding: Codable {
+
+    private enum CodingKeys: String, CodingKey {
+        case type, function
     }
 
-    let type: SourceType
-    let data: String?
-    let mediaType: String?
-    let url: URL?
-
-    init(from source: Transcript.ImageSegment.ImageSource) {
-        switch source {
-        case .base64(let data, let mediaType):
-            self.type = .base64
-            self.data = data
-            self.mediaType = mediaType
-            self.url = nil
-        case .url(let url):
-            self.type = .url
-            self.data = nil
-            self.mediaType = nil
-            self.url = url
-        }
+    private enum FunctionKeys: String, CodingKey {
+        case name, description, parameters
     }
 
-    func toImageSource() throws -> Transcript.ImageSegment.ImageSource {
-        switch type {
-        case .base64:
-            guard let data = data, let mediaType = mediaType else {
-                throw DecodingError.dataCorrupted(DecodingError.Context(
-                    codingPath: [],
-                    debugDescription: "Missing data or mediaType for base64 image source"
-                ))
-            }
-            return .base64(data: data, mediaType: mediaType)
-        case .url:
-            guard let url = url else {
-                throw DecodingError.dataCorrupted(DecodingError.Context(
-                    codingPath: [],
-                    debugDescription: "Missing url for url image source"
-                ))
-            }
-            return .url(url)
-        }
+    let definition: Transcript.ToolDefinition
+
+    init(_ definition: Transcript.ToolDefinition) {
+        self.definition = definition
     }
+
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let nested = try c.nestedContainer(keyedBy: FunctionKeys.self, forKey: .function)
+        let name = try nested.decode(String.self, forKey: .name)
+        let description = try nested.decode(String.self, forKey: .description)
+        let parameters = try nested.decode(GenerationSchema.self, forKey: .parameters)
+        definition = Transcript.ToolDefinition(name: name, description: description, parameters: parameters)
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode("function", forKey: .type)
+        var nested = c.nestedContainer(keyedBy: FunctionKeys.self, forKey: .function)
+        try nested.encode(definition.name, forKey: .name)
+        try nested.encode(definition.description, forKey: .description)
+        try nested.encode(definition.parameters, forKey: .parameters)
+    }
+
+    func toToolDefinition() -> Transcript.ToolDefinition { definition }
 }
+
+// MARK: - Tool Call
+
+private struct ToolCallCoding: Codable {
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, arguments
+    }
+
+    let call: Transcript.ToolCall
+
+    init(_ call: Transcript.ToolCall) throws {
+        self.call = call
+    }
+
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let id = try c.decode(String.self, forKey: .id)
+        let name = try c.decode(String.self, forKey: .name)
+        let argumentsJSON = try c.decode(String.self, forKey: .arguments)
+        let arguments = try GeneratedContent(json: argumentsJSON)
+        call = Transcript.ToolCall(id: id, toolName: name, arguments: arguments)
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(call.id, forKey: .id)
+        try c.encode(call.toolName, forKey: .name)
+        // Encode arguments as JSON string
+        let data = try JSONEncoder().encode(call.arguments)
+        let jsonString = String(data: data, encoding: .utf8) ?? "{}"
+        try c.encode(jsonString, forKey: .arguments)
+    }
+
+    func toToolCall() throws -> Transcript.ToolCall { call }
+}
+
+// MARK: - Generation Options
 
 private struct GenerationOptionsCoding: Codable {
-    enum SamplingModeCoding: Codable {
-        case greedy
-        case topK(k: Int, seed: UInt64?)
-        case topP(threshold: Double, seed: UInt64?)
-        
-        enum CodingKeys: String, CodingKey {
-            case type
-            case k
-            case threshold
-            case seed
-        }
-        
-        init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let type = try container.decode(String.self, forKey: .type)
-            
-            switch type {
-            case "greedy":
-                self = .greedy
-            case "topK":
-                let k = try container.decode(Int.self, forKey: .k)
-                let seed = try container.decodeIfPresent(UInt64.self, forKey: .seed)
-                self = .topK(k: k, seed: seed)
-            case "topP":
-                let threshold = try container.decode(Double.self, forKey: .threshold)
-                let seed = try container.decodeIfPresent(UInt64.self, forKey: .seed)
-                self = .topP(threshold: threshold, seed: seed)
-            default:
-                throw DecodingError.dataCorrupted(DecodingError.Context(
-                    codingPath: [],
-                    debugDescription: "Unknown sampling mode type: \(type)"
-                ))
-            }
-        }
-        
-        func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            
-            switch self {
-            case .greedy:
-                try container.encode("greedy", forKey: .type)
-            case .topK(let k, let seed):
-                try container.encode("topK", forKey: .type)
-                try container.encode(k, forKey: .k)
-                try container.encodeIfPresent(seed, forKey: .seed)
-            case .topP(let threshold, let seed):
-                try container.encode("topP", forKey: .type)
-                try container.encode(threshold, forKey: .threshold)
-                try container.encodeIfPresent(seed, forKey: .seed)
-            }
-        }
+
+    private enum CodingKeys: String, CodingKey {
+        case temperature, maximumResponseTokens
     }
-    
-    let sampling: SamplingModeCoding?
+
     let temperature: Double?
     let maximumResponseTokens: Int?
-    
-    init(from options: GenerationOptions) {
-        if let samplingMode = options.sampling {
-            let modeString = String(describing: samplingMode)
-            if modeString.contains("greedy") {
-                self.sampling = .greedy
-            } else if modeString.contains("topK") {
-                self.sampling = .topK(k: 10, seed: nil)
-            } else if modeString.contains("topP") {
-                self.sampling = .topP(threshold: 0.9, seed: nil)
-            } else {
-                self.sampling = nil
-            }
-        } else {
-            self.sampling = nil
-        }
-        self.temperature = options.temperature
-        self.maximumResponseTokens = options.maximumResponseTokens
+
+    init(_ options: GenerationOptions) {
+        temperature = options.temperature
+        maximumResponseTokens = options.maximumResponseTokens
     }
-    
+
     func toGenerationOptions() throws -> GenerationOptions {
-        var samplingMode: GenerationOptions.SamplingMode?
-        
-        if let sampling = sampling {
-            switch sampling {
-            case .greedy:
-                samplingMode = .greedy
-            case .topK(let k, let seed):
-                samplingMode = .random(top: k, seed: seed)
-            case .topP(let threshold, let seed):
-                samplingMode = .random(probabilityThreshold: threshold, seed: seed)
-            }
-        }
-        
-        return GenerationOptions(
-            sampling: samplingMode,
-            temperature: temperature,
-            maximumResponseTokens: maximumResponseTokens
-        )
+        GenerationOptions(temperature: temperature, maximumResponseTokens: maximumResponseTokens)
     }
 }
 
+// MARK: - Response Format
+
 private struct ResponseFormatCoding: Codable {
+
+    private enum CodingKeys: String, CodingKey {
+        case name, type, schema
+    }
+
     let name: String
     let type: String?
     let schema: GenerationSchema?
-    
-    init(from responseFormat: Transcript.ResponseFormat) {
-        self.name = responseFormat.name
-        self.type = responseFormat.type
-        self.schema = responseFormat.schema
+
+    init(_ format: Transcript.ResponseFormat) {
+        name = format.name
+        type = format.type
+        schema = format.schema
     }
-    
+
     func toResponseFormat() throws -> Transcript.ResponseFormat {
-        if let schema = schema {
-            var format = Transcript.ResponseFormat(schema: schema)
-            if name != "schema-based" {
-                format.name = name
-            }
-            if let originalType = type {
-                format.type = originalType
-            }
-            return format
-        } else {
-            var format = Transcript.ResponseFormat(schema: GenerationSchema(
-                type: String.self,
-                description: nil,
-                properties: []
-            ))
-            format.name = name
-            format.type = type
-            return format
+        if let schema {
+            var fmt = Transcript.ResponseFormat(schema: schema)
+            fmt.name = name
+            if let t = type { fmt.type = t }
+            return fmt
         }
-    }
-}
-
-private struct ToolDefinitionCoding: Codable {
-    let name: String
-    let description: String
-    let parameters: GenerationSchema
-    
-    init(from toolDefinition: Transcript.ToolDefinition) throws {
-        self.name = toolDefinition.name
-        self.description = toolDefinition.description
-        self.parameters = toolDefinition.parameters
-    }
-    
-    func toToolDefinition() throws -> Transcript.ToolDefinition {
-        return Transcript.ToolDefinition(
-            name: name,
-            description: description,
-            parameters: parameters
-        )
-    }
-}
-
-private struct ToolCallCoding: Codable {
-    let id: String
-    let toolName: String
-    let arguments: GeneratedContent
-    
-    init(from toolCall: Transcript.ToolCall) throws {
-        self.id = toolCall.id
-        self.toolName = toolCall.toolName
-        self.arguments = toolCall.arguments
-    }
-    
-    func toToolCall() throws -> Transcript.ToolCall {
-        return Transcript.ToolCall(
-            id: id,
-            toolName: toolName,
-            arguments: arguments
-        )
+        var fmt = Transcript.ResponseFormat(schema: GenerationSchema(type: String.self, description: nil, properties: []))
+        fmt.name = name
+        fmt.type = type
+        return fmt
     }
 }

@@ -45,21 +45,21 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         self.init(model: model)
         self.tools = tools
         if let instructions = instructions {
-            var instructionContent = instructions.content
-            
-            // Add tool schemas to the instructions
+            var instructionSegments = instructions.segments
+
+            // Append tool schemas as an additional text segment
             let toolInstructions = formatToolInstructions(for: tools)
             if !toolInstructions.isEmpty {
-                instructionContent += toolInstructions
+                instructionSegments.append(.text(Transcript.TextSegment(
+                    id: UUID().uuidString,
+                    content: toolInstructions
+                )))
             }
-            
+
             let instructionEntry = Transcript.Entry.instructions(
                 Transcript.Instructions(
                     id: UUID().uuidString,
-                    segments: [.text(Transcript.TextSegment(
-                        id: UUID().uuidString,
-                        content: instructionContent
-                    ))],
+                    segments: instructionSegments,
                     toolDefinitions: tools.map { Transcript.ToolDefinition(tool: $0) }
                 )
             )
@@ -121,16 +121,15 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         @PromptBuilder prompt: () throws -> Prompt
     ) async throws -> Response<String> {
         let promptValue = try prompt()
-        let promptText = promptValue.content
-        
+
         _isResponding = true
         defer { _isResponding = false }
-        
+
         // Add prompt to transcript
         let promptEntry = Transcript.Entry.prompt(
             Transcript.Prompt(
                 id: UUID().uuidString,
-                segments: [.text(Transcript.TextSegment(id: UUID().uuidString, content: promptText))],
+                segments: promptValue.segments,
                 options: options,
                 responseFormat: nil
             )
@@ -288,16 +287,15 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         @PromptBuilder prompt: () throws -> Prompt
     ) async throws -> Response<GeneratedContent> {
         let promptValue = try prompt()
-        let promptText = promptValue.content
-        
+
         _isResponding = true
         defer { _isResponding = false }
-        
+
         // Add prompt to transcript
         let promptEntry = Transcript.Entry.prompt(
             Transcript.Prompt(
                 id: UUID().uuidString,
-                segments: [.text(Transcript.TextSegment(id: UUID().uuidString, content: promptText))],
+                segments: promptValue.segments,
                 options: options,
                 responseFormat: includeSchemaInPrompt ? Transcript.ResponseFormat(schema: schema) : nil
             )
@@ -403,16 +401,15 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         @PromptBuilder prompt: () throws -> Prompt
     ) async throws -> Response<Content> {
         let promptValue = try prompt()
-        let promptText = promptValue.content
-        
+
         _isResponding = true
         defer { _isResponding = false }
-        
+
         // Add prompt to transcript
         let promptEntry = Transcript.Entry.prompt(
             Transcript.Prompt(
                 id: UUID().uuidString,
-                segments: [.text(Transcript.TextSegment(id: UUID().uuidString, content: promptText))],
+                segments: promptValue.segments,
                 options: options,
                 responseFormat: includeSchemaInPrompt ? Transcript.ResponseFormat(type: Content.self) : nil
             )
@@ -503,7 +500,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
     ) rethrows -> sending ResponseStream<String> {
         let promptValue = try prompt()
         appendPromptEntry(
-            promptText: promptValue.content,
+            segments: promptValue.segments,
             options: options,
             responseFormat: nil
         )
@@ -567,7 +564,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
     ) rethrows -> sending ResponseStream<GeneratedContent> {
         let promptValue = try prompt()
         appendPromptEntry(
-            promptText: promptValue.content,
+            segments: promptValue.segments,
             options: options,
             responseFormat: includeSchemaInPrompt ? Transcript.ResponseFormat(schema: schema) : nil
         )
@@ -613,7 +610,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
     ) rethrows -> sending ResponseStream<Content> {
         let promptValue = try prompt()
         appendPromptEntry(
-            promptText: promptValue.content,
+            segments: promptValue.segments,
             options: options,
             responseFormat: includeSchemaInPrompt ? Transcript.ResponseFormat(type: Content.self) : nil
         )
@@ -818,14 +815,14 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
     }
 
     private func appendPromptEntry(
-        promptText: String,
+        segments: [Transcript.Segment],
         options: GenerationOptions,
         responseFormat: Transcript.ResponseFormat?
     ) {
         let promptEntry = Transcript.Entry.prompt(
             Transcript.Prompt(
                 id: UUID().uuidString,
-                segments: [.text(Transcript.TextSegment(id: UUID().uuidString, content: promptText))],
+                segments: segments,
                 options: options,
                 responseFormat: responseFormat
             )
@@ -857,14 +854,14 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         guard callsArray.count > 1 else {
             for toolCall in callsArray {
                 let output = try await executeToolCall(toolCall)
-                appendToolOutput(toolCall: toolCall, output: output)
+                appendToolOutput(toolCall: toolCall, segments: output)
             }
             return
         }
 
         // Multiple tool calls: parallel execution with best-effort collection
         let results = await withTaskGroup(
-            of: (Int, Transcript.ToolCall, Result<String, Error>).self
+            of: (Int, Transcript.ToolCall, Result<[Transcript.Segment], Error>).self
         ) { group in
             for (index, toolCall) in callsArray.enumerated() {
                 group.addTask {
@@ -876,7 +873,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                     }
                 }
             }
-            var collected: [(Int, Transcript.ToolCall, Result<String, Error>)] = []
+            var collected: [(Int, Transcript.ToolCall, Result<[Transcript.Segment], Error>)] = []
             for await result in group {
                 collected.append(result)
             }
@@ -899,24 +896,24 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         // Append results to transcript (success = normal output, failure = error message)
         for (_, toolCall, result) in sorted {
             switch result {
-            case .success(let output):
-                appendToolOutput(toolCall: toolCall, output: output)
+            case .success(let segments):
+                appendToolOutput(toolCall: toolCall, segments: segments)
             case .failure(let error):
-                let errorMessage = "[Tool Error] \(toolCall.toolName): \(error.localizedDescription)"
-                appendToolOutput(toolCall: toolCall, output: errorMessage)
+                let errorSegments: [Transcript.Segment] = [.text(Transcript.TextSegment(
+                    id: UUID().uuidString,
+                    content: "[Tool Error] \(toolCall.toolName): \(error.localizedDescription)"
+                ))]
+                appendToolOutput(toolCall: toolCall, segments: errorSegments)
             }
         }
     }
 
-    private func appendToolOutput(toolCall: Transcript.ToolCall, output: String) {
+    private func appendToolOutput(toolCall: Transcript.ToolCall, segments: [Transcript.Segment]) {
         let outputEntry = Transcript.Entry.toolOutput(
             Transcript.ToolOutput(
                 id: UUID().uuidString,
                 toolName: toolCall.toolName,
-                segments: [.text(Transcript.TextSegment(
-                    id: UUID().uuidString,
-                    content: output
-                ))]
+                segments: segments
             )
         )
         var entries = _transcript.entries
@@ -954,8 +951,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         )
     }
     
-    private func executeToolCall(_ toolCall: Transcript.ToolCall) async throws -> String {
-        // Find the tool instance from available tools
+    private func executeToolCall(_ toolCall: Transcript.ToolCall) async throws -> [Transcript.Segment] {
         guard let tool = self.tools.first(where: { $0.name == toolCall.toolName }) else {
             throw GenerationError.decodingFailure(
                 GenerationError.Context(
@@ -965,20 +961,18 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         }
 
         do {
-            // Use a helper method that can handle the existential type
-            return try await executeToolWithHelper(tool, arguments: toolCall.arguments)
-
+            return try await callTool(tool, arguments: toolCall.arguments)
         } catch let error as ToolCallError {
             throw error
         } catch {
             throw ToolCallError(tool: tool, underlyingError: error)
         }
     }
-    
-    private func executeToolWithHelper<T: Tool>(_ tool: T, arguments: GeneratedContent) async throws -> String {
+
+    private func callTool<T: Tool>(_ tool: T, arguments: GeneratedContent) async throws -> [Transcript.Segment] {
         let typedArguments = try T.Arguments(arguments)
         let output = try await tool.call(arguments: typedArguments)
-        return output.promptRepresentation.content
+        return output.promptRepresentation.segments
     }
     
     private func formatToolInstructions(for tools: [any Tool]) -> String {

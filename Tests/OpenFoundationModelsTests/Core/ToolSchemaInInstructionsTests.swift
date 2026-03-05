@@ -96,13 +96,15 @@ struct ToolSchemaInInstructionsTests {
 
         let entry = try #require(instructionsEntry)
 
-        guard case .instructions(let data) = entry,
-              case .text(let text) = data.segments.first else {
-            Issue.record("Expected text segment in instructions")
+        guard case .instructions(let data) = entry else {
+            Issue.record("Expected instructions entry")
             return ""
         }
 
-        return text.content
+        return data.segments.compactMap { segment -> String? in
+            if case .text(let text) = segment { return text.content }
+            return nil
+        }.joined(separator: "\n")
     }
 
     // MARK: - Tests
