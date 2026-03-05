@@ -8,6 +8,33 @@
 
 import Foundation
 import OpenFoundationModels
+import OpenFoundationModelsCore
+
+// MARK: - Prompt
+
+extension Prompt {
+    /// Public access to transcript segments for provider implementations.
+    ///
+    /// Converts the prompt's components to transcript segments so that
+    /// provider-specific request builders can consume them.
+    public var _segments: [Transcript.Segment] {
+        return segments
+    }
+}
+
+// MARK: - Instructions
+
+extension Instructions {
+    /// Public access to transcript segments for provider implementations.
+    ///
+    /// Converts the instructions' components to transcript segments so that
+    /// provider-specific request builders can consume them.
+    public var _segments: [Transcript.Segment] {
+        return segments
+    }
+}
+
+// MARK: - Transcript
 
 extension Transcript {
     /// Access to internal entries for provider implementations
