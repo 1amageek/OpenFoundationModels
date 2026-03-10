@@ -534,10 +534,40 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         options: GenerationOptions = GenerationOptions()
     ) -> sending ResponseStream<GeneratedContent> {
         return streamResponse(
+            to: Prompt(prompt),
             schema: schema,
             includeSchemaInPrompt: includeSchemaInPrompt,
             options: options
-        ) { Prompt(prompt) }
+        )
+    }
+
+    /// Produces a response stream to a prompt and schema.
+    ///
+    /// Consider using the default value of `true` for `includeSchemaInPrompt`.
+    /// The exception to the rule is when the model has knowledge about the expected response format, either
+    /// because it has been trained on it, or because it has seen exhaustive examples during this session.
+    ///
+    /// - Important: If running in the background, use the non-streaming
+    /// ``LanguageModelSession/respond(to:options:)`` method to
+    /// reduce the likelihood of encountering ``LanguageModelSession/GenerationError/rateLimited(_:)`` errors.
+    ///
+    /// - Parameters:
+    ///   - prompt: A prompt for the model to respond to.
+    ///   - schema: A schema to guide the output with.
+    ///   - includeSchemaInPrompt: Inject the schema into the prompt to bias the model.
+    ///   - options: Options that control how tokens are sampled from the distribution the model produces.
+    /// - Returns: A response stream that produces ``GeneratedContent`` containing the fields and values defined in the schema.
+    public final func streamResponse(
+        to prompt: Prompt,
+        schema: GenerationSchema,
+        includeSchemaInPrompt: Bool = true,
+        options: GenerationOptions = GenerationOptions()
+    ) -> sending ResponseStream<GeneratedContent> {
+        return streamResponse(
+            schema: schema,
+            includeSchemaInPrompt: includeSchemaInPrompt,
+            options: options
+        ) { prompt }
     }
 
     /// Produces a response stream to a prompt and schema.
