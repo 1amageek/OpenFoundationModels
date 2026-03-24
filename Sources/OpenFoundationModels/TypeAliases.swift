@@ -1,6 +1,6 @@
 import Foundation
-@_exported import OpenFoundationModelsCore
-@_exported import OpenFoundationModelsMacros
+@_exported @_spi(Internal) import Generation
+@_exported import GenerationMacros
 
 public typealias Response = LanguageModelSession.Response
 public typealias ResponseStream = LanguageModelSession.ResponseStream

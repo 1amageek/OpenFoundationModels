@@ -1,5 +1,5 @@
 import Foundation
-import OpenFoundationModelsCore
+@_spi(Internal) import Generation
 
 /// A record of the conversation between the user and the language model.
 ///

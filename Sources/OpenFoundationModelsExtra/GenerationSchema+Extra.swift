@@ -7,7 +7,8 @@
 //
 
 import Foundation
-import OpenFoundationModelsCore
+@_spi(Internal) import Generation
+import OpenFoundationModels
 @_exported import JSONSchema
 
 extension GenerationSchema {

@@ -1,5 +1,5 @@
 import OpenFoundationModels
-import OpenFoundationModelsCore
+import OpenFoundationModels
 
 /// A type that builds a backend-specific API request from a `Transcript`.
 ///

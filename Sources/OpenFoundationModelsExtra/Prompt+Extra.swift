@@ -1,5 +1,5 @@
 import Foundation
-import OpenFoundationModelsCore
+import OpenFoundationModels
 
 /// A public image type for use in `PromptBuilder`.
 ///

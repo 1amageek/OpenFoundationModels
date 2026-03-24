@@ -47,7 +47,10 @@
       "Bash(gh repo list:*)",
       "Bash(gh repo view:*)",
       "Bash(gh api:*)",
-      "Bash(gh repo edit:*)"
+      "Bash(gh repo edit:*)",
+      "Bash(xcrun:*)",
+      "Bash(xcodebuild test:*)",
+      "Bash(xcodebuild:*)"
     ],
     "deny": [],
     "additionalDirectories": [

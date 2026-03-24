@@ -8,7 +8,7 @@
 
 import Foundation
 import OpenFoundationModels
-import OpenFoundationModelsCore
+import OpenFoundationModels
 
 // MARK: - Prompt
 

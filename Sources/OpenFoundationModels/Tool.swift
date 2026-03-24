@@ -1,5 +1,5 @@
 import Foundation
-import OpenFoundationModelsCore
+import Generation
 
 public protocol Tool<Arguments, Output>: Sendable, SendableMetatype {
     associatedtype Output: PromptRepresentable

@@ -1,6 +1,6 @@
 
 import Foundation
-import OpenFoundationModelsCore
+@_spi(Internal) import Generation
 
 public final class LanguageModelSession: Observable, @unchecked Sendable {
     
@@ -23,7 +23,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         self.init(
             model: model,
             tools: tools,
-            instructions: instructions.map { OpenFoundationModelsCore.Instructions($0) }
+            instructions: instructions.map { Instructions($0) }
         )
     }
     public convenience init(

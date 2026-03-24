@@ -1,5 +1,5 @@
 import OpenFoundationModels
-import OpenFoundationModelsCore
+import OpenFoundationModels
 
 /// A structured representation of a Transcript with tool calls and outputs paired.
 ///

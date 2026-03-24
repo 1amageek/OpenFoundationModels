@@ -1,6 +1,6 @@
 import Foundation
 import OpenFoundationModels
-import OpenFoundationModelsCore
+import OpenFoundationModels
 import JSONSchema
 
 extension GeneratedContent {

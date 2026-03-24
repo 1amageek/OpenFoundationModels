@@ -1,5 +1,5 @@
 import Foundation
-import OpenFoundationModelsCore
+import Generation
 
 // MARK: - Transcript: Codable
 

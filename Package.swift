@@ -1,7 +1,6 @@
 // swift-tools-version: 6.2
 
 import PackageDescription
-import CompilerPluginSupport
 
 let package = Package(
     name: "OpenFoundationModels",
@@ -13,54 +12,27 @@ let package = Package(
     ],
     products: [
         .library(
-            name: "OpenFoundationModelsCore",
-            targets: ["OpenFoundationModelsCore"]),
-        .library(
             name: "OpenFoundationModels",
             targets: ["OpenFoundationModels"]),
-        .library(
-            name: "OpenFoundationModelsMacros",
-            targets: ["OpenFoundationModelsMacros"]),
         .library(
             name: "OpenFoundationModelsExtra",
             targets: ["OpenFoundationModelsExtra"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "602.0.0"),
+        .package(path: "../swift-generation"),
         .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.1.1"),
         .package(url: "https://github.com/mattt/JSONSchema.git", from: "1.0.0"),
     ],
     targets: [
         .target(
-            name: "OpenFoundationModelsCore",
-            dependencies: []
-        ),
-        
-        .target(
             name: "OpenFoundationModels",
             dependencies: [
-                "OpenFoundationModelsCore",
-                "OpenFoundationModelsMacros",
+                .product(name: "Generation", package: "swift-generation"),
+                .product(name: "GenerationMacros", package: "swift-generation"),
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
             ]
         ),
-        
-        .macro(
-            name: "OpenFoundationModelsMacrosImpl",
-            dependencies: [
-                .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
-                .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
-            ]
-        ),
-        
-        .target(
-            name: "OpenFoundationModelsMacros",
-            dependencies: [
-                "OpenFoundationModelsMacrosImpl",
-                "OpenFoundationModelsCore"
-            ]
-        ),
-        
+
         .target(
             name: "OpenFoundationModelsExtra",
             dependencies: [
@@ -68,7 +40,7 @@ let package = Package(
                 .product(name: "JSONSchema", package: "JSONSchema"),
             ]
         ),
-        
+
         .testTarget(
             name: "OpenFoundationModelsTests",
             dependencies: ["OpenFoundationModels"]
@@ -79,7 +51,7 @@ let package = Package(
             dependencies: [
                 "OpenFoundationModelsExtra",
                 "OpenFoundationModels",
-                "OpenFoundationModelsMacros",
+                .product(name: "GenerationMacros", package: "swift-generation"),
             ]
         )
     ]
