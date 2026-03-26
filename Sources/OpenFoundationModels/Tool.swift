@@ -14,7 +14,7 @@ public protocol Tool<Arguments, Output>: Sendable, SendableMetatype {
     
     var parameters: GenerationSchema { get }
     
-    func call(arguments: Arguments) async throws -> Output
+    @concurrent func call(arguments: Arguments) async throws -> Output
 }
 
 extension Tool {
