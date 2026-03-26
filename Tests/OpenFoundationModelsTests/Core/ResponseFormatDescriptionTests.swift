@@ -1,7 +1,6 @@
 import Testing
 import Foundation
 @testable import OpenFoundationModels
-import OpenFoundationModelsMacros
 
 @Generable
 private struct DescTestProfile {

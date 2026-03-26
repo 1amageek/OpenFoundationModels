@@ -1,7 +1,6 @@
 import Foundation
 import Testing
 @testable import OpenFoundationModels
-import OpenFoundationModelsMacros
 
 @Suite("Tool Schema in Instructions Tests")
 struct ToolSchemaInInstructionsTests {

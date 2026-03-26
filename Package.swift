@@ -51,7 +51,6 @@ let package = Package(
             dependencies: [
                 "OpenFoundationModelsExtra",
                 "OpenFoundationModels",
-                .product(name: "GenerationMacros", package: "swift-generation"),
             ]
         )
     ]

@@ -1,8 +1,7 @@
 import Testing
 import Foundation
 @testable import OpenFoundationModels
-@testable import OpenFoundationModelsCore
-import OpenFoundationModelsMacros
+@testable import Generation
 
 @Suite("GenerationSchema JSON Schema Tests", .tags(.schema, .unit))
 struct GenerationSchemaJSONSchemaTests {

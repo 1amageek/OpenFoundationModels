@@ -2,7 +2,6 @@
 import Foundation
 import Testing
 @testable import OpenFoundationModels
-import OpenFoundationModelsMacros
 
 @Suite("Basic Tool Tests")
 struct BasicToolTests {
