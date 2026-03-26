@@ -1,6 +1,5 @@
 import Foundation
 @_exported @_spi(Internal) import Generation
-@_exported import GenerationMacros
 
 public typealias Response = LanguageModelSession.Response
 public typealias ResponseStream = LanguageModelSession.ResponseStream
