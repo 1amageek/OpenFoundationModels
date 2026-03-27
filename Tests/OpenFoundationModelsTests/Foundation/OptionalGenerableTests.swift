@@ -1,5 +1,5 @@
 import Testing
-import OpenFoundationModelsCore
+@_spi(Internal) import Generation
 @testable import OpenFoundationModels
 
 @Test

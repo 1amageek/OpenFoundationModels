@@ -1,4 +1,5 @@
 import Foundation
+@_spi(Internal) import Generation
 
 /// An image attachment that can be included in a multimodal ``Prompt`` or ``Instructions``.
 ///

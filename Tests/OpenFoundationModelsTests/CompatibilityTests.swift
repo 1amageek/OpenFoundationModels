@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 @testable import OpenFoundationModels
-@testable import OpenFoundationModelsCore
+@_spi(Internal) @testable import Generation
 
 @Suite("Apple API Compatibility Tests")
 struct CompatibilityTests {

@@ -2,7 +2,7 @@
 import Foundation
 import Testing
 @testable import OpenFoundationModels
-@testable import OpenFoundationModelsCore
+@_spi(Internal) @testable import Generation
 
 @Suite("Generated Content Tests", .tags(.foundation))
 struct GeneratedContentTests {
