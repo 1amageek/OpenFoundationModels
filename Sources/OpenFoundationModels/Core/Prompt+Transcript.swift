@@ -1,5 +1,5 @@
 import Foundation
-@_spi(Internal) import Generation
+@_spi(Internal) import OpenFoundationModelsCore
 
 extension Prompt {
     /// Converts the prompt's components to transcript segments.

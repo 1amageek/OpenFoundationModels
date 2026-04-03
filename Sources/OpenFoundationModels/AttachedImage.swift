@@ -1,5 +1,5 @@
 import Foundation
-@_spi(Internal) import Generation
+@_spi(Internal) import OpenFoundationModelsCore
 
 /// An image attachment that can be included in a multimodal ``Prompt`` or ``Instructions``.
 ///

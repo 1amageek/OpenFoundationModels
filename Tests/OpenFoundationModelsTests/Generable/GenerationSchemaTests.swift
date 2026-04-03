@@ -1,6 +1,6 @@
 import Testing
 @testable import OpenFoundationModels
-@testable import OpenFoundationModelsCore
+@_spi(Internal) @testable import OpenFoundationModelsCore
 
 @Suite("Generation Schema Tests", .tags(.schema, .unit))
 struct GenerationSchemaTests {

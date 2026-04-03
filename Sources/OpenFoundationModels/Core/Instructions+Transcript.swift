@@ -1,5 +1,5 @@
 import Foundation
-@_spi(Internal) import Generation
+@_spi(Internal) import OpenFoundationModelsCore
 
 extension Instructions {
     /// Converts the instructions' components to transcript segments.

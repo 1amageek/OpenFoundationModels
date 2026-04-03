@@ -1,5 +1,5 @@
 import XCTest
-@testable import OpenFoundationModelsCore
+@_spi(Internal) @testable import OpenFoundationModelsCore
 import OpenFoundationModels
 
 final class ArraySchemaTests: XCTestCase {

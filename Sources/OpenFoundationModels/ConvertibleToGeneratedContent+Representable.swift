@@ -1,5 +1,5 @@
 import Foundation
-import Generation
+import OpenFoundationModelsCore
 
 // MARK: - ConvertibleToGeneratedContent default implementations for Prompt/Instructions
 

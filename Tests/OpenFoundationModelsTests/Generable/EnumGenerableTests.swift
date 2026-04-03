@@ -2,7 +2,7 @@
 import XCTest
 import Foundation
 @testable import OpenFoundationModels
-@testable import Generation
+@testable import OpenFoundationModelsCore
 
 final class EnumGenerableTests: XCTestCase {
     

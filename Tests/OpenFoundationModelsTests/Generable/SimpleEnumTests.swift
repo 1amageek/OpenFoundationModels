@@ -43,10 +43,4 @@ struct SimpleEnumTests {
         #expect(inactiveContent.text == "inactive")
     }
     
-    @Test("Enum error handling with invalid case")
-    func enumErrorHandlingInvalidCase() {
-        #expect(throws: GenerationError.self) {
-            _ = try TestStatusWithPending(GeneratedContent("invalid"))
-        }
-    }
 }

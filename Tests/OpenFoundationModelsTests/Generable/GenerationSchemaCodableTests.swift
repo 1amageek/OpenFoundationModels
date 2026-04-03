@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 @testable import OpenFoundationModels
+@testable import OpenFoundationModelsCore
 
 @Suite("GenerationSchema Codable Tests", .tags(.schema, .unit))
 struct GenerationSchemaCodableTests {

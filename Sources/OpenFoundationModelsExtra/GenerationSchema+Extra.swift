@@ -7,7 +7,7 @@
 //
 
 import Foundation
-@_spi(Internal) import Generation
+@_spi(Internal) import OpenFoundationModelsCore
 import OpenFoundationModels
 @_exported import JSONSchema
 
@@ -22,7 +22,7 @@ extension GenerationSchema {
     public var _jsonSchema: JSONSchema {
         var dict = toSchemaDictionary()
         GenerationSchema.normalizeForJSONSchema(&dict)
-        let data = try! JSONSerialization.data(withJSONObject: dict)
+        let data = try! JSONSerialization.data(withJSONObject: dict as [String: Any])
         return try! JSONDecoder().decode(JSONSchema.self, from: data)
     }
 
@@ -30,14 +30,13 @@ extension GenerationSchema {
     ///
     /// Transforms `"type": ["X", "null"]` → `"anyOf": [{"type": "X", ...otherFields}, {"type": "null"}]`
     /// and recurses into `properties`, `items`, `anyOf`, `oneOf`, `allOf`.
-    private static func normalizeForJSONSchema(_ dict: inout [String: Any]) {
+    private static func normalizeForJSONSchema(_ dict: inout [String: any Sendable]) {
         // Convert "type": ["X", "null"] → anyOf
         if let typeArray = dict["type"] as? [String] {
             dict.removeValue(forKey: "type")
 
             // Collect extra fields that belong to the primary type schema
-            // (e.g. "items" for array, "properties"/"required"/"additionalProperties" for object)
-            var primarySchema: [String: Any] = [:]
+            var primarySchema: [String: any Sendable] = [:]
             let extraKeys: Set<String> = [
                 "items", "minItems", "maxItems", "uniqueItems",
                 "properties", "required", "additionalProperties",
@@ -52,12 +51,12 @@ extension GenerationSchema {
                 }
             }
 
-            var schemas: [[String: Any]] = []
+            var schemas: [[String: any Sendable]] = []
             for typeName in typeArray {
                 if typeName == "null" {
                     schemas.append(["type": "null"])
                 } else {
-                    var schema: [String: Any] = ["type": typeName]
+                    var schema: [String: any Sendable] = ["type": typeName]
                     for (k, v) in primarySchema {
                         schema[k] = v
                     }
@@ -68,9 +67,9 @@ extension GenerationSchema {
         }
 
         // Recursively normalize nested properties
-        if var properties = dict["properties"] as? [String: Any] {
+        if var properties = dict["properties"] as? [String: any Sendable] {
             for (key, value) in properties {
-                if var propDict = value as? [String: Any] {
+                if var propDict = value as? [String: any Sendable] {
                     normalizeForJSONSchema(&propDict)
                     properties[key] = propDict
                 }
@@ -79,14 +78,14 @@ extension GenerationSchema {
         }
 
         // Normalize items in array types
-        if var items = dict["items"] as? [String: Any] {
+        if var items = dict["items"] as? [String: any Sendable] {
             normalizeForJSONSchema(&items)
             dict["items"] = items
         }
 
         // Normalize anyOf/oneOf/allOf arrays
         for key in ["anyOf", "oneOf", "allOf"] {
-            if var schemas = dict[key] as? [[String: Any]] {
+            if var schemas = dict[key] as? [[String: any Sendable]] {
                 for i in schemas.indices {
                     normalizeForJSONSchema(&schemas[i])
                 }

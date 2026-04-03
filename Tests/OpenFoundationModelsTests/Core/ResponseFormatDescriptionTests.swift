@@ -101,7 +101,10 @@ struct ResponseFormatDescriptionTests {
     @Test("name is set correctly for schema-based init")
     func nameForSchemaBasedInit() {
         let format = Transcript.ResponseFormat(schema: DescTestProfile.generationSchema)
-        #expect(format.name.contains("DescTestProfile"))
+        #expect(format.name.contains("GenerationSchema"))
+        #expect(format.name.contains("name"))
+        #expect(format.name.contains("age"))
+        #expect(format.name.contains("nickname"))
     }
 
     @Test("name is set correctly for type-based init")

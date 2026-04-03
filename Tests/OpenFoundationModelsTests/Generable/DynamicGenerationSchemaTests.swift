@@ -15,19 +15,19 @@ struct DynamicGenerationSchemaTests {
                 DynamicGenerationSchema.Property(
                     name: "name",
                     description: "User name",
-                    schema: DynamicGenerationSchema(type: String.self),
+                    schema: DynamicGenerationSchema(type: String.self, guides: []),
                     isOptional: false
                 ),
                 DynamicGenerationSchema.Property(
                     name: "age",
                     description: "User age",
-                    schema: DynamicGenerationSchema(type: Int.self),
+                    schema: DynamicGenerationSchema(type: Int.self, guides: []),
                     isOptional: false
                 ),
                 DynamicGenerationSchema.Property(
                     name: "email",
                     description: "Email address",
-                    schema: DynamicGenerationSchema(type: String.self),
+                    schema: DynamicGenerationSchema(type: String.self, guides: []),
                     isOptional: true
                 )
             ]
@@ -107,7 +107,7 @@ struct DynamicGenerationSchemaTests {
     @Test("DynamicGenerationSchema with array encodes correctly")
     func dynamicSchemaWithArrayEncodesCorrectly() throws {
         // Create DynamicGenerationSchema with array
-        let itemSchema = DynamicGenerationSchema(type: String.self)
+        let itemSchema = DynamicGenerationSchema(type: String.self, guides: [])
         let arraySchema = DynamicGenerationSchema(
             arrayOf: itemSchema,
             minimumElements: 1,
@@ -142,11 +142,11 @@ struct DynamicGenerationSchemaTests {
             properties: [
                 DynamicGenerationSchema.Property(
                     name: "street",
-                    schema: DynamicGenerationSchema(type: String.self)
+                    schema: DynamicGenerationSchema(type: String.self, guides: [])
                 ),
                 DynamicGenerationSchema.Property(
                     name: "city",
-                    schema: DynamicGenerationSchema(type: String.self)
+                    schema: DynamicGenerationSchema(type: String.self, guides: [])
                 )
             ]
         )
@@ -157,7 +157,7 @@ struct DynamicGenerationSchemaTests {
             properties: [
                 DynamicGenerationSchema.Property(
                     name: "name",
-                    schema: DynamicGenerationSchema(type: String.self)
+                    schema: DynamicGenerationSchema(type: String.self, guides: [])
                 ),
                 DynamicGenerationSchema.Property(
                     name: "address",

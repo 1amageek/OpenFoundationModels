@@ -2,7 +2,7 @@
 import Foundation
 import Testing
 @testable import OpenFoundationModels
-@_spi(Internal) @testable import Generation
+@_spi(Internal) @testable import OpenFoundationModelsCore
 
 @Suite("Prompt Tests", .tags(.foundation))
 struct PromptTests {

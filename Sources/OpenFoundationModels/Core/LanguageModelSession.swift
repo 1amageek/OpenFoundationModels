@@ -1,6 +1,6 @@
 
 import Foundation
-@_spi(Internal) import Generation
+@_spi(Internal) import OpenFoundationModelsCore
 
 public final class LanguageModelSession: Observable, @unchecked Sendable {
     

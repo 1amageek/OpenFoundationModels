@@ -1,7 +1,6 @@
 import Testing
 import Foundation
-@testable import OpenFoundationModels
-@testable import Generation
+import OpenFoundationModels
 
 @Suite("GenerationSchema JSON Schema Tests", .tags(.schema, .unit))
 struct GenerationSchemaJSONSchemaTests {
@@ -146,7 +145,8 @@ struct GenerationSchemaJSONSchemaTests {
                 GenerationSchema.Property(
                     name: "isActive",
                     description: "Active status",
-                    type: Bool?.self
+                    type: Bool?.self,
+                    guides: [GenerationGuide<Bool>]()
                 )
             ]
         )
@@ -167,9 +167,13 @@ struct GenerationSchemaJSONSchemaTests {
         let reEncodedData = try encoder.encode(decodedSchema)
         let originalJson = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         let reEncodedJson = try JSONSerialization.jsonObject(with: reEncodedData) as? [String: Any]
+        let originalType = originalJson?["type"] as? String
+        let reEncodedType = reEncodedJson?["type"] as? String
+        let originalDescription = originalJson?["description"] as? String
+        let reEncodedDescription = reEncodedJson?["description"] as? String
         
-        #expect(originalJson?["type"] as? String == reEncodedJson?["type"] as? String)
-        #expect(originalJson?["description"] as? String == reEncodedJson?["description"] as? String)
+        #expect(originalType == reEncodedType)
+        #expect(originalDescription == reEncodedDescription)
     }
     
     @Test("GenerationSchema encodes to valid JSON Schema format")

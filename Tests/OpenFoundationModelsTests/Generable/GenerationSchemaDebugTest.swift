@@ -1,7 +1,7 @@
 import Testing
 import Foundation
 @testable import OpenFoundationModels
-@testable import Generation
+@testable import OpenFoundationModelsCore
 
 @Suite("GenerationSchema Debug Test")
 struct GenerationSchemaDebugTest {

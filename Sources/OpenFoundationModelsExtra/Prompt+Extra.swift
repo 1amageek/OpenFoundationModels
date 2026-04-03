@@ -1,6 +1,6 @@
 import Foundation
 import OpenFoundationModels
-@_spi(Internal) import Generation
+@_spi(Internal) import OpenFoundationModelsCore
 
 /// A public image type for use in `PromptBuilder`.
 ///

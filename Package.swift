@@ -12,6 +12,9 @@ let package = Package(
     ],
     products: [
         .library(
+            name: "OpenFoundationModelsCore",
+            targets: ["OpenFoundationModelsCore"]),
+        .library(
             name: "OpenFoundationModels",
             targets: ["OpenFoundationModels"]),
         .library(
@@ -19,15 +22,25 @@ let package = Package(
             targets: ["OpenFoundationModelsExtra"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/1amageek/swift-generation.git", from: "0.3.0"),
+        .package(url: "https://github.com/1amageek/swift-generation.git", from: "0.3.1"),
         .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.1.1"),
         .package(url: "https://github.com/mattt/JSONSchema.git", from: "1.0.0"),
     ],
     targets: [
         .target(
+            name: "OpenFoundationModelsCore",
+            dependencies: [
+                .product(
+                    name: "Generation",
+                    package: "swift-generation",
+                    moduleAliases: ["Generation": "FoundationGeneration"]
+                ),
+            ]
+        ),
+        .target(
             name: "OpenFoundationModels",
             dependencies: [
-                .product(name: "Generation", package: "swift-generation"),
+                "OpenFoundationModelsCore",
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
             ]
         ),
@@ -36,13 +49,18 @@ let package = Package(
             name: "OpenFoundationModelsExtra",
             dependencies: [
                 "OpenFoundationModels",
+                "OpenFoundationModelsCore",
                 .product(name: "JSONSchema", package: "JSONSchema"),
             ]
         ),
 
         .testTarget(
             name: "OpenFoundationModelsTests",
-            dependencies: ["OpenFoundationModels"]
+            dependencies: [
+                "OpenFoundationModels",
+                "OpenFoundationModelsExtra",
+                "OpenFoundationModelsCore",
+            ]
         ),
 
         .testTarget(
@@ -50,6 +68,7 @@ let package = Package(
             dependencies: [
                 "OpenFoundationModelsExtra",
                 "OpenFoundationModels",
+                "OpenFoundationModelsCore",
             ]
         )
     ]

@@ -1,5 +1,5 @@
 import Foundation
-@_spi(Internal) import Generation
+@_spi(Internal) import OpenFoundationModelsCore
 
 /// A record of the conversation between the user and the language model.
 ///
@@ -524,4 +524,3 @@ extension Transcript.Response: CustomStringConvertible {
         return "(Response) \(segmentText)"
     }
 }
-

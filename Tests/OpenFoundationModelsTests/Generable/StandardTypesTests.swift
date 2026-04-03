@@ -1,9 +1,19 @@
 import Testing
 import Foundation
-@testable import OpenFoundationModels
-@testable import OpenFoundationModelsCore
+import OpenFoundationModels
+import OpenFoundationModelsExtra
 
+private enum SchemaInspectionError: Error {
+    case notDictionary
+}
 
+private func schemaToDictionary(_ schema: GenerationSchema) throws -> [String: Any] {
+    let data = try JSONEncoder().encode(schema._jsonSchema)
+    guard let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        throw SchemaInspectionError.notDictionary
+    }
+    return dict
+}
 
 @Suite("Standard Types Generable Conformance")
 struct StandardTypesTests {
@@ -130,15 +140,15 @@ struct StandardTypesTests {
     
     
     @Test("Generation schema for standard types")
-    func testGenerationSchemaForStandardTypes() {
-        let uuidSchema = UUID.generationSchema
-        #expect(uuidSchema.description?.contains("UUID") == true)
+    func testGenerationSchemaForStandardTypes() throws {
+        let uuidSchema = try schemaToDictionary(UUID.generationSchema)
+        #expect((uuidSchema["description"] as? String)?.contains("UUID") == true)
         
-        let dateSchema = Date.generationSchema
-        #expect(dateSchema.description?.contains("ISO") == true)
+        let dateSchema = try schemaToDictionary(Date.generationSchema)
+        #expect((dateSchema["description"] as? String)?.contains("ISO") == true)
         
-        let urlSchema = URL.generationSchema
-        #expect(urlSchema.description?.contains("URL") == true)
+        let urlSchema = try schemaToDictionary(URL.generationSchema)
+        #expect((urlSchema["description"] as? String)?.contains("URL") == true)
     }
     
     

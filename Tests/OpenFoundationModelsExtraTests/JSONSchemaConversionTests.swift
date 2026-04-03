@@ -2,7 +2,7 @@ import Testing
 import Foundation
 import OpenFoundationModelsExtra
 import OpenFoundationModels
-@_spi(Internal) @testable import Generation
+@_spi(Internal) @testable import OpenFoundationModelsCore
 
 // MARK: - Test Types
 
