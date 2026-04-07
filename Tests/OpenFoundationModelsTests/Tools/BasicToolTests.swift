@@ -63,21 +63,6 @@ struct BasicToolTests {
         }
     }
     
-    struct StringArgumentTool: Tool {
-        let description = "Process string input"
-        
-        typealias Arguments = String
-        typealias Output = String
-        
-        func call(arguments: String) async throws -> String {
-            let result = SimpleResult(output: "Processed: \(arguments)")
-            let encoder = JSONEncoder()
-            let data = try encoder.encode(result)
-            return String(data: data, encoding: .utf8) ?? "{}"
-        }
-    }
-    
-    
     struct WeatherInfo: Codable {
         let city: String
         let temperature: Int
@@ -115,16 +100,6 @@ struct BasicToolTests {
         #expect(tool.description == "Perform basic mathematical calculations")
     }
     
-    @Test("Tool with String arguments")
-    func toolWithStringArguments() {
-        let tool = StringArgumentTool()
-        
-        let debugString = tool.parameters.debugDescription
-        #expect(debugString.contains("GenerationSchema"))
-        #expect(tool.description == "Process string input")
-    }
-    
-    
     @Test("Basic tool execution")
     func basicToolExecution() async throws {
         let tool = SimpleWeatherTool()
@@ -140,19 +115,7 @@ struct BasicToolTests {
         #expect(weather.condition == "sunny")
     }
     
-    @Test("Tool execution with String arguments")
-    func toolExecutionWithString() async throws {
-        let tool = StringArgumentTool()
-        let args = "test input"
-        
-        let result = try await tool.call(arguments: args)
-        let data = result.data(using: .utf8)!
-        let output = try JSONDecoder().decode(SimpleResult.self, from: data)
-        
-        #expect(output.output == "Processed: test input")
-    }
-    
-    @Test("Tool error handling")
+@Test("Tool error handling")
     func toolErrorHandling() async throws {
         let tool = CalculatorTool()
         let content = GeneratedContent(properties: ["expression": "10/0"])
@@ -190,11 +153,9 @@ struct BasicToolTests {
     func toolSendableConformance() {
         let weatherTool = SimpleWeatherTool()
         let calculatorTool = CalculatorTool()
-        let stringTool = StringArgumentTool()
-        
+
         let _ = weatherTool as Sendable
         let _ = calculatorTool as Sendable
-        let _ = stringTool as Sendable
     }
     
     

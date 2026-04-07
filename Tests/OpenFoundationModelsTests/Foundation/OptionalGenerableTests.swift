@@ -41,10 +41,11 @@ func testOptionalPartiallyGenerated() throws {
 func testOptionalPromptRepresentable() {
     let nilValue: String? = nil
     let nilPrompt = nilValue.promptRepresentation
-    #expect(nilPrompt.components.isEmpty || {
-        guard case .text(let t) = nilPrompt.components.first else { return true }
-        return t.value.isEmpty
-    }())
+    // nil produces "null" text via ConvertibleToGeneratedContent default implementation
+    guard case .text(let nullText) = nilPrompt.components.first else {
+        Issue.record("Expected text component for nil"); return
+    }
+    #expect(nullText.value == "null")
 
     let someValue: String? = "prompt text"
     let somePrompt = someValue.promptRepresentation
@@ -58,10 +59,11 @@ func testOptionalPromptRepresentable() {
 func testOptionalInstructionsRepresentable() {
     let nilValue: String? = nil
     let nilInstructions = nilValue.instructionsRepresentation
-    #expect(nilInstructions.components.isEmpty || {
-        guard case .text(let t) = nilInstructions.components.first else { return true }
-        return t.value.isEmpty
-    }())
+    // nil produces "null" text via ConvertibleToGeneratedContent default implementation
+    guard case .text(let nullText) = nilInstructions.components.first else {
+        Issue.record("Expected text component for nil"); return
+    }
+    #expect(nullText.value == "null")
 
     let someValue: String? = "instruction text"
     let someInstructions = someValue.instructionsRepresentation

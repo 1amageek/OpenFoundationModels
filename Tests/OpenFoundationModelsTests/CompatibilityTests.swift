@@ -55,10 +55,11 @@ struct CompatibilityTests {
             Issue.record("Expected text component"); return
         }
         #expect(t.value.contains("hello"))
-        #expect(nonePrompt.components.isEmpty || {
-            guard case .text(let t) = nonePrompt.components.first else { return true }
-            return t.value.isEmpty
-        }())
+        // nil produces "null" text via ConvertibleToGeneratedContent default implementation
+        guard case .text(let nullText) = nonePrompt.components.first else {
+            Issue.record("Expected text component for nil"); return
+        }
+        #expect(nullText.value == "null")
     }
 
     @Test("Optional conforms to InstructionsRepresentable")
@@ -73,10 +74,11 @@ struct CompatibilityTests {
             Issue.record("Expected text component"); return
         }
         #expect(t.value.contains("hello"))
-        #expect(noneInstructions.components.isEmpty || {
-            guard case .text(let t) = noneInstructions.components.first else { return true }
-            return t.value.isEmpty
-        }())
+        // nil produces "null" text via ConvertibleToGeneratedContent default implementation
+        guard case .text(let nullText) = noneInstructions.components.first else {
+            Issue.record("Expected text component for nil"); return
+        }
+        #expect(nullText.value == "null")
     }
 
     @Test("Transcript.ToolDefinition has parameters property")

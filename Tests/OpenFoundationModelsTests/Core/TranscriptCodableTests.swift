@@ -232,10 +232,7 @@ struct TranscriptCodableTests {
         }
         #expect(p.id == "prompt1")
         #expect(p.responseFormat != nil)
-        #expect(p.responseFormat?.name.contains("GenerationSchema") == true)
-        #expect(p.responseFormat?.name.contains("name") == true)
-        #expect(p.responseFormat?.name.contains("age") == true)
-        #expect(p.responseFormat?.name.contains("isActive") == true)
+        #expect(p.responseFormat?.name == "TestTranscriptUserProfile")
     }
 
     @Test("Prompt with temperature round-trip")
