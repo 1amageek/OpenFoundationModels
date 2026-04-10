@@ -94,7 +94,7 @@ print(response.content)
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/1amageek/AnyFoundationModels.git", branch: "main"),
+    .package(url: "https://github.com/1amageek/AnyFoundationModels.git", from: "0.2.0"),
 ]
 
 // Enable only the backends you need via traits:
