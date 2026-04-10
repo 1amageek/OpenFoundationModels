@@ -39,6 +39,16 @@ struct RequestBuilderTests {
         #expect(builder.segmentsToText(segments) == "Hello World")
     }
 
+    @Test("reasoning segments are excluded from plain text conversion")
+    func reasoningSegmentsIgnored() {
+        let segments: [Transcript.Segment] = [
+            .text(.init(content: "Visible")),
+            .reasoning(.init(content: "Hidden")),
+            .text(.init(content: "Answer")),
+        ]
+        #expect(builder.segmentsToText(segments) == "Visible Answer")
+    }
+
     // MARK: - Structure segments
 
     @Test("structure segment is serialised via jsonString")

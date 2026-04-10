@@ -101,12 +101,15 @@ extension Transcript {
         public typealias ID = String
 
         case text(TextSegment)
+        case reasoning(TextSegment)
         case structure(StructuredSegment)
         case image(ImageSegment)
 
         public var id: String {
             switch self {
             case .text(let textSegment):
+                return textSegment.id
+            case .reasoning(let textSegment):
                 return textSegment.id
             case .structure(let structuredSegment):
                 return structuredSegment.id
@@ -312,6 +315,8 @@ extension Transcript.Segment: Equatable {
         switch (lhs, rhs) {
         case (.text(let l), .text(let r)):
             return l == r
+        case (.reasoning(let l), .reasoning(let r)):
+            return l == r
         case (.structure(let l), .structure(let r)):
             return l == r
         case (.image(let l), .image(let r)):
@@ -438,6 +443,8 @@ extension Transcript.Segment: CustomStringConvertible {
         switch self {
         case .text(let segment):
             return segment.description
+        case .reasoning(let segment):
+            return "(Reasoning) \(segment.description)"
         case .structure(let segment):
             return segment.description
         case .image(let segment):

@@ -54,6 +54,8 @@ extension RequestBuilder {
             switch segment {
             case .text(let t):
                 texts.append(t.content)
+            case .reasoning:
+                continue
             case .structure(let s):
                 texts.append(s.content.jsonString)
             case .image:

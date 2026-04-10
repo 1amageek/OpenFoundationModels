@@ -186,7 +186,7 @@ private struct EntryCoding: Codable {
 private struct SegmentCoding: Codable {
 
     private enum SegmentType: String, Codable {
-        case text, structure, image
+        case text, reasoning, structure, image
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -216,6 +216,10 @@ private struct SegmentCoding: Codable {
             let text = try c.decode(String.self, forKey: .text)
             segment = .text(Transcript.TextSegment(id: id, content: text))
 
+        case .reasoning:
+            let text = try c.decode(String.self, forKey: .text)
+            segment = .reasoning(Transcript.TextSegment(id: id, content: text))
+
         case .structure:
             let nested = try c.nestedContainer(keyedBy: StructureKeys.self, forKey: .structure)
             let source = try nested.decode(String.self, forKey: .source)
@@ -242,6 +246,10 @@ private struct SegmentCoding: Codable {
         switch segment {
         case .text(let t):
             try c.encode(SegmentType.text, forKey: .type)
+            try c.encode(t.content, forKey: .text)
+
+        case .reasoning(let t):
+            try c.encode(SegmentType.reasoning, forKey: .type)
             try c.encode(t.content, forKey: .text)
 
         case .structure(let s):

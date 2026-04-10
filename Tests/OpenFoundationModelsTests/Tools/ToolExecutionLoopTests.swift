@@ -171,6 +171,32 @@ struct ToolExecutionLoopTests {
         }
         #expect(toolOutputExists)
     }
+
+    @Test("respond extracts reasoning separately from response segments")
+    func respondSeparatesReasoning() async throws {
+        let responseEntry = Transcript.Entry.response(
+            Transcript.Response(
+                id: UUID().uuidString,
+                assetIDs: [],
+                segments: [
+                    .reasoning(.init(id: UUID().uuidString, content: "internal reasoning")),
+                    .text(.init(id: UUID().uuidString, content: "Visible answer")),
+                ]
+            )
+        )
+
+        let mockModel = MockLanguageModel(responses: [responseEntry])
+        let session = LanguageModelSession(
+            model: mockModel,
+            tools: [],
+            instructions: "You are a helpful assistant"
+        )
+
+        let response = try await session.respond(to: "Hello")
+
+        #expect(response.content == "Visible answer")
+        #expect(response.reasoning == "internal reasoning")
+    }
     
     @Test("Multiple tool execution steps")
     func multipleToolExecutionSteps() async throws {

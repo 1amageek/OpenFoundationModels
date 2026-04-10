@@ -126,6 +126,25 @@ struct ResponseStreamTests {
         let response = try await responseStream.collect()
         #expect(response.content == "partial")
     }
+
+    @Test("ResponseStream collect() preserves reasoning from final snapshot")
+    func responseStreamCollectPreservesReasoning() async throws {
+        let stream = AsyncThrowingStream<LanguageModelSession.ResponseStream<String>.Snapshot, Error> { continuation in
+            let snapshot = LanguageModelSession.ResponseStream<String>.Snapshot(
+                content: "final",
+                rawContent: GeneratedContent("final"),
+                reasoning: "hidden chain"
+            )
+            continuation.yield(snapshot)
+            continuation.finish()
+        }
+
+        let responseStream = LanguageModelSession.ResponseStream<String>(stream: stream)
+        let response = try await responseStream.collect()
+
+        #expect(response.content == "final")
+        #expect(response.reasoning == "hidden chain")
+    }
     
     @Test("ResponseStream collectPartials() helper method")
     func responseStreamCollectPartials() async throws {

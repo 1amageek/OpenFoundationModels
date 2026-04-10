@@ -94,8 +94,22 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         public let content: Content
         
         public let rawContent: GeneratedContent
+
+        public let reasoning: String?
         
         public let transcriptEntries: ArraySlice<Transcript.Entry>
+
+        public init(
+            content: Content,
+            rawContent: GeneratedContent,
+            reasoning: String? = nil,
+            transcriptEntries: ArraySlice<Transcript.Entry>
+        ) {
+            self.content = content
+            self.rawContent = rawContent
+            self.reasoning = reasoning
+            self.transcriptEntries = transcriptEntries
+        }
     }
     
     
@@ -159,23 +173,15 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 
             case .response(let response):
                 // Final response - extract content and return
-                let content = response.segments.compactMap { segment -> String? in
-                    switch segment {
-                    case .text(let textSegment):
-                        return textSegment.content
-                    case .structure(let structuredSegment):
-                        return structuredSegment.content.text
-                    case .image:
-                        return nil
-                    }
-                }.joined()
+                let extracted = Self.extractTextResponseChannels(from: response)
                 
                 let recentEntries = Array(_transcript.entries.suffix(2))
                 let entriesSlice = ArraySlice(recentEntries)
                 
                 return Response(
-                    content: content,
-                    rawContent: GeneratedContent(content),
+                    content: extracted.answer,
+                    rawContent: GeneratedContent(extracted.answer),
+                    reasoning: extracted.reasoning.nilIfEmpty,
                     transcriptEntries: entriesSlice
                 )
                 
@@ -220,23 +226,15 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 continue
 
             case .response(let response):
-                let content = response.segments.compactMap { segment -> String? in
-                    switch segment {
-                    case .text(let textSegment):
-                        return textSegment.content
-                    case .structure(let structuredSegment):
-                        return structuredSegment.content.text
-                    case .image:
-                        return nil
-                    }
-                }.joined()
+                let extracted = Self.extractTextResponseChannels(from: response)
 
                 let recentEntries = Array(_transcript.entries.suffix(2))
                 let entriesSlice = ArraySlice(recentEntries)
 
                 return Response(
-                    content: content,
-                    rawContent: GeneratedContent(content),
+                    content: extracted.answer,
+                    rawContent: GeneratedContent(extracted.answer),
+                    reasoning: extracted.reasoning.nilIfEmpty,
                     transcriptEntries: entriesSlice
                 )
 
@@ -350,6 +348,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 return Response(
                     content: finalContent,
                     rawContent: finalContent,
+                    reasoning: Self.extractReasoning(from: response).nilIfEmpty,
                     transcriptEntries: entriesSlice
                 )
                 
@@ -466,6 +465,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 return Response(
                     content: content,
                     rawContent: finalContent,
+                    reasoning: Self.extractReasoning(from: response).nilIfEmpty,
                     transcriptEntries: entriesSlice
                 )
                 
@@ -661,6 +661,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         typealias OutputContent = String
 
         private var accumulatedContent = ""
+        private var accumulatedReasoning = ""
 
         mutating func makeSnapshot(for entry: Transcript.Entry) -> ResponseStream<String>.Snapshot? {
             switch entry {
@@ -669,6 +670,8 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                     switch segment {
                     case .text(let textSegment):
                         accumulatedContent += textSegment.content
+                    case .reasoning(let textSegment):
+                        accumulatedReasoning += textSegment.content
                     case .structure(let structuredSegment):
                         accumulatedContent += structuredSegment.content.text
                     case .image:
@@ -677,13 +680,15 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 }
                 return ResponseStream<String>.Snapshot(
                     content: accumulatedContent,
-                    rawContent: GeneratedContent(accumulatedContent)
+                    rawContent: GeneratedContent(accumulatedContent),
+                    reasoning: accumulatedReasoning.nilIfEmpty
                 )
             case .toolCalls:
                 // Keep yielding the latest accumulated text so UIs can refresh status.
                 return ResponseStream<String>.Snapshot(
                     content: accumulatedContent,
-                    rawContent: GeneratedContent(accumulatedContent)
+                    rawContent: GeneratedContent(accumulatedContent),
+                    reasoning: accumulatedReasoning.nilIfEmpty
                 )
             default:
                 return nil
@@ -692,17 +697,23 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
 
         mutating func transcriptEntry(for finalEntry: Transcript.Entry) -> Transcript.Entry {
             guard case .response = finalEntry else { return finalEntry }
-            return LanguageModelSession.makeTextResponseEntry(content: accumulatedContent)
+            return LanguageModelSession.makeTextResponseEntry(
+                content: accumulatedContent,
+                reasoning: accumulatedReasoning.nilIfEmpty
+            )
         }
     }
 
     private struct StructuredStreamAccumulator: Sendable {
         private(set) var accumulatedContent: GeneratedContent?
+        private(set) var accumulatedReasoning = ""
         private var jsonBuffer = ""
 
         mutating func ingest(_ response: Transcript.Response) {
             for segment in response.segments {
                 switch segment {
+                case .reasoning(let textSegment):
+                    accumulatedReasoning += textSegment.content
                 case .structure(let structuredSegment):
                     accumulatedContent = structuredSegment.content
                     jsonBuffer = ""
@@ -736,7 +747,8 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
             guard let content = accumulator.accumulatedContent else { return nil }
             return ResponseStream<GeneratedContent>.Snapshot(
                 content: content,
-                rawContent: content
+                rawContent: content,
+                reasoning: accumulator.accumulatedReasoning.nilIfEmpty
             )
         }
 
@@ -745,7 +757,10 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                   let content = accumulator.accumulatedContent else {
                 return finalEntry
             }
-            return LanguageModelSession.makeStructuredResponseEntry(content: content)
+            return LanguageModelSession.makeStructuredResponseEntry(
+                content: content,
+                reasoning: accumulator.accumulatedReasoning.nilIfEmpty
+            )
         }
     }
 
@@ -763,7 +778,8 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                 let partial = try Content.PartiallyGenerated(generatedContent)
                 return ResponseStream<Content>.Snapshot(
                     content: partial,
-                    rawContent: generatedContent
+                    rawContent: generatedContent,
+                    reasoning: accumulator.accumulatedReasoning.nilIfEmpty
                 )
             } catch {
                 return nil
@@ -775,7 +791,10 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
                   let content = accumulator.accumulatedContent else {
                 return finalEntry
             }
-            return LanguageModelSession.makeStructuredResponseEntry(content: content)
+            return LanguageModelSession.makeStructuredResponseEntry(
+                content: content,
+                reasoning: accumulator.accumulatedReasoning.nilIfEmpty
+            )
         }
     }
 
@@ -951,32 +970,67 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         _transcript = Transcript(entries: entries)
     }
 
-    private static func makeTextResponseEntry(content: String) -> Transcript.Entry {
+    private static func extractTextResponseChannels(from response: Transcript.Response) -> (answer: String, reasoning: String) {
+        var answer = ""
+        var reasoning = ""
+        for segment in response.segments {
+            switch segment {
+            case .text(let textSegment):
+                answer += textSegment.content
+            case .reasoning(let textSegment):
+                reasoning += textSegment.content
+            case .structure(let structuredSegment):
+                answer += structuredSegment.content.text
+            case .image:
+                break
+            }
+        }
+        return (answer, reasoning)
+    }
+
+    private static func extractReasoning(from response: Transcript.Response) -> String {
+        response.segments.compactMap { segment -> String? in
+            guard case .reasoning(let textSegment) = segment else { return nil }
+            return textSegment.content
+        }.joined()
+    }
+
+    private static func makeTextResponseEntry(content: String, reasoning: String? = nil) -> Transcript.Entry {
+        var segments: [Transcript.Segment] = []
+        if let reasoning, !reasoning.isEmpty {
+            segments.append(.reasoning(Transcript.TextSegment(id: UUID().uuidString, content: reasoning)))
+        }
+        if !content.isEmpty {
+            segments.append(.text(Transcript.TextSegment(id: UUID().uuidString, content: content)))
+        }
         return .response(
             Transcript.Response(
                 id: UUID().uuidString,
                 assetIDs: [],
-                segments: [
-                    .text(Transcript.TextSegment(id: UUID().uuidString, content: content))
-                ]
+                segments: segments
             )
         )
     }
 
-    private static func makeStructuredResponseEntry(content: GeneratedContent) -> Transcript.Entry {
+    private static func makeStructuredResponseEntry(content: GeneratedContent, reasoning: String? = nil) -> Transcript.Entry {
+        var segments: [Transcript.Segment] = []
+        if let reasoning, !reasoning.isEmpty {
+            segments.append(.reasoning(Transcript.TextSegment(id: UUID().uuidString, content: reasoning)))
+        }
+        segments.append(
+            .structure(
+                Transcript.StructuredSegment(
+                    id: UUID().uuidString,
+                    source: "generated",
+                    content: content
+                )
+            )
+        )
         return .response(
             Transcript.Response(
                 id: UUID().uuidString,
                 assetIDs: [],
-                segments: [
-                    .structure(
-                        Transcript.StructuredSegment(
-                            id: UUID().uuidString,
-                            source: "generated",
-                            content: content
-                        )
-                    )
-                ]
+                segments: segments
             )
         )
     }
@@ -1160,6 +1214,19 @@ extension LanguageModelSession {
             ///
             /// When `Content` is `GeneratedContent`, this is the same as `content`.
             public var rawContent: GeneratedContent
+
+            /// Accumulated reasoning content, when the backend emits it separately.
+            public var reasoning: String?
+
+            public init(
+                content: Content.PartiallyGenerated,
+                rawContent: GeneratedContent,
+                reasoning: String? = nil
+            ) {
+                self.content = content
+                self.rawContent = rawContent
+                self.reasoning = reasoning
+            }
         }
 
         internal let stream: AsyncThrowingStream<Snapshot, Error>
@@ -1167,6 +1234,12 @@ extension LanguageModelSession {
         internal init(stream: AsyncThrowingStream<Snapshot, Error>) {
             self.stream = stream
         }
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }
 
@@ -1231,6 +1304,7 @@ extension LanguageModelSession.ResponseStream: AsyncSequence {
         return LanguageModelSession.Response(
             content: content,
             rawContent: snapshot.rawContent,
+            reasoning: snapshot.reasoning,
             transcriptEntries: allEntries
         )
     }

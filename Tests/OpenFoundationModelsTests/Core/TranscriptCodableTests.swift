@@ -184,6 +184,35 @@ struct TranscriptCodableTests {
         #expect(contents.count == 1)
     }
 
+    @Test("Reasoning segment round-trips through transcript codable")
+    func reasoningSegmentRoundTrip() throws {
+        let transcript = Transcript(entries: [
+            .response(
+                Transcript.Response(
+                    id: "resp-1",
+                    assetIDs: [],
+                    segments: [
+                        .reasoning(.init(id: "reason-1", content: "hidden chain")),
+                        .text(.init(id: "text-1", content: "Visible answer")),
+                    ]
+                )
+            )
+        ])
+
+        let decoded = try roundTrip(transcript)
+        guard case .response(let response) = decoded.entries[0] else {
+            Issue.record("Expected response entry")
+            return
+        }
+
+        guard case .reasoning(let reasoning) = response.segments[0] else {
+            Issue.record("Expected reasoning segment")
+            return
+        }
+
+        #expect(reasoning.content == "hidden chain")
+    }
+
     // MARK: - Round-trip Tests
 
     @Test("Instructions entry round-trip")
