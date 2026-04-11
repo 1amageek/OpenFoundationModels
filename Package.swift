@@ -22,7 +22,7 @@ let package = Package(
             targets: ["OpenFoundationModelsExtra"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/1amageek/swift-generation.git", from: "0.4.0"),
+        .package(url: "https://github.com/1amageek/swift-generation.git", from: "0.5.0"),
         .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.1.1"),
         .package(url: "https://github.com/mattt/JSONSchema.git", from: "1.0.0"),
     ],
@@ -31,9 +31,9 @@ let package = Package(
             name: "OpenFoundationModelsCore",
             dependencies: [
                 .product(
-                    name: "Generation",
+                    name: "SwiftGeneration",
                     package: "swift-generation",
-                    moduleAliases: ["Generation": "FoundationGeneration"]
+                    moduleAliases: ["SwiftGeneration": "FoundationGeneration"]
                 ),
             ]
         ),

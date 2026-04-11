@@ -1,5 +1,5 @@
 {
-  "originHash" : "6f035d743704fa97407d4ff92594dc2d33c26dfed9711849d1f9851fd7b609c4",
+  "originHash" : "bf87760efbdc16018213237b4b1feed148e3bb2ac02213f4f8d5ef5f35cc1209",
   "pins" : [
     {
       "identity" : "jsonschema",
@@ -33,8 +33,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/1amageek/swift-generation.git",
       "state" : {
-        "revision" : "b7307e90df36903209fb6ef7803747bc5a88c5cf",
-        "version" : "0.4.0"
+        "revision" : "396f4301404dfa7837cd221b2098d10f09ac2fb3",
+        "version" : "0.5.0"
       }
     },
     {

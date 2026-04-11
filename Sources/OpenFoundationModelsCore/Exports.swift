@@ -1,1 +1,1 @@
-@_exported @_spi(Internal) import Generation
+@_exported @_spi(Internal) import SwiftGeneration
