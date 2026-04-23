@@ -32,8 +32,7 @@ let package = Package(
             dependencies: [
                 .product(
                     name: "SwiftGeneration",
-                    package: "swift-generation",
-                    moduleAliases: ["SwiftGeneration": "FoundationGeneration"]
+                    package: "swift-generation"
                 ),
             ]
         ),
