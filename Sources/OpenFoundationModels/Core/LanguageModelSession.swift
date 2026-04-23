@@ -45,21 +45,10 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         self.init(model: model)
         self.tools = tools
         if let instructions = instructions {
-            var instructionSegments = instructions.segments
-
-            // Append tool schemas as an additional text segment
-            let toolInstructions = formatToolInstructions(for: tools)
-            if !toolInstructions.isEmpty {
-                instructionSegments.append(.text(Transcript.TextSegment(
-                    id: UUID().uuidString,
-                    content: toolInstructions
-                )))
-            }
-
             let instructionEntry = Transcript.Entry.instructions(
                 Transcript.Instructions(
                     id: UUID().uuidString,
-                    segments: instructionSegments,
+                    segments: instructions.segments,
                     toolDefinitions: tools.map { Transcript.ToolDefinition(tool: $0) }
                 )
             )
@@ -1058,48 +1047,7 @@ public final class LanguageModelSession: Observable, @unchecked Sendable {
         let output = try await tool.call(arguments: typedArguments)
         return output.promptRepresentation.segments
     }
-    
-    private func formatToolInstructions(for tools: [any Tool]) -> String {
-        guard !tools.isEmpty else { return "" }
 
-        var sections: [String] = []
-        sections.append("")
-        sections.append("# Tools")
-        sections.append("In this environment you have access to a set of tools you can use to answer the user's question.")
-        sections.append("")
-        sections.append("Check that all the required parameters for each tool call are provided or can reasonably be inferred from context. IF there are no relevant tools or there are missing values for required parameters, ask the user to supply these values; otherwise proceed with the tool calls. If the user provides a specific value for a parameter, make sure to use that value EXACTLY.")
-        sections.append("")
-
-        for tool in tools {
-            var toolSection = "## \(tool.name)\n\n"
-            toolSection += tool.description
-
-            if tool.includesSchemaInInstructions {
-                toolSection += "\n\n```json\n"
-                toolSection += formatJSONSchema(tool.parameters)
-                toolSection += "\n```"
-            }
-
-            sections.append(toolSection)
-        }
-
-        return sections.joined(separator: "\n\n")
-    }
-    
-    private func formatJSONSchema(_ schema: GenerationSchema) -> String {
-        // Since GenerationSchema is Codable, we can encode it to JSON
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        
-        if let data = try? encoder.encode(schema),
-           let string = String(data: data, encoding: .utf8) {
-            return string
-        }
-        
-        // Fallback to debug description
-        return schema.debugDescription
-    }
-    
     /// Logs and serializes a feedback attachment that can be submitted to Apple.
     ///
     /// This method creates a structured feedback attachment containing the session's transcript

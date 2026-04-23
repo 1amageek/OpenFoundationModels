@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import OpenFoundationModels
 
-@Suite("Tool Schema in Instructions Tests")
+@Suite("Tools in Instructions Tests")
 struct ToolSchemaInInstructionsTests {
 
     // MARK: - Test Tools
@@ -27,10 +27,6 @@ struct ToolSchemaInInstructionsTests {
     struct CalculatorTool: Tool {
         let name = "Calculator"
         let description = "Perform mathematical calculations"
-
-        var includesSchemaInInstructions: Bool {
-            return false
-        }
 
         @Generable
         struct Arguments {
@@ -83,9 +79,9 @@ struct ToolSchemaInInstructionsTests {
         }
     }
 
-    // MARK: - Helper
+    // MARK: - Helpers
 
-    private func extractInstructionsContent(from model: MockLanguageModel) throws -> String {
+    private func extractInstructionsEntry(from model: MockLanguageModel) throws -> Transcript.Instructions {
         let transcript = try #require(model.capturedTranscript)
 
         let instructionsEntry = transcript.entries.first { entry in
@@ -97,10 +93,13 @@ struct ToolSchemaInInstructionsTests {
 
         guard case .instructions(let data) = entry else {
             Issue.record("Expected instructions entry")
-            return ""
+            throw CancellationError()
         }
+        return data
+    }
 
-        return data.segments.compactMap { segment -> String? in
+    private func segmentsText(_ instructions: Transcript.Instructions) -> String {
+        instructions.segments.compactMap { segment -> String? in
             if case .text(let text) = segment { return text.content }
             return nil
         }.joined(separator: "\n")
@@ -108,8 +107,8 @@ struct ToolSchemaInInstructionsTests {
 
     // MARK: - Tests
 
-    @Test("Tool schema is included in instructions when includesSchemaInInstructions is true")
-    func toolSchemaIncludedInInstructions() async throws {
+    @Test("Tool definitions are exposed via Instructions.toolDefinitions, not injected into segments")
+    func toolsExposedAsStructuredToolDefinitions() async throws {
         let model = MockLanguageModel()
 
         let session = LanguageModelSession(
@@ -120,51 +119,22 @@ struct ToolSchemaInInstructionsTests {
 
         _ = try await session.respond(to: "What's the weather?")
 
-        let content = try extractInstructionsContent(from: model)
+        let instructions = try extractInstructionsEntry(from: model)
 
-        // Base text present
-        #expect(content.contains("You are a helpful assistant."))
+        // Structured path: tool is available via toolDefinitions
+        #expect(instructions.toolDefinitions.count == 1)
+        #expect(instructions.toolDefinitions.first?.name == "Weather")
 
-        // Preamble declares tool access
-        #expect(content.contains("In this environment you have access to a set of tools"))
-
-        // Markdown header with tool name
-        #expect(content.contains("## Weather"))
-
-        // Description present
-        #expect(content.contains("Get weather information for a city"))
-
-        // JSON schema in code block
-        #expect(content.contains("```json"))
-        #expect(content.contains("\"city\""))
-        #expect(content.contains("\"units\""))
+        // Segments only contain user-provided instructions — no tool text baked in
+        let text = segmentsText(instructions)
+        #expect(text == "You are a helpful assistant.")
+        #expect(!text.contains("## Weather"))
+        #expect(!text.contains("```json"))
+        #expect(!text.contains("In this environment you have access to a set of tools"))
     }
 
-    @Test("Tool schema is not included when includesSchemaInInstructions is false")
-    func toolSchemaNotIncludedWhenFlagIsFalse() async throws {
-        let model = MockLanguageModel()
-
-        let session = LanguageModelSession(
-            model: model,
-            tools: [CalculatorTool()],
-            instructions: "You are a helpful assistant."
-        )
-
-        _ = try await session.respond(to: "Calculate 2+2")
-
-        let content = try extractInstructionsContent(from: model)
-
-        // Tool listed with markdown header
-        #expect(content.contains("## Calculator"))
-        #expect(content.contains("Perform mathematical calculations"))
-
-        // Schema NOT included
-        #expect(!content.contains("```json"))
-        #expect(!content.contains("\"expression\""))
-    }
-
-    @Test("Multiple tools are correctly formatted in instructions")
-    func multipleToolsInInstructions() async throws {
+    @Test("Multiple tools all appear in toolDefinitions without polluting segments")
+    func multipleToolsInToolDefinitions() async throws {
         let model = MockLanguageModel()
 
         let session = LanguageModelSession(
@@ -175,21 +145,19 @@ struct ToolSchemaInInstructionsTests {
 
         _ = try await session.respond(to: "Test")
 
-        let content = try extractInstructionsContent(from: model)
+        let instructions = try extractInstructionsEntry(from: model)
 
-        // Both tools listed with markdown headers
-        #expect(content.contains("## Weather"))
-        #expect(content.contains("## Calculator"))
+        #expect(instructions.toolDefinitions.count == 2)
+        let names = instructions.toolDefinitions.map(\.name)
+        #expect(names.contains("Weather"))
+        #expect(names.contains("Calculator"))
 
-        // Weather has schema
-        #expect(content.contains("\"city\""))
-
-        // Calculator does not have schema
-        #expect(!content.contains("\"expression\""))
+        let text = segmentsText(instructions)
+        #expect(text == "You are a helpful assistant.")
     }
 
-    @Test("No tools section when no tools are provided")
-    func noToolsSectionWhenNoTools() async throws {
+    @Test("No toolDefinitions when no tools are provided")
+    func noToolDefinitionsWhenNoTools() async throws {
         let model = MockLanguageModel()
 
         let session = LanguageModelSession(
@@ -200,12 +168,9 @@ struct ToolSchemaInInstructionsTests {
 
         _ = try await session.respond(to: "Test")
 
-        let content = try extractInstructionsContent(from: model)
+        let instructions = try extractInstructionsEntry(from: model)
 
-        // Only base text
-        #expect(content == "You are a helpful assistant.")
-
-        // No tool preamble
-        #expect(!content.contains("In this environment you have access to a set of tools"))
+        #expect(instructions.toolDefinitions.isEmpty)
+        #expect(segmentsText(instructions) == "You are a helpful assistant.")
     }
 }
