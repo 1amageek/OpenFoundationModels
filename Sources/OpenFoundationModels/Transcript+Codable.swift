@@ -357,18 +357,47 @@ private struct GenerationOptionsCoding: Codable {
 
     private enum CodingKeys: String, CodingKey {
         case temperature, maximumResponseTokens
+        case topP, topK, minP
+        case repetitionPenalty, presencePenalty, frequencyPenalty
+        case repetitionContextSize
     }
 
     let temperature: Double?
     let maximumResponseTokens: Int?
+    let topP: Double?
+    let topK: Int?
+    let minP: Double?
+    let repetitionPenalty: Double?
+    let presencePenalty: Double?
+    let frequencyPenalty: Double?
+    let repetitionContextSize: Int?
 
     init(_ options: GenerationOptions) {
         temperature = options.temperature
         maximumResponseTokens = options.maximumResponseTokens
+        topP = options.topP
+        topK = options.topK
+        minP = options.minP
+        repetitionPenalty = options.repetitionPenalty
+        presencePenalty = options.presencePenalty
+        frequencyPenalty = options.frequencyPenalty
+        repetitionContextSize = options.repetitionContextSize
     }
 
     func toGenerationOptions() throws -> GenerationOptions {
-        GenerationOptions(temperature: temperature, maximumResponseTokens: maximumResponseTokens)
+        GenerationOptions(
+            temperature: temperature,
+            maximumResponseTokens: maximumResponseTokens,
+            extensions: GenerationOptions.Extensions(
+                topP: topP,
+                topK: topK,
+                minP: minP,
+                repetitionPenalty: repetitionPenalty,
+                presencePenalty: presencePenalty,
+                frequencyPenalty: frequencyPenalty,
+                repetitionContextSize: repetitionContextSize
+            )
+        )
     }
 }
 
